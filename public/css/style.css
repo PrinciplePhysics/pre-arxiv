@@ -319,6 +319,17 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 .badge-audited   { background: var(--ok-bg);   color: var(--ok);   border-color: var(--ok-rule); }
 .badge-unaudited { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-rule); }
 .badge-agent     { background: #e9eef7;        color: #2c4a78;     border-color: #b9c5db; }
+.badge-withdrawn { background: #f0ece2;        color: #5a5a5a;     border-color: #c9c2af; }
+
+.ms-row-withdrawn .ms-title { text-decoration: line-through; color: var(--muted); }
+.ms-row-withdrawn .ms-authors,
+.ms-row-withdrawn .conductor-pair,
+.ms-row-withdrawn .conductor-pair em,
+.ms-row-withdrawn .conductor-pair strong { color: var(--muted); font-style: italic; }
+.ms-row-withdrawn .ms-arxivid,
+.ms-row-withdrawn .ms-cat,
+.ms-row-withdrawn .ms-cat-name { opacity: 0.7; }
+.withdrawn-score { color: var(--muted); font-style: italic; }
 
 .empty {
   padding: 40px 20px;

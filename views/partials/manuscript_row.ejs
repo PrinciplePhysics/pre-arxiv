@@ -5,9 +5,10 @@
   const _aiDisp    = (m.conductor_ai_model_public !== 0 || _canSeeFull) ? m.conductor_ai_model : '(undisclosed)';
   const _humanDisp = (m.conductor_human_public    !== 0 || _canSeeFull) ? m.conductor_human    : '(undisclosed)';
 %>
-<li class="ms-row" id="m<%= m.id %>">
+<li class="ms-row <%= m.withdrawn ? 'ms-row-withdrawn' : '' %>" id="m<%= m.id %>">
   <div class="ms-rank"><%= typeof rank !== 'undefined' ? rank + '.' : '' %></div>
   <div class="ms-vote">
+    <% if (!m.withdrawn) { %>
     <form action="/vote/manuscript/<%= m.id %>" method="post" class="vote-form">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input type="hidden" name="value" value="1">
@@ -19,26 +20,33 @@
       <input type="hidden" name="value" value="-1">
       <button type="submit" class="vote-btn vote-dn <%= myVote === -1 ? 'voted' : '' %>" title="downvote" aria-label="downvote">▼</button>
     </form>
+    <% } else { %>
+    <div class="vote-score withdrawn-score" title="withdrawn">—</div>
+    <% } %>
   </div>
   <div class="ms-body">
     <div class="ms-title-line">
       <a class="ms-title" href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>"><%= escapeHtml(m.title) %></a>
       <span class="ms-arxivid">[<%= m.arxiv_like_id %>]</span>
-      <% if (m.pdf_path) { %><a class="ms-pdf" href="<%= m.pdf_path %>" target="_blank" rel="noopener">[PDF]</a><% } %>
-      <% if (m.external_url) { %><a class="ms-pdf" href="<%= m.external_url %>" target="_blank" rel="nofollow noopener">[link]</a><% } %>
+      <% if (!m.withdrawn && m.pdf_path) { %><a class="ms-pdf" href="<%= m.pdf_path %>" target="_blank" rel="noopener">[PDF]</a><% } %>
+      <% if (!m.withdrawn && m.external_url) { %><a class="ms-pdf" href="<%= m.external_url %>" target="_blank" rel="nofollow noopener">[link]</a><% } %>
     </div>
     <div class="ms-meta">
       <span class="ms-authors"><%= escapeHtml(m.authors) %></span>
       <span class="dot">·</span>
       <a class="ms-cat" href="/browse/<%= encodeURIComponent(m.category) %>"><%= m.category %></a>
       <span class="ms-cat-name muted">(<%= cat.name %>)</span>
-      <% if (m.conductor_type === 'ai-agent') { %>
-        <span class="badge badge-agent" title="Produced autonomously by an AI agent — no human conductor">⚙ AI-agent</span>
-      <% } %>
-      <% if (m.has_auditor) { %>
-        <span class="badge badge-audited" title="An auditor has signed off">✓ audited · <%= escapeHtml(m.auditor_name) %></span>
+      <% if (m.withdrawn) { %>
+        <span class="badge badge-withdrawn" title="The submitter (or an admin) withdrew this manuscript">⊘ withdrawn</span>
       <% } else { %>
-        <span class="badge badge-unaudited" title="No auditor — no human is responsible for correctness">⚠ unaudited</span>
+        <% if (m.conductor_type === 'ai-agent') { %>
+          <span class="badge badge-agent" title="Produced autonomously by an AI agent — no human conductor">⚙ AI-agent</span>
+        <% } %>
+        <% if (m.has_auditor) { %>
+          <span class="badge badge-audited" title="An auditor has signed off">✓ audited · <%= escapeHtml(m.auditor_name) %></span>
+        <% } else { %>
+          <span class="badge badge-unaudited" title="No auditor — no human is responsible for correctness">⚠ unaudited</span>
+        <% } %>
       <% } %>
     </div>
     <div class="ms-sub">
