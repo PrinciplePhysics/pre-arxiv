@@ -44,6 +44,9 @@ Environment variables (all optional in development; `SESSION_SECRET` is required
 | `SMTP_USER` / `SMTP_PASS` | unset | SMTP credentials (optional, depends on the relay) |
 | `SMTP_SECURE` | `0` | `1` to force implicit TLS |
 | `MAIL_FROM` | `pre-arxiv <no-reply@pre-arxiv.local>` | From: address for outgoing mail |
+| `ADMIN_USERNAMES` | unset | comma-separated list; matching users are auto-promoted to admin on every server start |
+| `ZENODO_TOKEN` | unset | personal access token from zenodo.org / sandbox.zenodo.org. When set, submissions get real Zenodo DOIs |
+| `ZENODO_USE_PRODUCTION` | `0` | set to `1` to use production Zenodo (permanent DOIs) instead of sandbox |
 
 ## Layout
 
@@ -69,10 +72,15 @@ data/                  SQLite DB (git-ignored)
 - **Search**: SQLite FTS5 over title, abstract, authors, and extracted PDF body, with exact-id and DOI matches surfaced first. Try `/search?q=…`.
 - **Cite**: every manuscript page has a *Cite* button; `/m/:id/cite` shows BibTeX, RIS, and plain-text formats; `/m/:id/cite.bib` and `/m/:id/cite.ris` return the raw files.
 - **Account hygiene**: email verification on register (gates submission); password reset via emailed token; both flows surface the link in-page when no SMTP is configured so the site is usable as a self-hosted demo without mail infra.
+- **Anti-bot**: simple math CAPTCHA on `/register`, regenerated on every failed attempt.
+- **Moderation**: any submitter can withdraw their own manuscript (replaced with a tombstone preserving id + DOI for citation continuity); any logged-in user can flag manuscripts or comments; admins (configured via `ADMIN_USERNAMES` env) get an `/admin` queue and can permanently delete spam. Comment authors can delete their own comments.
+- **Real DOIs (optional)**: if `ZENODO_TOKEN` is set, each new submission is deposited and published on Zenodo (sandbox by default; set `ZENODO_USE_PRODUCTION=1` for permanent DOIs). Without the token, submissions get a synthetic `10.99999/<id>` identifier.
 
 ## What it does not do (yet)
 
-- No moderation tools, no flagging, no withdrawal flow.
-- No CAPTCHA on registration, no IP/account-level abuse heuristics. CSRF protection and per-route rate limits *are* in place; CAPTCHA is the remaining gap before posting the URL anywhere a determined bot will find it.
+- No IP/account-level abuse heuristics beyond rate limits and CAPTCHA.
+- No `nofollow`-style search-engine policies, no robots.txt tuning.
+- No federated identity / SSO. Local accounts only.
+- The Zenodo integration is metadata-only — it doesn't upload the PDF to Zenodo. (Adding `PUT /files/...` before `actions/publish` would, but it shifts the storage burden.)
 
 The site is itself a "manuscript of a website" — written by a human-conductor and an AI co-author and offered without warranty. Issues and pull requests welcome.

@@ -27,6 +27,9 @@
       <a href="/browse"  class="<%= path && path.startsWith('/browse') ? 'on' : '' %>">browse</a>
       <a href="/submit"  class="<%= path === '/submit' ? 'on submit-link' : 'submit-link' %>">submit</a>
       <a href="/about"   class="<%= path === '/about' ? 'on' : '' %>">about</a>
+      <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+      <a href="/admin"   class="<%= path === '/admin' ? 'on admin-link' : 'admin-link' %>">admin</a>
+      <% } %>
     </nav>
     <form class="searchbox" action="/search" method="get">
       <input type="search" name="q" placeholder="search title, author, id…" value="<%= escapeHtml((currentQuery && currentQuery.q) || '') %>">

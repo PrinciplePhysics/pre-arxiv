@@ -25,6 +25,10 @@
     <label><span class="label-text">Affiliation</span>
       <input type="text" name="affiliation" maxlength="200" value="<%= escapeHtml((values && values.affiliation) || '') %>" placeholder="e.g., MIT · Reed College · independent">
     </label>
+    <label><span class="label-text">Anti-bot check <span class="req">*</span></span>
+      <span class="captcha-q">What is <strong><%= captcha.a %> <%= captcha.op %> <%= captcha.b %></strong>?</span>
+      <input type="text" name="captcha" required inputmode="numeric" pattern="-?[0-9]+" maxlength="6" autocomplete="off" style="max-width: 120px">
+    </label>
     <button type="submit" class="btn-primary">create account</button>
   </form>
   <p class="muted small">Already have one? <a href="/login">Log in</a>.</p>

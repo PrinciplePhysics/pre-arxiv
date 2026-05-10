@@ -26,11 +26,23 @@
   <% if (typeof user !== 'undefined' && user) { %>
   <div class="comment-actions">
     <a href="#" class="reply-toggle" data-target="reply-<%= c.id %>">reply</a>
+    <a href="#" class="reply-toggle" data-target="flag-c-<%= c.id %>">flag</a>
+    <% if (c.author_id === user.id || (typeof isAdmin !== 'undefined' && isAdmin)) { %>
+      <form action="/comment/<%= c.id %>/delete" method="post" class="inline-form" onsubmit="return confirm('Delete this comment?')">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="link-button">delete</button>
+      </form>
+    <% } %>
     <form class="reply-form" id="reply-<%= c.id %>" action="/m/<%= manuscriptArxivId %>/comment" method="post" style="display:none">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input type="hidden" name="parent_id" value="<%= c.id %>">
       <textarea name="content" required minlength="2" maxlength="8000" rows="4" placeholder="reply with markdown — math via $…$ supported"></textarea>
       <button type="submit">post reply</button>
+    </form>
+    <form class="reply-form" id="flag-c-<%= c.id %>" action="/flag/comment/<%= c.id %>" method="post" style="display:none">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <textarea name="reason" required minlength="5" maxlength="1000" rows="2" placeholder="reason for flagging this comment"></textarea>
+      <button type="submit">submit flag</button>
     </form>
   </div>
   <% } %>

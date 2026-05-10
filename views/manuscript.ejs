@@ -3,7 +3,14 @@
 
 <article class="manuscript">
 
-  <% if (!m.has_auditor) { %>
+  <% if (m.withdrawn) { %>
+  <div class="tombstone-banner">
+    <strong>Withdrawn.</strong>
+    This manuscript was withdrawn <%= timeAgo(m.withdrawn_at) %>.
+    <% if (m.withdrawn_reason) { %><span class="tombstone-reason">Reason: <%= escapeHtml(m.withdrawn_reason) %></span><% } %>
+    The contents below are kept for citation continuity; the work no longer reflects the conductor's current view.
+  </div>
+  <% } else if (!m.has_auditor) { %>
   <div class="warn-banner">
     <strong>Unaudited manuscript.</strong>
     The submitter has explicitly stated that they are <em>not</em> responsible for the correctness of this work.
@@ -55,6 +62,39 @@
       <span class="score-pill" title="net score"><%= m.score %> pts</span>
     </div>
   </div>
+
+  <% if (typeof user !== 'undefined' && user) { %>
+  <div class="ms-mod-bar">
+    <% if (!m.withdrawn && (m.submitter_id === user.id || isAdmin)) { %>
+      <details class="mod-action">
+        <summary>Withdraw…</summary>
+        <form action="/m/<%= m.arxiv_like_id %>/withdraw" method="post" class="mod-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <textarea name="reason" maxlength="500" rows="2" placeholder="Reason (optional but encouraged) — visible on the tombstone."></textarea>
+          <button type="submit" class="btn-secondary">withdraw manuscript</button>
+        </form>
+      </details>
+    <% } %>
+    <% if (isAdmin) { %>
+      <details class="mod-action">
+        <summary class="danger">Delete (admin)…</summary>
+        <form action="/m/<%= m.arxiv_like_id %>/delete" method="post" class="mod-form" onsubmit="return confirm('Permanently delete this manuscript? This cannot be undone.')">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <p class="muted small">Permanent. Use only for spam, abuse, or duplicate posts. Prefer withdrawal for normal cleanup.</p>
+          <button type="submit" class="btn-secondary danger">delete permanently</button>
+        </form>
+      </details>
+    <% } %>
+    <details class="mod-action">
+      <summary>Flag…</summary>
+      <form action="/flag/manuscript/<%= m.id %>" method="post" class="mod-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <textarea name="reason" minlength="5" maxlength="1000" rows="2" required placeholder="Why is this off? (spam, false-auditor, plagiarism, abusive, etc.)"></textarea>
+        <button type="submit" class="btn-secondary">submit flag</button>
+      </form>
+    </details>
+  </div>
+  <% } %>
 
   <section class="ms-section">
     <h2 class="ms-section-h">Abstract</h2>

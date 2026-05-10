@@ -889,6 +889,108 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   font-size: 11px;
 }
 
+/* ─── moderation UI ──────────────────────────────────────────────────────── */
+
+.tombstone-banner {
+  background: #f0ece2;
+  border: 1px solid #c9c2af;
+  color: #4a4a4a;
+  border-radius: 4px;
+  padding: 12px 14px;
+  margin: -8px -8px 18px;
+  font-size: 13.5px;
+}
+.tombstone-reason { display: block; margin-top: 4px; font-style: italic; }
+
+.ms-mod-bar {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: -10px 0 18px;
+  font-size: 13px;
+}
+.mod-action summary {
+  cursor: pointer;
+  color: var(--muted);
+  user-select: none;
+}
+.mod-action summary.danger { color: #b03b3b; }
+.mod-action summary:hover { color: var(--brand); }
+.mod-form {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-top: 6px;
+  max-width: 460px;
+}
+.mod-form textarea {
+  width: 100%;
+  padding: 6px 8px;
+  font-family: var(--sans);
+  font-size: 13px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  resize: vertical;
+}
+.mod-form button { margin-top: 6px; }
+.btn-secondary.danger { color: #a03030; border-color: #d8a4a4; }
+.btn-secondary.danger:hover { background: #f8eaea; }
+
+.admin-link { background: rgba(0,0,0,0.18); color: #ffe0c8 !important; }
+
+/* ─── flag queue ─────────────────────────────────────────────────────────── */
+
+.flag-list { list-style: none; padding: 0; margin: 0; }
+.flag-row {
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+.flag-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.flag-type-pill {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--rule);
+  font-family: var(--mono);
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 3px;
+  color: var(--ink-soft);
+}
+.flag-target { font-weight: 600; }
+.flag-reason {
+  margin: 6px 0;
+  padding: 6px 10px;
+  background: var(--warn-bg);
+  border-left: 3px solid var(--warn-rule);
+  font-size: 13.5px;
+  border-radius: 0 3px 3px 0;
+}
+.flag-comment-preview {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--rule-strong);
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: var(--bg-card-alt);
+}
+.flag-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; align-items: center; }
+.inline-form { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+.inline-form input[type=text] {
+  font-size: 12px; padding: 3px 6px; border: 1px solid var(--rule-strong); border-radius: 3px;
+}
+.link-button {
+  background: none; border: none; padding: 0;
+  color: var(--muted); cursor: pointer;
+  font-family: inherit; font-size: 12px;
+  text-decoration: underline;
+}
+.link-button:hover { color: #a03030; }
+
+/* ─── captcha question ──────────────────────────────────────────────────── */
+
+.captcha-q { display: block; margin-bottom: 6px; }
+
 /* ─── small touches ──────────────────────────────────────────────────────── */
 
 ::selection { background: var(--brand-bg); color: var(--brand); }

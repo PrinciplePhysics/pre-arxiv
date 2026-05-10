@@ -13,6 +13,7 @@ const { hashPassword, verifyPassword, loadUser, requireAuth, validateUsername } 
 const { timeAgo, escapeHtml, rankScore, makeArxivLikeId, renderMarkdown, ageHours, paginate } = require('./lib/util');
 const { sendMail, absoluteUrl, enabled: emailEnabled } = require('./lib/email');
 const { renderBibtex, renderRis, renderPlain } = require('./lib/citation');
+const zenodo = require('./lib/zenodo');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 3000;
@@ -73,6 +74,16 @@ app.use(session({
 }));
 
 app.use(loadUser);
+
+// ─── expose admin status for templates ──────────────────────────────────────
+app.use((req, res, next) => {
+  res.locals.isAdmin = false;
+  if (req.user) {
+    const row = db.prepare('SELECT is_admin FROM users WHERE id = ?').get(req.user.id);
+    res.locals.isAdmin = !!(row && row.is_admin);
+  }
+  next();
+});
 
 // ─── CSRF (hand-rolled double-submit using session token) ───────────────────
 function csrfTokenFor(req) {
@@ -375,7 +386,7 @@ app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
   }
 
   const arxivId = makeArxivLikeId();
-  const doi     = makeSyntheticDoi(arxivId);
+  let   doi     = makeSyntheticDoi(arxivId); // may be replaced by Zenodo below
   const pdf_path = req.file ? '/uploads/' + path.basename(req.file.path) : null;
 
   // Best-effort PDF text extraction. Synchronous-ish (we await once before insert).
@@ -403,6 +414,27 @@ app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
   // self-upvote
   db.prepare("INSERT INTO votes (user_id, target_type, target_id, value) VALUES (?, 'manuscript', ?, 1)")
     .run(req.user.id, r.lastInsertRowid);
+
+  // Best-effort Zenodo deposition. If ZENODO_TOKEN is set we replace the
+  // synthetic DOI with the real one from Zenodo. Failures are logged and
+  // tolerated — the manuscript stays posted with the synthetic id.
+  if (zenodo.enabled) {
+    const base = (process.env.APP_URL || '').replace(/\/+$/, '') ||
+      ((req.get('x-forwarded-proto') || (req.secure ? 'https' : 'http')) + '://' + req.get('host'));
+    // Build the manuscript object the helper expects.
+    const mForZenodo = {
+      arxiv_like_id: arxivId, title: v.title, abstract: v.abstract,
+      authors: v.authors, category: v.category,
+      conductor_human: v.conductor_human, conductor_ai_model: v.conductor_ai_model,
+      has_auditor: v.has_auditor, auditor_name: v.auditor_name,
+    };
+    zenodo.depositAndPublish(mForZenodo, base).then(zr => {
+      if (zr.ok && zr.doi) {
+        db.prepare('UPDATE manuscripts SET doi = ? WHERE id = ?').run(zr.doi, r.lastInsertRowid);
+        console.log(`[zenodo] minted ${zr.doi} (${zr.sandbox ? 'sandbox' : 'production'}) for ${arxivId}`);
+      }
+    }).catch(() => {});
+  }
 
   flash(req, 'ok', 'Manuscript posted as ' + arxivId + '.');
   res.redirect('/m/' + arxivId);
@@ -530,9 +562,27 @@ app.post('/login', authLimiter, (req, res) => {
   res.redirect(next);
 });
 
+// ─── CAPTCHA (simple math) ──────────────────────────────────────────────────
+function freshCaptcha(req) {
+  const a = 1 + Math.floor(Math.random() * 9);
+  const b = 1 + Math.floor(Math.random() * 9);
+  const op = Math.random() < 0.5 ? '+' : (a >= b ? '-' : '+');
+  const answer = op === '+' ? a + b : a - b;
+  req.session.captcha = { a, b, op, answer, issuedAt: Date.now() };
+  return req.session.captcha;
+}
+function verifyCaptcha(req) {
+  const c = req.session.captcha;
+  if (!c) return false;
+  if (Date.now() - c.issuedAt > 1000 * 60 * 30) return false; // 30 min validity
+  const guess = parseInt((req.body.captcha || '').trim(), 10);
+  return Number.isFinite(guess) && guess === c.answer;
+}
+
 app.get('/register', (req, res) => {
   if (req.user) return res.redirect('/');
-  res.render('register', { values: {}, errors: [] });
+  const captcha = freshCaptcha(req);
+  res.render('register', { values: {}, errors: [], captcha });
 });
 
 app.post('/register', authLimiter, async (req, res) => {
@@ -546,12 +596,17 @@ app.post('/register', authLimiter, async (req, res) => {
   if (uErr) errors.push(uErr);
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) errors.push('A valid email is required.');
   if (!password || password.length < 8) errors.push('Password must be ≥ 8 characters.');
+  if (!verifyCaptcha(req)) errors.push('CAPTCHA answer is incorrect.');
   if (!errors.length) {
     const dup = db.prepare('SELECT 1 FROM users WHERE username = ? OR email = ?').get(username, email);
     if (dup) errors.push('That username or email is already in use.');
   }
   if (errors.length) {
-    return res.render('register', { values: { username, email, display_name, affiliation }, errors });
+    return res.render('register', {
+      values: { username, email, display_name, affiliation },
+      errors,
+      captcha: freshCaptcha(req),
+    });
   }
   const verifyToken = crypto.randomBytes(24).toString('base64url');
   const verifyExpires = Date.now() + 1000 * 60 * 60 * 24 * 3; // 3 days
@@ -700,6 +755,104 @@ app.get('/u/:username', (req, res) => {
   `).all(u.display_name || '', u.username);
   const auditedCount = db.prepare(`SELECT COUNT(*) AS n FROM manuscripts WHERE auditor_name LIKE ? OR auditor_name = ?`).get(`%${u.display_name || u.username}%`, u.username).n;
   res.render('user', { profile: u, submissions, conductedAs, auditedCount });
+});
+
+// ─── routes: moderation (withdraw / delete / flag / admin queue) ───────────
+function isAdmin(user) { return !!(user && db.prepare('SELECT is_admin FROM users WHERE id = ?').get(user.id)?.is_admin); }
+function requireAdmin(req, res, next) {
+  if (!req.user) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+  if (!isAdmin(req.user)) return res.status(403).render('error', { code: 403, msg: 'Admin only.' });
+  next();
+}
+
+app.post('/m/:id/withdraw', requireAuth, (req, res) => {
+  const m = db.prepare('SELECT id, submitter_id FROM manuscripts WHERE arxiv_like_id = ? OR id = ?').get(req.params.id, req.params.id);
+  if (!m) return res.status(404).render('error', { code: 404, msg: 'Manuscript not found.' });
+  const allowed = (m.submitter_id === req.user.id) || isAdmin(req.user);
+  if (!allowed) return res.status(403).render('error', { code: 403, msg: 'You can only withdraw your own manuscripts.' });
+  const reason = (req.body.reason || '').trim().slice(0, 500) || 'No reason given.';
+  db.prepare(`UPDATE manuscripts SET withdrawn = 1, withdrawn_reason = ?, withdrawn_at = CURRENT_TIMESTAMP WHERE id = ?`)
+    .run(reason, m.id);
+  flash(req, 'ok', 'Manuscript withdrawn. The page now shows a tombstone.');
+  res.redirect('/m/' + req.params.id);
+});
+
+app.post('/m/:id/delete', requireAdmin, (req, res) => {
+  const m = db.prepare('SELECT id, pdf_path FROM manuscripts WHERE arxiv_like_id = ? OR id = ?').get(req.params.id, req.params.id);
+  if (!m) return res.status(404).render('error', { code: 404, msg: 'Manuscript not found.' });
+  // best-effort PDF cleanup
+  if (m.pdf_path) {
+    const p = path.join(__dirname, 'public', m.pdf_path.replace(/^\//, ''));
+    fs.unlink(p, () => {});
+  }
+  db.prepare('DELETE FROM manuscripts WHERE id = ?').run(m.id);
+  flash(req, 'ok', 'Manuscript deleted.');
+  res.redirect('/');
+});
+
+app.post('/comment/:id/delete', requireAuth, (req, res) => {
+  const c = db.prepare('SELECT c.id, c.author_id, c.manuscript_id, m.arxiv_like_id FROM comments c JOIN manuscripts m ON m.id = c.manuscript_id WHERE c.id = ?').get(req.params.id);
+  if (!c) return res.status(404).render('error', { code: 404, msg: 'Comment not found.' });
+  const allowed = (c.author_id === req.user.id) || isAdmin(req.user);
+  if (!allowed) return res.status(403).render('error', { code: 403, msg: 'You can only delete your own comments.' });
+  db.prepare('DELETE FROM comments WHERE id = ?').run(c.id);
+  db.prepare('UPDATE manuscripts SET comment_count = (SELECT COUNT(*) FROM comments WHERE manuscript_id = ?) WHERE id = ?').run(c.manuscript_id, c.manuscript_id);
+  res.redirect('/m/' + c.arxiv_like_id);
+});
+
+app.post('/flag/:type/:id', requireAuth, (req, res) => {
+  const type = req.params.type;
+  if (type !== 'manuscript' && type !== 'comment') return res.status(400).render('error', { code: 400, msg: 'Bad flag target.' });
+  const targetId = parseInt(req.params.id, 10);
+  if (!targetId) return res.status(400).render('error', { code: 400, msg: 'Bad target id.' });
+  const reason = (req.body.reason || '').trim().slice(0, 1000);
+  if (!reason || reason.length < 5) {
+    flash(req, 'error', 'Please give a brief reason for the flag (≥ 5 characters).');
+    return res.redirect(req.get('Referer') || '/');
+  }
+  try {
+    db.prepare('INSERT INTO flag_reports (target_type, target_id, reporter_id, reason) VALUES (?, ?, ?, ?)')
+      .run(type, targetId, req.user.id, reason);
+    flash(req, 'ok', 'Thanks — flagged for review.');
+  } catch (e) {
+    if (/UNIQUE/.test(e.message)) {
+      flash(req, 'ok', 'You have already flagged this. The moderators will see it.');
+    } else throw e;
+  }
+  res.redirect(req.get('Referer') || '/');
+});
+
+app.get('/admin', requireAdmin, (req, res) => {
+  const flags = db.prepare(`
+    SELECT f.*, u.username AS reporter_username
+    FROM flag_reports f JOIN users u ON u.id = f.reporter_id
+    WHERE f.resolved = 0
+    ORDER BY f.created_at DESC LIMIT 200
+  `).all();
+  // hydrate target data
+  const enriched = flags.map(f => {
+    if (f.target_type === 'manuscript') {
+      const m = db.prepare('SELECT id, arxiv_like_id, title, withdrawn FROM manuscripts WHERE id = ?').get(f.target_id);
+      return { ...f, target: m, targetUrl: m ? '/m/' + m.arxiv_like_id : null };
+    } else {
+      const c = db.prepare(`
+        SELECT c.id, c.content, c.author_id, m.arxiv_like_id, u.username AS author_username
+        FROM comments c JOIN manuscripts m ON m.id = c.manuscript_id
+        JOIN users u ON u.id = c.author_id
+        WHERE c.id = ?
+      `).get(f.target_id);
+      return { ...f, target: c, targetUrl: c ? '/m/' + c.arxiv_like_id + '#c' + c.id : null };
+    }
+  });
+  res.render('admin', { flags: enriched });
+});
+
+app.post('/admin/flag/:id/resolve', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const note = (req.body.note || '').trim().slice(0, 500);
+  db.prepare(`UPDATE flag_reports SET resolved = 1, resolved_by_id = ?, resolved_at = CURRENT_TIMESTAMP, resolution_note = ? WHERE id = ?`)
+    .run(req.user.id, note || null, id);
+  res.redirect('/admin');
 });
 
 // ─── routes: citation export ────────────────────────────────────────────────

@@ -1,0 +1,67 @@
+<% const pageTitle = 'admin · flag queue' %>
+<%- include('partials/header', { pageTitle }) %>
+
+<div class="page-header">
+  <h1>Flag queue</h1>
+  <p class="muted">Open reports from users. Resolve when handled — the flag stays in the DB but drops out of this list.</p>
+</div>
+
+<% if (!flags.length) { %>
+  <p class="muted">No open flags. Nice.</p>
+<% } else { %>
+<ul class="flag-list">
+  <% for (const f of flags) { %>
+  <li class="flag-row">
+    <div class="flag-head">
+      <span class="flag-type-pill"><%= f.target_type %></span>
+      <% if (f.target && f.targetUrl) { %>
+        <a href="<%= f.targetUrl %>" class="flag-target">
+          <% if (f.target_type === 'manuscript') { %>
+            <%= escapeHtml(f.target.title || '(no title)') %>
+            <span class="muted small">[<%= f.target.arxiv_like_id %>]</span>
+            <% if (f.target.withdrawn) { %><span class="badge badge-unaudited">withdrawn</span><% } %>
+          <% } else { %>
+            comment by <%= escapeHtml(f.target.author_username) %> on <span class="muted small"><%= f.target.arxiv_like_id %></span>
+          <% } %>
+        </a>
+      <% } else { %>
+        <span class="muted">(target deleted)</span>
+      <% } %>
+      <span class="flag-when muted small">flagged <%= timeAgo(f.created_at) %> by <a href="/u/<%= escapeHtml(f.reporter_username) %>"><%= escapeHtml(f.reporter_username) %></a></span>
+    </div>
+    <div class="flag-reason"><%= escapeHtml(f.reason) %></div>
+    <% if (f.target_type === 'comment' && f.target) { %>
+    <blockquote class="flag-comment-preview"><%- renderMarkdown((f.target.content || '').slice(0, 800)) %></blockquote>
+    <% } %>
+    <div class="flag-actions">
+      <form action="/admin/flag/<%= f.id %>/resolve" method="post" class="inline-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="text" name="note" maxlength="500" placeholder="resolution note (optional)">
+        <button type="submit" class="btn-secondary">mark resolved</button>
+      </form>
+      <% if (f.target_type === 'manuscript' && f.target && !f.target.withdrawn) { %>
+      <form action="/m/<%= f.target.arxiv_like_id %>/withdraw" method="post" class="inline-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="reason" value="Withdrawn after community flag review.">
+        <button type="submit" class="btn-secondary">withdraw</button>
+      </form>
+      <% } %>
+      <% if (f.target_type === 'comment' && f.target) { %>
+      <form action="/comment/<%= f.target.id %>/delete" method="post" class="inline-form" onsubmit="return confirm('Delete this comment? Cannot be undone.')">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="btn-secondary danger">delete comment</button>
+      </form>
+      <% } %>
+      <% if (f.target_type === 'manuscript' && f.target) { %>
+      <form action="/m/<%= f.target.arxiv_like_id %>/delete" method="post" class="inline-form" onsubmit="return confirm('Delete this manuscript permanently? Cannot be undone.')">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="btn-secondary danger">delete</button>
+      </form>
+      <% } %>
+    </div>
+  </li>
+  <% } %>
+</ul>
+<% } %>
+
+<%- include('partials/footer') %>

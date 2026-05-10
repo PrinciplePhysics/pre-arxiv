@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
   affiliation            TEXT,
   bio                    TEXT,
   karma                  INTEGER DEFAULT 0,
+  is_admin               INTEGER NOT NULL DEFAULT 0,
   email_verified         INTEGER NOT NULL DEFAULT 0,
   email_verify_token     TEXT,
   email_verify_expires   INTEGER,
@@ -54,6 +55,10 @@ CREATE TABLE IF NOT EXISTS manuscripts (
   view_count         INTEGER DEFAULT 0,
   score              INTEGER DEFAULT 0,
   comment_count      INTEGER DEFAULT 0,
+
+  withdrawn          INTEGER NOT NULL DEFAULT 0,
+  withdrawn_reason   TEXT,
+  withdrawn_at       DATETIME,
 
   created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -93,6 +98,21 @@ CREATE TABLE IF NOT EXISTS audit_endorsements (
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(manuscript_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS flag_reports (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_type     TEXT NOT NULL CHECK(target_type IN ('manuscript','comment')),
+  target_id       INTEGER NOT NULL,
+  reporter_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason          TEXT NOT NULL,
+  resolved        INTEGER NOT NULL DEFAULT 0,
+  resolved_by_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  resolved_at     DATETIME,
+  resolution_note TEXT,
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(target_type, target_id, reporter_id)
+);
+CREATE INDEX IF NOT EXISTS idx_flags_unresolved ON flag_reports(resolved, created_at DESC);
 `);
 
 // ─── lightweight migrations for databases created on earlier schemas ────────
@@ -104,8 +124,21 @@ safeAlter(`ALTER TABLE users ADD COLUMN email_verify_token     TEXT`);
 safeAlter(`ALTER TABLE users ADD COLUMN email_verify_expires   INTEGER`);
 safeAlter(`ALTER TABLE users ADD COLUMN password_reset_token   TEXT`);
 safeAlter(`ALTER TABLE users ADD COLUMN password_reset_expires INTEGER`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN doi      TEXT`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN pdf_text TEXT`);
+safeAlter(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN doi              TEXT`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN pdf_text         TEXT`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn        INTEGER NOT NULL DEFAULT 0`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn_reason TEXT`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn_at     DATETIME`);
+
+// ─── promote configured admins ──────────────────────────────────────────────
+const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+if (ADMIN_USERNAMES.length) {
+  for (const u of ADMIN_USERNAMES) {
+    db.prepare('UPDATE users SET is_admin = 1 WHERE username = ?').run(u);
+  }
+}
 
 // ─── FTS5 over manuscripts (title + abstract + authors + pdf body) ──────────
 db.exec(`
