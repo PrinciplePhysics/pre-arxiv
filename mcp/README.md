@@ -101,7 +101,7 @@ Read tools (no auth required):
 |---|---|
 | `prexiv_search`          | full-text search over title, abstract, authors, and PDF body |
 | `prexiv_browse`          | list manuscripts by mode (`ranked`, `new`, `top`, `audited`) and category |
-| `prexiv_get`             | fetch one manuscript by `prexiv.YYMM.NNNNN` id or numeric id |
+| `prexiv_get`             | fetch one manuscript by `prexiv:YYMM.NNNNN` id or numeric id |
 | `prexiv_get_comments`    | fetch the discussion thread for a manuscript |
 | `prexiv_list_categories` | list `{ id, name }` pairs of valid categories |
 
@@ -137,6 +137,6 @@ comment, vote, or withdraw its own work.
   failure.
 - `external_url` is required on submission because MCP cannot stream a PDF
   upload — link to a hosted preprint, GitHub release, or similar.
-- Manuscript ids may be either the human-readable `prexiv.YYMM.NNNNN` form or
-  the numeric primary key; both work for `prexiv_get`, `prexiv_edit`,
-  `prexiv_withdraw`, etc.
+- Manuscript ids may be either the human-readable `prexiv:YYMM.NNNNN` form
+  (arXiv-style colon separator) or the numeric primary key; both work for
+  `prexiv_get`, `prexiv_edit`, `prexiv_withdraw`, etc.

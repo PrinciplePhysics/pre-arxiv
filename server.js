@@ -698,7 +698,32 @@ app.post('/vote/:type/:id', voteLimiter, requireAuth, (req, res) => {
   if (req.headers.accept && req.headers.accept.includes('application/json')) {
     return res.json({ score: newScore, myVote });
   }
-  res.redirect(req.get('Referer') || '/');
+  // Compute the right destination from the target itself — Referer is
+  // unreliable (Referrer-Policy can strip it) and the previous fallback to
+  // "/" sent the user to the homepage on every vote.
+  let dest = '/';
+  if (type === 'manuscript') {
+    const m = db.prepare('SELECT arxiv_like_id FROM manuscripts WHERE id = ?').get(id);
+    if (m) dest = '/m/' + encodeURIComponent(m.arxiv_like_id);
+  } else {
+    const row = db.prepare(`
+      SELECT m.arxiv_like_id FROM comments c
+      JOIN manuscripts m ON m.id = c.manuscript_id
+      WHERE c.id = ?
+    `).get(id);
+    if (row) dest = '/m/' + encodeURIComponent(row.arxiv_like_id) + '#c' + id;
+  }
+  // Honor Referer ONLY if it's same-origin and points at the same manuscript;
+  // otherwise use the canonical URL we just computed.
+  const ref = req.get('Referer');
+  if (ref) {
+    try {
+      const u = new URL(ref);
+      const sameOrigin = u.host === req.get('host');
+      if (sameOrigin && u.pathname.startsWith('/m/')) dest = u.pathname + u.search + u.hash;
+    } catch { /* fall through to computed dest */ }
+  }
+  res.redirect(dest);
 });
 
 // ─── routes: auth ───────────────────────────────────────────────────────────
@@ -969,10 +994,24 @@ app.post('/flag/:type/:id', requireAuth, (req, res) => {
   if (type !== 'manuscript' && type !== 'comment') return res.status(400).render('error', { code: 400, msg: 'Bad flag target.' });
   const targetId = parseInt(req.params.id, 10);
   if (!targetId) return res.status(400).render('error', { code: 400, msg: 'Bad target id.' });
+  // Compute a sensible destination from the target itself; Referer is
+  // unreliable under modern Referrer-Policy defaults.
+  let dest = '/';
+  if (type === 'manuscript') {
+    const m = db.prepare('SELECT arxiv_like_id FROM manuscripts WHERE id = ?').get(targetId);
+    if (m) dest = '/m/' + encodeURIComponent(m.arxiv_like_id);
+  } else {
+    const row = db.prepare(`
+      SELECT m.arxiv_like_id FROM comments c
+      JOIN manuscripts m ON m.id = c.manuscript_id
+      WHERE c.id = ?
+    `).get(targetId);
+    if (row) dest = '/m/' + encodeURIComponent(row.arxiv_like_id) + '#c' + targetId;
+  }
   const reason = (req.body.reason || '').trim().slice(0, 1000);
   if (!reason || reason.length < 5) {
     flash(req, 'error', 'Please give a brief reason for the flag (≥ 5 characters).');
-    return res.redirect(req.get('Referer') || '/');
+    return res.redirect(dest);
   }
   try {
     db.prepare('INSERT INTO flag_reports (target_type, target_id, reporter_id, reason) VALUES (?, ?, ?, ?)')
@@ -983,7 +1022,7 @@ app.post('/flag/:type/:id', requireAuth, (req, res) => {
       flash(req, 'ok', 'You have already flagged this. The moderators will see it.');
     } else throw e;
   }
-  res.redirect(req.get('Referer') || '/');
+  res.redirect(dest);
 });
 
 app.get('/admin', requireAdmin, (req, res) => {
@@ -1068,7 +1107,17 @@ app.get('/me/tokens', requireAuth, (req, res) => {
   ).all(req.user.id);
   const justCreated = req.session.justCreatedToken || null;
   delete req.session.justCreatedToken;
-  res.render('me_tokens', { tokens, justCreated });
+
+  // Compute the public base URL the agent should call. Honors APP_URL,
+  // otherwise reflects the request's own origin so a curl example here
+  // works whether you're hitting localhost, victoria's tunnel, or anywhere
+  // else.
+  const proto  = req.get('x-forwarded-proto') || (req.secure ? 'https' : 'http');
+  const host   = req.get('host');
+  const origin = (process.env.APP_URL || '').replace(/\/+$/, '') || (proto + '://' + host);
+  const apiBase = origin + '/api/v1';
+
+  res.render('me_tokens', { tokens, justCreated, origin, apiBase });
 });
 
 app.post('/me/tokens', requireAuth, (req, res) => {

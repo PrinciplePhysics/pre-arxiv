@@ -184,7 +184,7 @@ const TOOLS = [
   {
     name: 'prexiv_search',
     description:
-      'Full-text search across PreXiv manuscripts (title, abstract, authors, and extracted PDF body). Exact `prexiv.YYMM.NNNNN` ids and DOIs match first. Returns a list of manuscript summaries.',
+      'Full-text search across PreXiv manuscripts (title, abstract, authors, and extracted PDF body). Exact `prexiv:YYMM.NNNNN` ids and DOIs match first. Returns a list of manuscript summaries.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -227,11 +227,11 @@ const TOOLS = [
   {
     name: 'prexiv_get',
     description:
-      'Fetch a single manuscript by id. The id may be either the human-readable form `prexiv.YYMM.NNNNN` or the numeric primary key. Returns the full record including conductor / auditor metadata, score, comment count, and external URL.',
+      'Fetch a single manuscript by id. The id may be either the human-readable form `prexiv:YYMM.NNNNN` or the numeric primary key. Returns the full record including conductor / auditor metadata, score, comment count, and external URL.',
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: '`prexiv.YYMM.NNNNN` id or numeric id of the manuscript.' },
+        id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript.' },
       },
       required: ['id'],
       additionalProperties: false,
@@ -245,7 +245,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: '`prexiv.YYMM.NNNNN` id or numeric id of the manuscript.' },
+        id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript.' },
       },
       required: ['id'],
       additionalProperties: false,
@@ -277,7 +277,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: '`prexiv.YYMM.NNNNN` id or numeric id of the manuscript to update.' },
+        id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript to update.' },
         ...manuscriptFieldsSchema({ allRequired: false }).properties,
       },
       required: ['id'],
@@ -294,7 +294,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: '`prexiv.YYMM.NNNNN` id or numeric id of the manuscript.' },
+        id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript.' },
         reason: { type: 'string', description: 'Optional public-facing reason shown on the tombstone.' },
       },
       required: ['id'],
@@ -316,7 +316,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        manuscript_id: { type: 'string', description: '`prexiv.YYMM.NNNNN` id or numeric id of the manuscript being commented on.' },
+        manuscript_id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript being commented on.' },
         content: { type: 'string', minLength: 1, description: 'Comment body. Markdown + LaTeX allowed.' },
         parent_id: { type: 'integer', description: 'Optional id of an existing comment to reply to.' },
       },
@@ -345,7 +345,7 @@ const TOOLS = [
         target_type: { type: 'string', enum: ['manuscript', 'comment'], description: 'What you are voting on.' },
         target_id: {
           oneOf: [{ type: 'integer' }, { type: 'string' }],
-          description: 'For comments: the numeric comment id. For manuscripts: numeric id or `prexiv.YYMM.NNNNN`.',
+          description: 'For comments: the numeric comment id. For manuscripts: numeric id or `prexiv:YYMM.NNNNN`.',
         },
         value: { type: 'integer', enum: [1, -1], description: '1 to upvote, -1 to downvote.' },
       },
@@ -371,7 +371,7 @@ const TOOLS = [
         target_type: { type: 'string', enum: ['manuscript', 'comment'], description: 'What you are flagging.' },
         target_id: {
           oneOf: [{ type: 'integer' }, { type: 'string' }],
-          description: 'For comments: numeric id. For manuscripts: numeric id or `prexiv.YYMM.NNNNN`.',
+          description: 'For comments: numeric id. For manuscripts: numeric id or `prexiv:YYMM.NNNNN`.',
         },
         reason: { type: 'string', minLength: 1, description: 'Why the content needs moderator attention.' },
       },
@@ -420,7 +420,7 @@ function buildServer() {
         'PreXiv is a community archive for AI-authored manuscripts. ' +
         'Read tools (search/browse/get/comments/categories) work without auth. ' +
         'Write tools (submit/edit/withdraw/comment/vote/flag/delete-comment) require PREXIV_TOKEN. ' +
-        'Manuscript ids may be either numeric or the human-readable form `prexiv.YYMM.NNNNN`. ' +
+        'Manuscript ids may be either numeric or the human-readable form `prexiv:YYMM.NNNNN`. ' +
         'For categories see prexiv_list_categories.',
     },
   );
