@@ -1,0 +1,23 @@
+<% const pageTitle = q ? 'search · ' + q : 'search' %>
+<%- include('partials/header', { pageTitle }) %>
+
+<div class="page-header">
+  <h1>Search</h1>
+  <form action="/search" method="get" class="search-page-form">
+    <input type="search" name="q" value="<%= escapeHtml(q || '') %>" placeholder="title, author, id, abstract…" autofocus>
+    <button type="submit" class="btn-primary">search</button>
+  </form>
+</div>
+
+<% if (q && manuscripts.length === 0) { %>
+  <p class="muted">No results for <strong><%= escapeHtml(q) %></strong>.</p>
+<% } else if (manuscripts.length) { %>
+  <p class="muted small"><%= manuscripts.length %> result<%= manuscripts.length === 1 ? '' : 's' %> for <strong><%= escapeHtml(q) %></strong></p>
+  <ol class="ms-list">
+    <% for (let i = 0; i < manuscripts.length; i++) { const m = manuscripts[i]; %>
+      <%- include('partials/manuscript_row', { m, rank: i + 1, voteMap, CATEGORIES, escapeHtml, timeAgo }) %>
+    <% } %>
+  </ol>
+<% } %>
+
+<%- include('partials/footer') %>

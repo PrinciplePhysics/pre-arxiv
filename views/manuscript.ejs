@@ -1,0 +1,123 @@
+<% const pageTitle = m.title %>
+<%- include('partials/header', { pageTitle }) %>
+
+<article class="manuscript">
+
+  <% if (!m.has_auditor) { %>
+  <div class="warn-banner">
+    <strong>Unaudited manuscript.</strong>
+    The submitter has explicitly stated that they are <em>not</em> responsible for the correctness of this work.
+    No human expert has signed off on the contents. Treat the result with appropriate skepticism.
+  </div>
+  <% } else { %>
+  <div class="audit-banner">
+    <strong>Audited.</strong>
+    <%= escapeHtml(m.auditor_name) %><% if (m.auditor_affiliation) { %> (<%= escapeHtml(m.auditor_affiliation) %>)<% } %>
+    has read the manuscript and provided a signed correctness statement (see below).
+    Audit endorses what was reviewed; it is not a guarantee.
+  </div>
+  <% } %>
+
+  <header class="ms-header">
+    <div class="ms-id-row">
+      <span class="ms-arxivid-big"><%= m.arxiv_like_id %></span>
+      <a class="ms-cat-pill" href="/browse/<%= encodeURIComponent(m.category) %>"><%= m.category %></a>
+      <% const _cat = CATEGORIES.find(c => c.id === m.category); if (_cat) { %><span class="muted"><%= _cat.name %></span><% } %>
+      <span class="muted">·</span>
+      <span class="muted">submitted <%= timeAgo(m.created_at) %></span>
+      <span class="muted">·</span>
+      <span class="muted"><%= m.view_count %> views</span>
+    </div>
+    <h1 class="ms-h1"><%= escapeHtml(m.title) %></h1>
+    <div class="ms-authors-line"><%= escapeHtml(m.authors) %></div>
+  </header>
+
+  <div class="ms-actions-bar">
+    <div class="ms-actions-left">
+      <% if (m.pdf_path) { %><a class="btn-primary" href="<%= m.pdf_path %>" target="_blank" rel="noopener">Download PDF</a><% } %>
+      <% if (m.external_url) { %><a class="btn-secondary" href="<%= m.external_url %>" target="_blank" rel="nofollow noopener">External link ↗</a><% } %>
+    </div>
+    <div class="ms-actions-right">
+      <% if (typeof user !== 'undefined' && user) { %>
+      <form action="/vote/manuscript/<%= m.id %>" method="post" class="inline-vote-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="value" value="1">
+        <button type="submit" class="vote-pill <%= myMsVote === 1 ? 'voted' : '' %>">▲ upvote</button>
+      </form>
+      <form action="/vote/manuscript/<%= m.id %>" method="post" class="inline-vote-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="value" value="-1">
+        <button type="submit" class="vote-pill <%= myMsVote === -1 ? 'voted' : '' %>">▼ downvote</button>
+      </form>
+      <% } %>
+      <span class="score-pill" title="net score"><%= m.score %> pts</span>
+    </div>
+  </div>
+
+  <section class="ms-section">
+    <h2 class="ms-section-h">Abstract</h2>
+    <p class="ms-abstract"><%= escapeHtml(m.abstract) %></p>
+  </section>
+
+  <section class="ms-section ms-conductor">
+    <h2 class="ms-section-h">Conductor</h2>
+    <p class="muted small">The conductor is the pair (human, AI) responsible for producing the manuscript.</p>
+    <table class="kv">
+      <tr><th>Human conductor</th><td><strong><%= escapeHtml(m.conductor_human) %></strong> · <span class="role-tag"><%= escapeHtml(m.conductor_role) %></span></td></tr>
+      <tr><th>AI co-author</th><td><%= escapeHtml(m.conductor_ai_model) %></td></tr>
+      <tr><th>Submitted by</th><td><a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a><% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %></td></tr>
+      <% if (m.conductor_notes) { %>
+      <tr><th>Notes</th><td><%- renderMarkdown(m.conductor_notes) %></td></tr>
+      <% } %>
+    </table>
+  </section>
+
+  <section class="ms-section ms-auditor">
+    <h2 class="ms-section-h">Auditor</h2>
+    <% if (m.has_auditor) { %>
+      <table class="kv">
+        <tr><th>Auditor</th><td><strong><%= escapeHtml(m.auditor_name) %></strong> · <span class="role-tag"><%= escapeHtml(m.auditor_role) %></span></td></tr>
+        <% if (m.auditor_affiliation) { %><tr><th>Affiliation</th><td><%= escapeHtml(m.auditor_affiliation) %></td></tr><% } %>
+        <tr><th>Statement</th><td class="auditor-statement"><%= escapeHtml(m.auditor_statement) %></td></tr>
+      </table>
+    <% } else { %>
+      <div class="no-auditor">
+        <p><strong>No auditor.</strong> The submitter elected not to designate a human auditor and has acknowledged that they are <em>not</em> responsible for the correctness of this work.</p>
+        <p class="muted small">If you are a domain expert and have read the manuscript, you may comment with a signed correctness opinion below — those carry no formal status, but readers find them useful.</p>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="ms-section" id="comments">
+    <h2 class="ms-section-h">Discussion <span class="muted small">(<%= allComments.length %>)</span></h2>
+
+    <% if (typeof user !== 'undefined' && user) { %>
+    <form action="/m/<%= m.arxiv_like_id %>/comment" method="post" class="comment-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <textarea name="content" required minlength="2" maxlength="8000" rows="5" placeholder="markdown supported · math: $E = mc^2$ or $$\\nabla \\cdot E = \\rho/\\varepsilon_0$$"></textarea>
+      <div class="comment-form-actions">
+        <span class="muted small">Be specific. Cite line numbers. Disagree productively.</span>
+        <button type="submit" class="btn-primary">post comment</button>
+      </div>
+    </form>
+    <% } else { %>
+    <div class="login-cta">
+      <a href="/login?next=<%= encodeURIComponent('/m/' + m.arxiv_like_id) %>">login</a> or
+      <a href="/register">register</a> to comment.
+    </div>
+    <% } %>
+
+    <% if (comments.length === 0) { %>
+      <p class="muted">No comments yet. Be the first.</p>
+    <% } else { %>
+      <ul class="comments">
+        <% for (const c of comments) { %>
+          <%- include('partials/comment', { c, cVoteMap, manuscriptArxivId: m.arxiv_like_id, user: typeof user !== 'undefined' ? user : null, escapeHtml, timeAgo, renderMarkdown }) %>
+        <% } %>
+      </ul>
+    <% } %>
+  </section>
+
+</article>
+
+<%- include('partials/footer') %>

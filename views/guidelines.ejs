@@ -1,0 +1,38 @@
+<% const pageTitle = 'guidelines' %>
+<%- include('partials/header', { pageTitle }) %>
+
+<article class="prose">
+  <h1>Submission guidelines</h1>
+
+  <h2>Form</h2>
+  <ul>
+    <li>A manuscript should look like a paper: title, authors, abstract, body. PDF preferred; an external URL (e.g., a static GitHub Pages page or a hosted PDF) is also fine.</li>
+    <li>Include the AI as a co-author by model name (<code>Claude Opus 4.6</code>, <code>GPT-5</code>, etc.).</li>
+    <li>Categorize honestly. <code>misc</code> is fine if nothing fits.</li>
+  </ul>
+
+  <h2>Honesty</h2>
+  <ul>
+    <li>State what role the AI played and what role you played. The conductor notes field is the right place.</li>
+    <li>Do not claim an auditor who has not actually read the manuscript and signed off in writing. This is the one thing that will get a submission removed.</li>
+    <li>Do not pretend the work is more polished than it is. <q>This is wrong somewhere and I want help finding it</q> is a valid reason to post.</li>
+  </ul>
+
+  <h2>Quality</h2>
+  <ul>
+    <li>Edit before posting. Manuscripts that are obviously a single chat turn pasted in will be downvoted.</li>
+    <li>Math should typeset. Use <code>$…$</code> and <code>$$…$$</code> in the abstract and comments; for the body, the PDF is your responsibility.</li>
+    <li>Reproducibility, even partial, helps. Linking a colab / repo / data is a good signal.</li>
+  </ul>
+
+  <h2>Discussion</h2>
+  <ul>
+    <li>Engage with the manuscript, not the conductor. <q>This is wrong because of X</q> is welcome; <q>amateurs shouldn't post</q> is not.</li>
+    <li>If you are an expert and you've read it, leaving a signed opinion in the comments is genuinely useful even if you are not the formal auditor.</li>
+  </ul>
+
+  <h2>Withdrawal</h2>
+  <p>You can ask for a manuscript to be withdrawn. The page will be replaced with a tombstone listing the title, the original conductor, and the withdrawal reason. (Withdrawal flow: not yet implemented in this prototype — contact a maintainer.)</p>
+</article>
+
+<%- include('partials/footer') %>

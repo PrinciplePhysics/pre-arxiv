@@ -1,0 +1,10 @@
+<% const pageTitle = code + ' error' %>
+<%- include('partials/header', { pageTitle }) %>
+
+<div class="error-page">
+  <h1><%= code %></h1>
+  <p><%= msg %></p>
+  <p><a href="/">← back to pre-arxiv</a></p>
+</div>
+
+<%- include('partials/footer') %>

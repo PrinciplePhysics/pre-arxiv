@@ -1,0 +1,45 @@
+<% const pageTitle = 'about' %>
+<%- include('partials/header', { pageTitle }) %>
+
+<article class="prose">
+  <h1>About pre-arxiv</h1>
+  <p class="lede">pre-arxiv is a community archive for manuscripts that were largely written by an AI under the guidance of a human, and that have not yet passed the kind of rigorous human audit that would make them appropriate for arXiv.</p>
+
+  <h2>Why this exists</h2>
+  <p>Frontier AI systems can now produce manuscript-shaped artifacts — derivations, write-ups, conjectures, code-and-experiment reports — that look like research papers and sometimes are. But in 2026 most of those artifacts shouldn't go on arXiv: they haven't been read line by line by a competent human, and the standards for posting there are (rightly) calibrated to a different mode of production.</p>
+  <p>So the work piles up in private chats, scratchpads, and forgotten gists. Useful work is lost; clearly wrong work is not corrected; and there is no public, citable, comment-able place for the genre.</p>
+  <p>pre-arxiv is that place.</p>
+
+  <h2>The two roles</h2>
+  <table class="role-table">
+    <tr>
+      <th>Conductor</th>
+      <td>The (human, AI) pair that produced the manuscript. The human conductor takes responsibility for <em>directing</em> the work — for the questions asked, the prompts given, the edits made. The conductor does <em>not</em> automatically take responsibility for correctness.</td>
+    </tr>
+    <tr>
+      <th>Auditor</th>
+      <td>Optional. A named human expert who has read the manuscript and is willing to attach their professional reputation to a written correctness statement. Audits are not formal peer review; they are a public, signed opinion.</td>
+    </tr>
+  </table>
+
+  <h2>What submission means</h2>
+  <ul>
+    <li>If you submit <strong>with an auditor</strong>: the auditor's name and statement are displayed prominently. The audit is binding to whatever the auditor wrote in their statement — no more, no less.</li>
+    <li>If you submit <strong>without an auditor</strong>: a large <q>unaudited</q> warning appears on the manuscript page, and you must explicitly acknowledge that you are not responsible for the correctness of the work. You are still responsible for having conducted it (i.e., for not posting spam, not posting plagiarism, not falsely claiming an auditor).</li>
+  </ul>
+
+  <h2>What pre-arxiv is not</h2>
+  <ul>
+    <li>It is not arXiv. Don't post here things that should go on arXiv.</li>
+    <li>It is not a venue of record. Nothing here is peer reviewed.</li>
+    <li>It is not a chatbot transcript dump. Submissions should be manuscript-shaped: title, authors, abstract, a body that reads like a paper.</li>
+  </ul>
+
+  <h2>Comments</h2>
+  <p>Discussion happens on every manuscript page. The expected register is technical: cite line numbers, be specific, bring evidence. Karma accumulates from upvotes on your manuscripts and comments. There is no special status for any account; readers calibrate from stated role and affiliation.</p>
+
+  <h2>Site code</h2>
+  <p>pre-arxiv is itself a manuscript-of-a-website: the code was conducted by a human and an AI, and is offered without warranty. <a href="/guidelines">Read the guidelines</a> before submitting.</p>
+</article>
+
+<%- include('partials/footer') %>

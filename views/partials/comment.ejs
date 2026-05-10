@@ -1,0 +1,44 @@
+<%
+  const myVote = (typeof cVoteMap !== 'undefined' && cVoteMap[c.id]) ? cVoteMap[c.id] : 0;
+%>
+<li class="comment" id="c<%= c.id %>">
+  <div class="comment-head">
+    <div class="cvote">
+      <form action="/vote/comment/<%= c.id %>" method="post" class="vote-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="value" value="1">
+        <button type="submit" class="vote-btn vote-up <%= myVote === 1 ? 'voted' : '' %>" aria-label="upvote">▲</button>
+      </form>
+      <span class="cvote-score"><%= c.score %></span>
+      <form action="/vote/comment/<%= c.id %>" method="post" class="vote-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="value" value="-1">
+        <button type="submit" class="vote-btn vote-dn <%= myVote === -1 ? 'voted' : '' %>" aria-label="downvote">▼</button>
+      </form>
+    </div>
+    <div class="comment-byline">
+      <a href="/u/<%= escapeHtml(c.username) %>" class="comment-author"><%= escapeHtml(c.username) %></a>
+      <span class="muted"><%= timeAgo(c.created_at) %></span>
+      <a class="comment-permalink muted" href="#c<%= c.id %>">#</a>
+    </div>
+  </div>
+  <div class="comment-body"><%- renderMarkdown(c.content) %></div>
+  <% if (typeof user !== 'undefined' && user) { %>
+  <div class="comment-actions">
+    <a href="#" class="reply-toggle" data-target="reply-<%= c.id %>">reply</a>
+    <form class="reply-form" id="reply-<%= c.id %>" action="/m/<%= manuscriptArxivId %>/comment" method="post" style="display:none">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="parent_id" value="<%= c.id %>">
+      <textarea name="content" required minlength="2" maxlength="8000" rows="4" placeholder="reply with markdown — math via $…$ supported"></textarea>
+      <button type="submit">post reply</button>
+    </form>
+  </div>
+  <% } %>
+  <% if (c.children && c.children.length) { %>
+    <ul class="comment-children">
+      <% for (const child of c.children) { %>
+        <%- include('comment', { c: child, cVoteMap, manuscriptArxivId, user, escapeHtml, timeAgo, renderMarkdown }) %>
+      <% } %>
+    </ul>
+  <% } %>
+</li>

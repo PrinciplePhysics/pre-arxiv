@@ -1,0 +1,161 @@
+<% const pageTitle = 'submit' %>
+<%- include('partials/header', { pageTitle }) %>
+
+<div class="page-header">
+  <h1>Submit a manuscript</h1>
+  <p class="muted">A manuscript on pre-arxiv is a piece of work in which an AI was a substantial co-author. The <strong>conductor</strong> is the human who guided the AI to write it; the <strong>auditor</strong> (optional) is a human expert who has verified its correctness.</p>
+</div>
+
+<% if (errors && errors.length) { %>
+<div class="form-errors">
+  <strong>Please fix the following:</strong>
+  <ul><% for (const e of errors) { %><li><%= e %></li><% } %></ul>
+</div>
+<% } %>
+
+<form action="/submit" method="post" enctype="multipart/form-data" class="submit-form">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <section class="form-section">
+    <h2>1 — The manuscript</h2>
+
+    <label>
+      <span class="label-text">Title <span class="req">*</span></span>
+      <input type="text" name="title" required maxlength="300" value="<%= escapeHtml(values.title || '') %>" placeholder="A descriptive title — like an arxiv title">
+    </label>
+
+    <label>
+      <span class="label-text">Authors line <span class="req">*</span></span>
+      <input type="text" name="authors" required maxlength="500" value="<%= escapeHtml(values.authors || '') %>" placeholder="e.g., Jane Doe; Claude Opus 4.6">
+      <span class="hint">Separate authors with semicolons. List the AI as a co-author by its model name.</span>
+    </label>
+
+    <label>
+      <span class="label-text">Category <span class="req">*</span></span>
+      <select name="category" required>
+        <option value="">— select —</option>
+        <% for (const c of CATEGORIES) { %>
+          <option value="<%= c.id %>" <%= values.category === c.id ? 'selected' : '' %>><%= c.id %> — <%= c.name %></option>
+        <% } %>
+      </select>
+    </label>
+
+    <label>
+      <span class="label-text">Abstract <span class="req">*</span></span>
+      <textarea name="abstract" required minlength="50" maxlength="5000" rows="8" placeholder="The abstract. State what the manuscript claims, what role the AI played, and what (if anything) you have verified by hand."><%= escapeHtml(values.abstract || '') %></textarea>
+      <span class="hint">~50–500 words. Plain text. Math via $…$ / $$…$$ will render in the manuscript view.</span>
+    </label>
+
+    <div class="row-fields">
+      <label class="grow">
+        <span class="label-text">Upload PDF</span>
+        <input type="file" name="pdf" accept="application/pdf">
+        <span class="hint">Optional if you provide an external URL. Max 30 MB.</span>
+      </label>
+      <label class="grow">
+        <span class="label-text">External URL</span>
+        <input type="url" name="external_url" maxlength="500" value="<%= escapeHtml(values.external_url || '') %>" placeholder="https://… (e.g., GitHub repo or hosted PDF)">
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h2>2 — Conductor <span class="muted">(required)</span></h2>
+    <p class="muted small">Who is responsible for the conduct of the AI here? The conductor signs off that they directed the work, even if not its correctness.</p>
+
+    <div class="row-fields">
+      <label class="grow">
+        <span class="label-text">AI model <span class="req">*</span></span>
+        <input type="text" name="conductor_ai_model" required maxlength="200" value="<%= escapeHtml(values.conductor_ai_model || '') %>" placeholder="e.g., Claude Opus 4.6, GPT-5, Gemini 3 Pro">
+      </label>
+      <label class="grow">
+        <span class="label-text">Human conductor <span class="req">*</span></span>
+        <input type="text" name="conductor_human" required maxlength="200" value="<%= escapeHtml(values.conductor_human || '') %>" placeholder="full name — usually you">
+      </label>
+    </div>
+
+    <label>
+      <span class="label-text">Conductor role <span class="req">*</span></span>
+      <select name="conductor_role" required>
+        <option value="">— select —</option>
+        <% for (const r of ROLES) { %>
+          <option value="<%= r %>" <%= values.conductor_role === r ? 'selected' : '' %>><%= r %></option>
+        <% } %>
+      </select>
+      <span class="hint">From undergraduate to professional expert — readers use this to calibrate.</span>
+    </label>
+
+    <label>
+      <span class="label-text">Conductor notes <span class="muted">(optional)</span></span>
+      <textarea name="conductor_notes" maxlength="3000" rows="4" placeholder="How was the work produced? How much was your contribution vs. the AI's? Anything a reader should know about how to read this?"><%= escapeHtml(values.conductor_notes || '') %></textarea>
+    </label>
+  </section>
+
+  <section class="form-section">
+    <h2>3 — Auditor <span class="muted">(optional)</span></h2>
+    <p class="muted small">An auditor is a named human expert who has read the manuscript and is willing to put their name on a correctness statement. Listing one is <em>strongly encouraged</em>.</p>
+
+    <label class="checkbox">
+      <input type="checkbox" name="has_auditor" id="has_auditor" <%= values.has_auditor ? 'checked' : '' %>>
+      <span>This manuscript has a human auditor</span>
+    </label>
+
+    <div class="auditor-fields" id="auditor-fields" style="<%= values.has_auditor ? '' : 'display:none' %>">
+      <div class="row-fields">
+        <label class="grow">
+          <span class="label-text">Auditor name <span class="req">*</span></span>
+          <input type="text" name="auditor_name" maxlength="200" value="<%= escapeHtml(values.auditor_name || '') %>">
+        </label>
+        <label class="grow">
+          <span class="label-text">Affiliation</span>
+          <input type="text" name="auditor_affiliation" maxlength="200" value="<%= escapeHtml(values.auditor_affiliation || '') %>" placeholder="e.g., MIT, IAS, none">
+        </label>
+      </div>
+      <label>
+        <span class="label-text">Auditor role <span class="req">*</span></span>
+        <select name="auditor_role">
+          <option value="">— select —</option>
+          <% for (const r of ROLES) { %>
+            <option value="<%= r %>" <%= values.auditor_role === r ? 'selected' : '' %>><%= r %></option>
+          <% } %>
+        </select>
+      </label>
+      <label>
+        <span class="label-text">Audit statement <span class="req">*</span></span>
+        <textarea name="auditor_statement" minlength="20" maxlength="3000" rows="5" placeholder="A few sentences. What did the auditor verify? What did they NOT verify? Are there caveats?"><%= escapeHtml(values.auditor_statement || '') %></textarea>
+        <span class="hint">Quote the auditor's own words if possible. The auditor accepts professional reputational responsibility for what they assert here.</span>
+      </label>
+    </div>
+
+    <div class="no-auditor-block" id="no-auditor-block" style="<%= values.has_auditor ? 'display:none' : '' %>">
+      <label class="checkbox checkbox-warn">
+        <input type="checkbox" name="no_auditor_ack" <%= values.no_auditor_ack ? 'checked' : '' %>>
+        <span>
+          I understand and acknowledge that <strong>without an auditor I am NOT responsible for the correctness of this manuscript.</strong>
+          The work is offered to the community for inspection and discussion in its current form.
+          A prominent <em>“unaudited”</em> warning will be displayed on the manuscript page.
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <div class="form-submit">
+    <button type="submit" class="btn-primary big">Post manuscript</button>
+    <span class="muted small">By submitting you confirm the work was conducted by you (and the AI you named).</span>
+  </div>
+</form>
+
+<script>
+  (function () {
+    const cb = document.getElementById('has_auditor');
+    const af = document.getElementById('auditor-fields');
+    const nb = document.getElementById('no-auditor-block');
+    function sync() {
+      af.style.display = cb.checked ? '' : 'none';
+      nb.style.display = cb.checked ? 'none' : '';
+    }
+    cb.addEventListener('change', sync);
+  })();
+</script>
+
+<%- include('partials/footer') %>

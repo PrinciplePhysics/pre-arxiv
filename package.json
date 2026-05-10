@@ -1,0 +1,26 @@
+{
+  "name": "pre-arxiv",
+  "version": "0.1.0",
+  "description": "pre-arxiv — a repository for AI-authored, human-conducted manuscripts that have not yet passed rigorous peer audit",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node seed.js",
+    "reset": "rm -f data/prearxiv.db && node seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.5.0",
+    "connect-sqlite3": "^0.9.15",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.5.1",
+    "express-session": "^1.18.1",
+    "helmet": "^8.1.0",
+    "marked": "^14.1.4",
+    "multer": "^2.1.1",
+    "sanitize-html": "^2.13.1"
+  }
+}

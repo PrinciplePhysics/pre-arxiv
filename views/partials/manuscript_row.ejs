@@ -1,0 +1,48 @@
+<%
+  const myVote = voteMap && voteMap[m.id] ? voteMap[m.id] : 0;
+  const cat = CATEGORIES.find(c => c.id === m.category) || { name: m.category };
+%>
+<li class="ms-row" id="m<%= m.id %>">
+  <div class="ms-rank"><%= typeof rank !== 'undefined' ? rank + '.' : '' %></div>
+  <div class="ms-vote">
+    <form action="/vote/manuscript/<%= m.id %>" method="post" class="vote-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="value" value="1">
+      <button type="submit" class="vote-btn vote-up <%= myVote === 1 ? 'voted' : '' %>" title="upvote" aria-label="upvote">▲</button>
+    </form>
+    <div class="vote-score" data-score="<%= m.score %>"><%= m.score %></div>
+    <form action="/vote/manuscript/<%= m.id %>" method="post" class="vote-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="value" value="-1">
+      <button type="submit" class="vote-btn vote-dn <%= myVote === -1 ? 'voted' : '' %>" title="downvote" aria-label="downvote">▼</button>
+    </form>
+  </div>
+  <div class="ms-body">
+    <div class="ms-title-line">
+      <a class="ms-title" href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>"><%= escapeHtml(m.title) %></a>
+      <span class="ms-arxivid">[<%= m.arxiv_like_id %>]</span>
+      <% if (m.pdf_path) { %><a class="ms-pdf" href="<%= m.pdf_path %>" target="_blank" rel="noopener">[PDF]</a><% } %>
+      <% if (m.external_url) { %><a class="ms-pdf" href="<%= m.external_url %>" target="_blank" rel="nofollow noopener">[link]</a><% } %>
+    </div>
+    <div class="ms-meta">
+      <span class="ms-authors"><%= escapeHtml(m.authors) %></span>
+      <span class="dot">·</span>
+      <a class="ms-cat" href="/browse/<%= encodeURIComponent(m.category) %>"><%= m.category %></a>
+      <span class="ms-cat-name muted">(<%= cat.name %>)</span>
+      <% if (m.has_auditor) { %>
+        <span class="badge badge-audited" title="An auditor has signed off">✓ audited · <%= escapeHtml(m.auditor_name) %></span>
+      <% } else { %>
+        <span class="badge badge-unaudited" title="No auditor — submitter is not responsible for correctness">⚠ unaudited</span>
+      <% } %>
+    </div>
+    <div class="ms-sub">
+      <span class="muted">submitted <%= timeAgo(m.created_at) %> by</span>
+      <a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a>
+      <span class="dot">·</span>
+      <span class="muted">conducted by</span>
+      <span class="conductor-pair"><strong><%= escapeHtml(m.conductor_human) %></strong> + <em><%= escapeHtml(m.conductor_ai_model) %></em></span>
+      <span class="dot">·</span>
+      <a href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>#comments"><%= m.comment_count %> comment<%= m.comment_count === 1 ? '' : 's' %></a>
+    </div>
+  </div>
+</li>
