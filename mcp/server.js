@@ -196,7 +196,7 @@ const TOOLS = [
     },
     handler: async ({ q, limit }) => {
       const data = await apiCall('GET', `/search?q=${encodeURIComponent(q)}`);
-      const results = Array.isArray(data) ? data : (data?.results || data?.manuscripts || []);
+      const results = Array.isArray(data) ? data : (data?.items || data?.results || data?.manuscripts || []);
       return typeof limit === 'number' ? results.slice(0, limit) : results;
     },
   },
