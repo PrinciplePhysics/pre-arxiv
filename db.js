@@ -272,6 +272,17 @@ db.exec(`
   WHERE  doi IS NULL AND arxiv_like_id IS NOT NULL;
 `);
 
+// Rename legacy 'pa.' id prefix to 'prexiv.' to match the brand. Idempotent —
+// only matches rows that still have the old prefix.
+db.exec(`
+  UPDATE manuscripts
+  SET arxiv_like_id = 'prexiv.' || SUBSTR(arxiv_like_id, 4)
+  WHERE arxiv_like_id LIKE 'pa.%';
+  UPDATE manuscripts
+  SET doi = '10.99999/PREXIV.' || SUBSTR(doi, LENGTH('10.99999/PA.') + 1)
+  WHERE doi LIKE '10.99999/PA.%';
+`);
+
 // Backfill FTS for any manuscripts that pre-date the FTS table. We use
 // FTS5's built-in 'rebuild' command so the doclist matches the live row
 // values exactly — a manual delete-all + reinsert can leave the index in a
