@@ -41,10 +41,14 @@ CREATE TABLE IF NOT EXISTS manuscripts (
   pdf_text           TEXT,
   external_url       TEXT,
 
+  -- 'human-ai' (named human conductor + AI co-author) or 'ai-agent' (AI alone, autonomous)
+  conductor_type     TEXT NOT NULL DEFAULT 'human-ai'
+                     CHECK (conductor_type IN ('human-ai', 'ai-agent')),
   conductor_ai_model TEXT NOT NULL,
-  conductor_human    TEXT NOT NULL,
-  conductor_role     TEXT NOT NULL,
+  conductor_human    TEXT,           -- required only when conductor_type='human-ai'
+  conductor_role     TEXT,           -- required only when conductor_type='human-ai'
   conductor_notes    TEXT,
+  agent_framework    TEXT,           -- optional; only meaningful for conductor_type='ai-agent'
 
   has_auditor        INTEGER NOT NULL DEFAULT 0,
   auditor_name       TEXT,
@@ -130,6 +134,99 @@ safeAlter(`ALTER TABLE manuscripts ADD COLUMN pdf_text         TEXT`);
 safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn        INTEGER NOT NULL DEFAULT 0`);
 safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn_reason TEXT`);
 safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn_at     DATETIME`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN conductor_type   TEXT NOT NULL DEFAULT 'human-ai'`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN agent_framework  TEXT`);
+
+// ─── relax NOT NULL on conductor_human / conductor_role ──────────────────────
+// Old schema had both as NOT NULL. AI-agent manuscripts have neither, so we
+// rebuild the table without those constraints (idempotent — only fires when
+// the running DB still has the legacy NOT NULL).
+function relaxConductorNotNullIfNeeded() {
+  const cols = db.prepare(`PRAGMA table_info(manuscripts)`).all();
+  const ch = cols.find(c => c.name === 'conductor_human');
+  const cr = cols.find(c => c.name === 'conductor_role');
+  if (!ch || !cr) return;
+  if (ch.notnull !== 1 && cr.notnull !== 1) return; // already relaxed
+
+  console.log('[migrate] rebuilding manuscripts table to allow AI-agent (no human conductor) submissions…');
+
+  const colNames = cols.map(c => c.name);
+  const selectList = colNames.join(', ');
+
+  db.exec(`
+    PRAGMA foreign_keys = OFF;
+    BEGIN;
+    DROP TRIGGER IF EXISTS manuscripts_ai;
+    DROP TRIGGER IF EXISTS manuscripts_ad;
+    DROP TRIGGER IF EXISTS manuscripts_au;
+
+    CREATE TABLE manuscripts_new (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      arxiv_like_id      TEXT UNIQUE,
+      doi                TEXT UNIQUE,
+      submitter_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title              TEXT NOT NULL,
+      abstract           TEXT NOT NULL,
+      authors            TEXT NOT NULL,
+      category           TEXT NOT NULL,
+      pdf_path           TEXT,
+      pdf_text           TEXT,
+      external_url       TEXT,
+      conductor_type     TEXT NOT NULL DEFAULT 'human-ai'
+                         CHECK (conductor_type IN ('human-ai', 'ai-agent')),
+      conductor_ai_model TEXT NOT NULL,
+      conductor_human    TEXT,
+      conductor_role     TEXT,
+      conductor_notes    TEXT,
+      agent_framework    TEXT,
+      has_auditor        INTEGER NOT NULL DEFAULT 0,
+      auditor_name       TEXT,
+      auditor_affiliation TEXT,
+      auditor_role       TEXT,
+      auditor_statement  TEXT,
+      view_count         INTEGER DEFAULT 0,
+      score              INTEGER DEFAULT 0,
+      comment_count      INTEGER DEFAULT 0,
+      withdrawn          INTEGER NOT NULL DEFAULT 0,
+      withdrawn_reason   TEXT,
+      withdrawn_at       DATETIME,
+      created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    INSERT INTO manuscripts_new (${selectList})
+    SELECT ${selectList} FROM manuscripts;
+
+    DROP TABLE manuscripts;
+    ALTER TABLE manuscripts_new RENAME TO manuscripts;
+
+    CREATE INDEX IF NOT EXISTS idx_manuscripts_created ON manuscripts(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_manuscripts_score   ON manuscripts(score DESC);
+    CREATE INDEX IF NOT EXISTS idx_manuscripts_cat     ON manuscripts(category);
+
+    CREATE TRIGGER IF NOT EXISTS manuscripts_ai AFTER INSERT ON manuscripts BEGIN
+      INSERT INTO manuscripts_fts(rowid, title, abstract, authors, pdf_text)
+      VALUES (new.id, new.title, new.abstract, new.authors, COALESCE(new.pdf_text, ''));
+    END;
+    CREATE TRIGGER IF NOT EXISTS manuscripts_ad AFTER DELETE ON manuscripts BEGIN
+      INSERT INTO manuscripts_fts(manuscripts_fts, rowid, title, abstract, authors, pdf_text)
+      VALUES ('delete', old.id, old.title, old.abstract, old.authors, COALESCE(old.pdf_text, ''));
+    END;
+    CREATE TRIGGER IF NOT EXISTS manuscripts_au AFTER UPDATE ON manuscripts BEGIN
+      INSERT INTO manuscripts_fts(manuscripts_fts, rowid, title, abstract, authors, pdf_text)
+      VALUES ('delete', old.id, old.title, old.abstract, old.authors, COALESCE(old.pdf_text, ''));
+      INSERT INTO manuscripts_fts(rowid, title, abstract, authors, pdf_text)
+      VALUES (new.id, new.title, new.abstract, new.authors, COALESCE(new.pdf_text, ''));
+    END;
+
+    COMMIT;
+    PRAGMA foreign_keys = ON;
+  `);
+
+  // FTS now points at the new manuscripts table by row content; rebuild to be safe.
+  db.exec(`INSERT INTO manuscripts_fts(manuscripts_fts) VALUES ('rebuild');`);
+}
+relaxConductorNotNullIfNeeded();
 
 // ─── promote configured admins ──────────────────────────────────────────────
 const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || '')

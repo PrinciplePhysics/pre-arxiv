@@ -339,22 +339,26 @@ app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
   });
 }, csrfCheckParsed, async (req, res) => {
   const errors = [];
+  const ct = (req.body.conductor_type || '').trim();
   const v = {
     title: (req.body.title || '').trim(),
     abstract: (req.body.abstract || '').trim(),
     authors: (req.body.authors || '').trim(),
     category: (req.body.category || '').trim(),
     external_url: (req.body.external_url || '').trim() || null,
+    conductor_type: (ct === 'ai-agent') ? 'ai-agent' : 'human-ai',
     conductor_ai_model: (req.body.conductor_ai_model || '').trim(),
     conductor_human: (req.body.conductor_human || '').trim(),
     conductor_role: (req.body.conductor_role || '').trim(),
     conductor_notes: (req.body.conductor_notes || '').trim() || null,
+    agent_framework: (req.body.agent_framework || '').trim() || null,
     has_auditor: req.body.has_auditor === 'on' || req.body.has_auditor === '1' || req.body.has_auditor === 'true',
     auditor_name: (req.body.auditor_name || '').trim(),
     auditor_affiliation: (req.body.auditor_affiliation || '').trim(),
     auditor_role: (req.body.auditor_role || '').trim(),
     auditor_statement: (req.body.auditor_statement || '').trim(),
     no_auditor_ack: req.body.no_auditor_ack === 'on' || req.body.no_auditor_ack === '1',
+    ai_agent_ack:   req.body.ai_agent_ack   === 'on' || req.body.ai_agent_ack   === '1',
   };
 
   if (!v.title || v.title.length < 5)         errors.push('Title is required (≥ 5 characters).');
@@ -364,15 +368,24 @@ app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
   if (!v.authors)                             errors.push('Authors line is required (e.g., "Jane Doe; Claude Opus 4.6").');
   if (!CATEGORIES.find(c => c.id === v.category)) errors.push('Pick a valid category.');
   if (!v.conductor_ai_model)                  errors.push('Conductor: AI model is required.');
-  if (!v.conductor_human)                     errors.push('Conductor: human name is required.');
-  if (!ROLES.includes(v.conductor_role))      errors.push('Conductor: pick a valid role.');
+
+  if (v.conductor_type === 'human-ai') {
+    if (!v.conductor_human)                   errors.push('Conductor: human conductor name is required.');
+    if (!ROLES.includes(v.conductor_role))    errors.push('Conductor: pick a valid role for the human conductor.');
+  } else {
+    // ai-agent: human/role optional, but the submitter must explicitly attest
+    // that no human was involved beyond pressing the submit button.
+    if (!v.ai_agent_ack) {
+      errors.push('You must acknowledge that this manuscript was produced by an AI agent acting autonomously and that NO human (including you) takes responsibility for its conduct or contents.');
+    }
+  }
 
   if (v.has_auditor) {
     if (!v.auditor_name)                      errors.push('Auditor name is required when an auditor is listed.');
     if (!ROLES.includes(v.auditor_role))      errors.push('Auditor: pick a valid role.');
     if (!v.auditor_statement || v.auditor_statement.length < 20)
       errors.push('Auditor statement is required (≥ 20 characters).');
-  } else if (!v.no_auditor_ack) {
+  } else if (v.conductor_type === 'human-ai' && !v.no_auditor_ack) {
     errors.push('You must acknowledge that without an auditor you are NOT responsible for the correctness of the work, and that this manuscript is unaudited.');
   }
 
@@ -398,13 +411,18 @@ app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
   const r = db.prepare(`
     INSERT INTO manuscripts (
       arxiv_like_id, doi, submitter_id, title, abstract, authors, category, pdf_path, pdf_text, external_url,
-      conductor_ai_model, conductor_human, conductor_role, conductor_notes,
+      conductor_type, conductor_ai_model, conductor_human, conductor_role, conductor_notes, agent_framework,
       has_auditor, auditor_name, auditor_affiliation, auditor_role, auditor_statement,
       score
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
   `).run(
     arxivId, doi, req.user.id, v.title, v.abstract, v.authors, v.category, pdf_path, pdf_text, v.external_url,
-    v.conductor_ai_model, v.conductor_human, v.conductor_role, v.conductor_notes,
+    v.conductor_type,
+    v.conductor_ai_model,
+    v.conductor_type === 'human-ai' ? v.conductor_human : null,
+    v.conductor_type === 'human-ai' ? v.conductor_role  : null,
+    v.conductor_notes,
+    v.conductor_type === 'ai-agent' ? v.agent_framework : null,
     v.has_auditor ? 1 : 0,
     v.has_auditor ? v.auditor_name : null,
     v.has_auditor ? (v.auditor_affiliation || null) : null,
@@ -425,7 +443,9 @@ app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
     const mForZenodo = {
       arxiv_like_id: arxivId, title: v.title, abstract: v.abstract,
       authors: v.authors, category: v.category,
+      conductor_type: v.conductor_type,
       conductor_human: v.conductor_human, conductor_ai_model: v.conductor_ai_model,
+      agent_framework: v.agent_framework,
       has_auditor: v.has_auditor, auditor_name: v.auditor_name,
     };
     zenodo.depositAndPublish(mForZenodo, base).then(zr => {
@@ -620,9 +640,9 @@ app.post('/register', authLimiter, async (req, res) => {
   const verifyLink = absoluteUrl(req, '/verify/' + verifyToken);
   const result = await sendMail({
     to: email,
-    subject: 'Verify your email for pre-arxiv',
+    subject: 'Verify your email for PreXiv',
     text:
-`Welcome to pre-arxiv.
+`Welcome to PreXiv.
 
 Please confirm your email address by visiting:
 
@@ -671,7 +691,7 @@ app.post('/verify/resend', authLimiter, requireAuth, async (req, res) => {
   const link = absoluteUrl(req, '/verify/' + verifyToken);
   const result = await sendMail({
     to: u.email,
-    subject: 'New pre-arxiv verification link',
+    subject: 'New PreXiv verification link',
     text: `Use this link to verify your email:\n\n  ${link}\n\nThis one expires in 3 days.`,
   });
   req.session.lastVerifyLink = result.devMode ? link : null;
@@ -703,7 +723,7 @@ app.post('/forgot', authLimiter, async (req, res) => {
     const link = absoluteUrl(req, '/reset/' + token);
     const result = await sendMail({
       to: email,
-      subject: 'pre-arxiv password reset',
+      subject: 'PreXiv password reset',
       text: `A password reset was requested for this email.\n\nIf it was you, follow this link within 1 hour:\n\n  ${link}\n\nIf it wasn't, ignore this message — nothing has changed.`,
     });
     if (result.devMode) devLink = link;
@@ -906,7 +926,7 @@ app.use((err, req, res, _next) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`pre-arxiv listening on http://localhost:${PORT}`);
+    console.log(`PreXiv listening on http://localhost:${PORT}`);
   });
 }
 

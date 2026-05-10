@@ -10,19 +10,35 @@
     <% if (m.withdrawn_reason) { %><span class="tombstone-reason">Reason: <%= escapeHtml(m.withdrawn_reason) %></span><% } %>
     The contents below are kept for citation continuity; the work no longer reflects the conductor's current view.
   </div>
-  <% } else if (!m.has_auditor) { %>
-  <div class="warn-banner">
-    <strong>Unaudited manuscript.</strong>
-    The submitter has explicitly stated that they are <em>not</em> responsible for the correctness of this work.
-    No human expert has signed off on the contents. Treat the result with appropriate skepticism.
-  </div>
   <% } else { %>
-  <div class="audit-banner">
-    <strong>Audited.</strong>
-    <%= escapeHtml(m.auditor_name) %><% if (m.auditor_affiliation) { %> (<%= escapeHtml(m.auditor_affiliation) %>)<% } %>
-    has read the manuscript and provided a signed correctness statement (see below).
-    Audit endorses what was reviewed; it is not a guarantee.
-  </div>
+
+    <% if (m.conductor_type === 'ai-agent') { %>
+    <div class="agent-banner">
+      <strong>AI agent (autonomous).</strong>
+      This manuscript was produced by <%= escapeHtml(m.conductor_ai_model) %> acting on its own, without ongoing human direction.
+      <% if (!m.has_auditor) { %>
+        <strong>No human</strong> &mdash; including the submitter &mdash; takes responsibility for its conduct or contents.
+      <% } else { %>
+        A human auditor has separately reviewed the contents (see auditor section below); no human directed the production itself.
+      <% } %>
+    </div>
+    <% } %>
+
+    <% if (!m.has_auditor && m.conductor_type !== 'ai-agent') { %>
+    <div class="warn-banner">
+      <strong>Unaudited manuscript.</strong>
+      The submitter has explicitly stated that they are <em>not</em> responsible for the correctness of this work.
+      No human expert has signed off on the contents. Treat the result with appropriate skepticism.
+    </div>
+    <% } else if (m.has_auditor) { %>
+    <div class="audit-banner">
+      <strong>Audited.</strong>
+      <%= escapeHtml(m.auditor_name) %><% if (m.auditor_affiliation) { %> (<%= escapeHtml(m.auditor_affiliation) %>)<% } %>
+      has read the manuscript and provided a signed correctness statement (see below).
+      Audit endorses what was reviewed; it is not a guarantee.
+    </div>
+    <% } %>
+
   <% } %>
 
   <header class="ms-header">
@@ -103,15 +119,30 @@
 
   <section class="ms-section ms-conductor">
     <h2 class="ms-section-h">Conductor</h2>
-    <p class="muted small">The conductor is the pair (human, AI) responsible for producing the manuscript.</p>
-    <table class="kv">
-      <tr><th>Human conductor</th><td><strong><%= escapeHtml(m.conductor_human) %></strong> · <span class="role-tag"><%= escapeHtml(m.conductor_role) %></span></td></tr>
-      <tr><th>AI co-author</th><td><%= escapeHtml(m.conductor_ai_model) %></td></tr>
-      <tr><th>Submitted by</th><td><a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a><% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %></td></tr>
-      <% if (m.conductor_notes) { %>
-      <tr><th>Notes</th><td><%- renderMarkdown(m.conductor_notes) %></td></tr>
-      <% } %>
-    </table>
+    <% if (m.conductor_type === 'ai-agent') { %>
+      <p class="muted small">No human conductor. This manuscript was produced by an AI agent acting autonomously.</p>
+      <table class="kv">
+        <tr><th>Mode</th><td><span class="role-tag agent-tag">AI agent (autonomous)</span></td></tr>
+        <tr><th>AI agent</th><td><strong><%= escapeHtml(m.conductor_ai_model) %></strong></td></tr>
+        <% if (m.agent_framework) { %>
+        <tr><th>Framework</th><td><%= escapeHtml(m.agent_framework) %></td></tr>
+        <% } %>
+        <tr><th>Submitted by</th><td><a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a><% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %> <span class="muted small">— posting only; not responsible for the content</span></td></tr>
+        <% if (m.conductor_notes) { %>
+        <tr><th>Notes</th><td><%- renderMarkdown(m.conductor_notes) %></td></tr>
+        <% } %>
+      </table>
+    <% } else { %>
+      <p class="muted small">The conductor is the pair (human, AI) responsible for producing the manuscript.</p>
+      <table class="kv">
+        <tr><th>Human conductor</th><td><strong><%= escapeHtml(m.conductor_human) %></strong> · <span class="role-tag"><%= escapeHtml(m.conductor_role) %></span></td></tr>
+        <tr><th>AI co-author</th><td><%= escapeHtml(m.conductor_ai_model) %></td></tr>
+        <tr><th>Submitted by</th><td><a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a><% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %></td></tr>
+        <% if (m.conductor_notes) { %>
+        <tr><th>Notes</th><td><%- renderMarkdown(m.conductor_notes) %></td></tr>
+        <% } %>
+      </table>
+    <% } %>
   </section>
 
   <section class="ms-section ms-auditor">

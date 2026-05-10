@@ -2,7 +2,7 @@ const { db } = require('./db');
 const { hashPassword } = require('./lib/auth');
 const { makeArxivLikeId } = require('./lib/util');
 
-console.log('Seeding pre-arxiv with demo data…');
+console.log('Seeding PreXiv with demo data…');
 
 const usersExist = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
 if (usersExist > 0) {
@@ -33,10 +33,10 @@ const insertManuscript = db.prepare(`
   INSERT INTO manuscripts (
     arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
     pdf_path, external_url,
-    conductor_ai_model, conductor_human, conductor_role, conductor_notes,
+    conductor_type, conductor_ai_model, conductor_human, conductor_role, conductor_notes, agent_framework,
     has_auditor, auditor_name, auditor_affiliation, auditor_role, auditor_statement,
     score, comment_count
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 const samples = [
@@ -136,6 +136,36 @@ const samples = [
     auditor_role: 'professor',
     auditor_statement: 'I skimmed it. Looks fine for a workshop note.',
   },
+
+  // ── autonomous AI-agent submissions (no human conductor) ──
+  {
+    submitter: 'feynmann',
+    conductor_type: 'ai-agent',
+    title: 'Autonomous Survey of Open Conjectures in Two-Loop Master Integrals',
+    abstract: 'An autonomous AI agent was tasked, in a single prompt, with surveying open conjectures in the two-loop master-integral literature and producing a structured taxonomy with worked examples. The agent then ran for ~14 hours, reading papers, computing examples, and assembling this manuscript without further human input. The submitter has not read it line-by-line and does not vouch for any claim within. Posted for community evaluation of what fully-autonomous research surveys can produce.',
+    authors: 'Claude Opus 4.6 (autonomous)',
+    category: 'hep-th',
+    conductor_ai_model: 'Claude Opus 4.6',
+    agent_framework: 'Anthropic Agent SDK with web-search and code-execution tools',
+    conductor_notes: 'Initial prompt: "Survey open conjectures in two-loop master integrals; produce a manuscript-shaped taxonomy with worked examples. You have web search and a Python sandbox. Stop when you have ten examples." No further interventions.',
+    has_auditor: 0,
+  },
+  {
+    submitter: 'noether42',
+    conductor_type: 'ai-agent',
+    title: 'AI-Agent Generated Conjectures on Modular Forms of Weight 12',
+    abstract: 'Output of an autonomous agent that was asked to look for novel patterns in spaces of modular forms of weight 12. The agent generated and tested ~3000 candidate conjectures, kept the 17 that survived numerical scrutiny up to N = 10^5, and wrote them up. Submitted as-is; an audit by E. Noether confirms the worked examples but not the conjectures themselves.',
+    authors: 'GPT-5 (autonomous)',
+    category: 'math.NT',
+    conductor_ai_model: 'GPT-5',
+    agent_framework: 'OpenAI Agents SDK with SageMath sandbox',
+    conductor_notes: 'I (the submitter) did not direct the agent during the run — only set up the sandbox. The 17 surviving conjectures are exactly what the agent emitted; I have not edited them.',
+    has_auditor: 1,
+    auditor_name: 'E. Noether',
+    auditor_affiliation: 'Göttingen (independent)',
+    auditor_role: 'independent-researcher',
+    auditor_statement: 'I checked the worked examples (12 of 17 conjectures have a worked example; 5 do not). The examples are correct and the agent\'s computations match SageMath. I have NOT verified that any of the 17 conjectures are true; several look implausible and one reduces to a known fact.',
+  },
 ];
 
 let s = 0;
@@ -144,6 +174,7 @@ for (const m of samples) {
   const hoursAgo = Math.floor(Math.random() * 240) + 1;
   const arxivId = makeArxivLikeId();
   const doi     = '10.99999/' + arxivId.toUpperCase();
+  const ctype = m.conductor_type || 'human-ai';
   const r = insertManuscript.run(
     arxivId,
     doi,
@@ -154,10 +185,12 @@ for (const m of samples) {
     m.category,
     null,
     null,
+    ctype,
     m.conductor_ai_model,
-    m.conductor_human,
-    m.conductor_role,
+    ctype === 'human-ai' ? (m.conductor_human || null) : null,
+    ctype === 'human-ai' ? (m.conductor_role  || null) : null,
     m.conductor_notes || null,
+    ctype === 'ai-agent' ? (m.agent_framework || null) : null,
     m.has_auditor ? 1 : 0,
     m.auditor_name || null,
     m.auditor_affiliation || null,

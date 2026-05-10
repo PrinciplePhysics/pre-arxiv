@@ -69,34 +69,59 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 }
 .brand {
   display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 9px;
   color: #fff;
   text-decoration: none;
 }
 .brand:hover { text-decoration: none; color: #fff; }
+.brand:hover .bx { transform: translateY(-1px) rotate(-2deg); }
 .brand-mark {
-  display: inline-block;
-  width: 24px; height: 24px;
-  line-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   background: #fff;
-  color: var(--brand);
-  text-align: center;
-  border-radius: 4px;
-  font-family: var(--serif);
-  font-weight: 700;
-  font-size: 17px;
-  transform: translateY(3px);
+  border-radius: 6px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.15) inset, 0 0 0 1px rgba(255,255,255,0.3);
+  flex-shrink: 0;
 }
+.brand-mark svg { display: block; }
 .brand-name {
+  font-family: "Cormorant Garamond", "Source Serif Pro", "Iowan Old Style", Georgia, serif;
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0.4px;
+  display: inline-flex;
+  align-items: baseline;
+  position: relative;
+}
+.brand-name .bp,
+.brand-name .bi {
+  color: #ffe4ce;
+  font-weight: 500;
+}
+.brand-name .bx {
+  color: #fff;
   font-weight: 700;
-  font-size: 16px;
-  letter-spacing: 0.2px;
+  font-style: italic;
+  font-size: 30px;
+  margin: 0 -2px;
+  display: inline-block;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.15);
+  transition: transform 0.18s ease;
 }
 .brand-tagline {
-  font-size: 12px;
+  font-family: "Cormorant Garamond", "Source Serif Pro", Georgia, serif;
+  font-size: 13px;
   color: #fde4d2;
   font-style: italic;
+  margin-left: 4px;
+  letter-spacing: 0.2px;
+  position: relative;
+  top: 1px;
 }
 
 .topnav {
@@ -271,6 +296,7 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 }
 .badge-audited   { background: var(--ok-bg);   color: var(--ok);   border-color: var(--ok-rule); }
 .badge-unaudited { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-rule); }
+.badge-agent     { background: #e9eef7;        color: #2c4a78;     border-color: #b9c5db; }
 
 .empty {
   padding: 40px 20px;
@@ -312,6 +338,23 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   background: var(--ok-bg);
   border: 1px solid var(--ok-rule);
   color: #1d4b29;
+}
+.agent-banner {
+  background: #e9eef7;
+  border: 1px solid #b9c5db;
+  color: #2c4a78;
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: -8px -8px 18px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.agent-banner + .warn-banner,
+.agent-banner + .audit-banner { margin-top: 0; }
+.role-tag.agent-tag {
+  background: #e9eef7;
+  border-color: #b9c5db;
+  color: #2c4a78;
 }
 
 .ms-header { margin-bottom: 18px; }
@@ -841,6 +884,21 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   margin-right: 14px;
   color: var(--ink-soft);
 }
+.footer-brand {
+  font-family: "Cormorant Garamond", "Source Serif Pro", Georgia, serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--brand);
+  letter-spacing: 0.3px;
+}
+.footer-brand .bp,
+.footer-brand .bi { font-weight: 500; }
+.footer-brand .bx {
+  font-style: italic;
+  font-weight: 700;
+  font-size: 22px;
+  margin: 0 -1px;
+}
 
 /* ─── dev-mode email link surfaces ──────────────────────────────────────── */
 
@@ -986,6 +1044,35 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   text-decoration: underline;
 }
 .link-button:hover { color: #a03030; }
+
+/* ─── conductor-type radio cards (submit form) ──────────────────────────── */
+
+.conductor-type-choice {
+  display: flex;
+  gap: 12px;
+  margin: 8px 0 14px;
+  flex-wrap: wrap;
+}
+.ctype-card {
+  flex: 1 1 280px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 !important;
+}
+.ctype-card:has(input:checked) {
+  border-color: var(--brand);
+  background: #fff5ec;
+}
+.ctype-card input[type=radio] { margin-top: 4px; }
+.ctype-body { flex: 1; }
+.ctype-body strong { display: block; margin-bottom: 2px; }
+.ctype-section { margin-top: 6px; }
 
 /* ─── captcha question ──────────────────────────────────────────────────── */
 

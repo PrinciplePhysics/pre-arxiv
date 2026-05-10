@@ -3,7 +3,7 @@
 
 <div class="page-header">
   <h1>Submit a manuscript</h1>
-  <p class="muted">A manuscript on pre-arxiv is a piece of work in which an AI was a substantial co-author. The <strong>conductor</strong> is the human who guided the AI to write it; the <strong>auditor</strong> (optional) is a human expert who has verified its correctness.</p>
+  <p class="muted">A manuscript on PreXiv is a piece of work in which an AI was a substantial co-author. The <strong>conductor</strong> is the human who guided the AI to write it (or, in autonomous mode, the AI that produced it alone); the <strong>auditor</strong> (optional) is a human expert who has verified its correctness.</p>
 </div>
 
 <% if (errors && errors.length) { %>
@@ -61,33 +61,64 @@
 
   <section class="form-section">
     <h2>2 — Conductor <span class="muted">(required)</span></h2>
-    <p class="muted small">Who is responsible for the conduct of the AI here? The conductor signs off that they directed the work, even if not its correctness.</p>
+    <p class="muted small">How was this manuscript produced? PreXiv accepts both human-conducted (a person directed an AI) and fully autonomous AI-agent work. Pick one.</p>
 
-    <div class="row-fields">
-      <label class="grow">
-        <span class="label-text">AI model <span class="req">*</span></span>
-        <input type="text" name="conductor_ai_model" required maxlength="200" value="<%= escapeHtml(values.conductor_ai_model || '') %>" placeholder="e.g., Claude Opus 4.6, GPT-5, Gemini 3 Pro">
+    <div class="conductor-type-choice">
+      <label class="ctype-card">
+        <input type="radio" name="conductor_type" value="human-ai" <%= (values.conductor_type || 'human-ai') === 'human-ai' ? 'checked' : '' %>>
+        <div class="ctype-body">
+          <strong>Human + AI co-conductor</strong>
+          <span class="muted small">A named human directed the AI to produce this work. The human accepts responsibility for the <em>conduct</em> of the work (not necessarily its correctness — that's what an auditor is for).</span>
+        </div>
       </label>
-      <label class="grow">
-        <span class="label-text">Human conductor <span class="req">*</span></span>
-        <input type="text" name="conductor_human" required maxlength="200" value="<%= escapeHtml(values.conductor_human || '') %>" placeholder="full name — usually you">
+      <label class="ctype-card">
+        <input type="radio" name="conductor_type" value="ai-agent" <%= values.conductor_type === 'ai-agent' ? 'checked' : '' %>>
+        <div class="ctype-body">
+          <strong>AI agent alone <span class="muted">(autonomous)</span></strong>
+          <span class="muted small">The manuscript was produced by an AI agent acting on its own — no human direction beyond an initial task description. <em>No human</em> takes responsibility for either conduct or content; you (the submitter) only post it on the site.</span>
+        </div>
       </label>
     </div>
 
     <label>
-      <span class="label-text">Conductor role <span class="req">*</span></span>
-      <select name="conductor_role" required>
-        <option value="">— select —</option>
-        <% for (const r of ROLES) { %>
-          <option value="<%= r %>" <%= values.conductor_role === r ? 'selected' : '' %>><%= r %></option>
-        <% } %>
-      </select>
-      <span class="hint">From undergraduate to professional expert — readers use this to calibrate.</span>
+      <span class="label-text">AI model <span class="req">*</span></span>
+      <input type="text" name="conductor_ai_model" required maxlength="200" value="<%= escapeHtml(values.conductor_ai_model || '') %>" placeholder="e.g., Claude Opus 4.6, GPT-5, Gemini 3 Pro">
     </label>
+
+    <div class="ctype-section ctype-human-ai" id="ctype-human-ai" style="<%= values.conductor_type === 'ai-agent' ? 'display:none' : '' %>">
+      <label>
+        <span class="label-text">Human conductor <span class="req">*</span></span>
+        <input type="text" name="conductor_human" maxlength="200" value="<%= escapeHtml(values.conductor_human || '') %>" placeholder="full name — usually you">
+      </label>
+      <label>
+        <span class="label-text">Conductor role <span class="req">*</span></span>
+        <select name="conductor_role">
+          <option value="">— select —</option>
+          <% for (const r of ROLES) { %>
+            <option value="<%= r %>" <%= values.conductor_role === r ? 'selected' : '' %>><%= r %></option>
+          <% } %>
+        </select>
+        <span class="hint">From undergraduate to professional expert — readers use this to calibrate.</span>
+      </label>
+    </div>
+
+    <div class="ctype-section ctype-ai-agent" id="ctype-ai-agent" style="<%= values.conductor_type === 'ai-agent' ? '' : 'display:none' %>">
+      <label>
+        <span class="label-text">Agent framework / scaffold <span class="muted">(optional)</span></span>
+        <input type="text" name="agent_framework" maxlength="300" value="<%= escapeHtml(values.agent_framework || '') %>" placeholder="e.g., Anthropic Agent SDK, AutoGPT, ReAct loop, raw single prompt">
+        <span class="hint">What ran the agent? Helpful for readers trying to reproduce or evaluate.</span>
+      </label>
+      <label class="checkbox checkbox-warn">
+        <input type="checkbox" name="ai_agent_ack" <%= values.ai_agent_ack ? 'checked' : '' %>>
+        <span>
+          I acknowledge that this manuscript was produced by an AI agent acting <strong>autonomously</strong>. <strong>No human</strong> &mdash; including me &mdash; takes responsibility for its conduct or contents. The manuscript page will display a prominent <em>"AI-agent (autonomous)"</em> banner alongside any auditing status.
+        </span>
+      </label>
+    </div>
 
     <label>
       <span class="label-text">Conductor notes <span class="muted">(optional)</span></span>
-      <textarea name="conductor_notes" maxlength="3000" rows="4" placeholder="How was the work produced? How much was your contribution vs. the AI's? Anything a reader should know about how to read this?"><%= escapeHtml(values.conductor_notes || '') %></textarea>
+      <textarea name="conductor_notes" maxlength="3000" rows="4" placeholder="For human-conducted: how much was your contribution vs. the AI's? For AI-agent: what was the initial task and how long did it run?"><%= escapeHtml(values.conductor_notes || '') %></textarea>
     </label>
   </section>
 
@@ -150,11 +181,36 @@
     const cb = document.getElementById('has_auditor');
     const af = document.getElementById('auditor-fields');
     const nb = document.getElementById('no-auditor-block');
-    function sync() {
+    const radios = document.querySelectorAll('input[name="conductor_type"]');
+    const haSec  = document.getElementById('ctype-human-ai');
+    const agSec  = document.getElementById('ctype-ai-agent');
+
+    function syncAuditor() {
       af.style.display = cb.checked ? '' : 'none';
       nb.style.display = cb.checked ? 'none' : '';
     }
-    cb.addEventListener('change', sync);
+    function syncCType() {
+      const t = document.querySelector('input[name="conductor_type"]:checked');
+      const isAgent = t && t.value === 'ai-agent';
+      haSec.style.display = isAgent ? 'none' : '';
+      agSec.style.display = isAgent ? '' : 'none';
+      // The "submitter not responsible for correctness" ack is only meaningful
+      // when there's a human conductor; the AI-agent path has its own ack.
+      const noAuditorCheckbox = nb.querySelector('input[name="no_auditor_ack"]');
+      if (isAgent) {
+        nb.style.display = 'none';
+      } else if (!cb.checked) {
+        nb.style.display = '';
+      }
+      // Required attribute on conductor_human / conductor_role
+      const ch = document.querySelector('input[name="conductor_human"]');
+      const cr = document.querySelector('select[name="conductor_role"]');
+      if (ch) ch.required = !isAgent;
+      if (cr) cr.required = !isAgent;
+    }
+    cb.addEventListener('change', syncAuditor);
+    for (const r of radios) r.addEventListener('change', syncCType);
+    syncCType();
   })();
 </script>
 

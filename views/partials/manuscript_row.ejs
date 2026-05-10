@@ -29,18 +29,26 @@
       <span class="dot">·</span>
       <a class="ms-cat" href="/browse/<%= encodeURIComponent(m.category) %>"><%= m.category %></a>
       <span class="ms-cat-name muted">(<%= cat.name %>)</span>
+      <% if (m.conductor_type === 'ai-agent') { %>
+        <span class="badge badge-agent" title="Produced autonomously by an AI agent — no human conductor">⚙ AI-agent</span>
+      <% } %>
       <% if (m.has_auditor) { %>
         <span class="badge badge-audited" title="An auditor has signed off">✓ audited · <%= escapeHtml(m.auditor_name) %></span>
       <% } else { %>
-        <span class="badge badge-unaudited" title="No auditor — submitter is not responsible for correctness">⚠ unaudited</span>
+        <span class="badge badge-unaudited" title="No auditor — no human is responsible for correctness">⚠ unaudited</span>
       <% } %>
     </div>
     <div class="ms-sub">
       <span class="muted">submitted <%= timeAgo(m.created_at) %> by</span>
       <a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a>
       <span class="dot">·</span>
-      <span class="muted">conducted by</span>
-      <span class="conductor-pair"><strong><%= escapeHtml(m.conductor_human) %></strong> + <em><%= escapeHtml(m.conductor_ai_model) %></em></span>
+      <% if (m.conductor_type === 'ai-agent') { %>
+        <span class="muted">produced by</span>
+        <span class="conductor-pair"><em><%= escapeHtml(m.conductor_ai_model) %></em> <span class="muted small">(autonomous)</span></span>
+      <% } else { %>
+        <span class="muted">conducted by</span>
+        <span class="conductor-pair"><strong><%= escapeHtml(m.conductor_human) %></strong> + <em><%= escapeHtml(m.conductor_ai_model) %></em></span>
+      <% } %>
       <span class="dot">·</span>
       <a href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>#comments"><%= m.comment_count %> comment<%= m.comment_count === 1 ? '' : 's' %></a>
     </div>
