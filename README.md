@@ -25,6 +25,7 @@ Demo accounts (password `demo1234` for all):
 - KaTeX (CDN) for math in abstracts and comments
 - Sessions stored in SQLite; passwords hashed with bcrypt
 - `helmet` + Content-Security-Policy, `express-rate-limit` on auth/submit/comment/vote, hand-rolled CSRF tokens on all POST forms
+- No SMTP / mail dependency. Verification and reset links are shown in-page; swap `lib/email.js`'s `sendMail` for a real transport (nodemailer, sendgrid, etc.) if you want real email.
 
 ## Configuration
 
@@ -38,12 +39,7 @@ Environment variables (all optional in development; `SESSION_SECRET` is required
 | `DATA_DIR` | `./data` | where the SQLite DB and session store live (use a persistent disk in production) |
 | `UPLOAD_DIR` | `./public/uploads` | where uploaded PDFs are stored |
 | `RATE_LIMIT` | unset | set to `1` to enable rate limiting in development |
-| `APP_URL` | derived from the request | absolute base URL used in emailed verify/reset links and citation `url` fields |
-| `SMTP_HOST` | unset | if set, the verify/reset flows send real email via nodemailer; otherwise links are surfaced in-page (dev mode) |
-| `SMTP_PORT` | `587` | SMTP port (set `465` for implicit TLS) |
-| `SMTP_USER` / `SMTP_PASS` | unset | SMTP credentials (optional, depends on the relay) |
-| `SMTP_SECURE` | `0` | `1` to force implicit TLS |
-| `MAIL_FROM` | `pre-arxiv <no-reply@pre-arxiv.local>` | From: address for outgoing mail |
+| `APP_URL` | derived from the request | absolute base URL used in verify/reset links and citation `url` fields |
 | `ADMIN_USERNAMES` | unset | comma-separated list; matching users are auto-promoted to admin on every server start |
 | `ZENODO_TOKEN` | unset | personal access token from zenodo.org / sandbox.zenodo.org. When set, submissions get real Zenodo DOIs |
 | `ZENODO_USE_PRODUCTION` | `0` | set to `1` to use production Zenodo (permanent DOIs) instead of sandbox |
@@ -71,7 +67,7 @@ data/                  SQLite DB (git-ignored)
 - **Vote / comment**: any logged-in user; karma accumulates from upvotes.
 - **Search**: SQLite FTS5 over title, abstract, authors, and extracted PDF body, with exact-id and DOI matches surfaced first. Try `/search?q=…`.
 - **Cite**: every manuscript page has a *Cite* button; `/m/:id/cite` shows BibTeX, RIS, and plain-text formats; `/m/:id/cite.bib` and `/m/:id/cite.ris` return the raw files.
-- **Account hygiene**: email verification on register (gates submission); password reset via emailed token; both flows surface the link in-page when no SMTP is configured so the site is usable as a self-hosted demo without mail infra.
+- **Account hygiene**: email verification on register (gates submission); password reset via token. The site does not ship with an SMTP integration — both flows surface the link directly on the page after the form is submitted, and also log it to stdout so a server operator can recover it from the journal. Plug in a transport in `lib/email.js` if you want real email.
 - **Anti-bot**: simple math CAPTCHA on `/register`, regenerated on every failed attempt.
 - **Moderation**: any submitter can withdraw their own manuscript (replaced with a tombstone preserving id + DOI for citation continuity); any logged-in user can flag manuscripts or comments; admins (configured via `ADMIN_USERNAMES` env) get an `/admin` queue and can permanently delete spam. Comment authors can delete their own comments.
 - **Real DOIs (optional)**: if `ZENODO_TOKEN` is set, each new submission is deposited and published on Zenodo (sandbox by default; set `ZENODO_USE_PRODUCTION=1` for permanent DOIs). Without the token, submissions get a synthetic `10.99999/<id>` identifier.

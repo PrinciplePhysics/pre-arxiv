@@ -8,13 +8,13 @@
 
   <% if (devLink) { %>
     <div class="dev-link-box">
-      <strong>Dev / no-SMTP mode:</strong> this server is not configured to send real email.
-      Use this link directly:
+      <strong>This server doesn't send email.</strong>
+      Use this link directly to verify:
       <p><a href="<%= devLink %>" class="dev-link"><%= devLink %></a></p>
     </div>
-  <% } else if (!smtpEnabled) { %>
+  <% } else { %>
     <div class="dev-link-box">
-      <strong>Note:</strong> SMTP is not configured on this server, so the link was logged to the server console rather than emailed. Ask the operator, or set <code>SMTP_HOST</code> + friends.
+      <strong>Note:</strong> this server doesn't send email. The link was logged to the server console; ask the operator if your session expired before you copied it. You can request a fresh link with the button below.
     </div>
   <% } %>
 

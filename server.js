@@ -11,7 +11,7 @@ const rateLimit = require('express-rate-limit');
 const { db, CATEGORIES, ROLES } = require('./db');
 const { hashPassword, verifyPassword, loadUser, requireAuth, validateUsername } = require('./lib/auth');
 const { timeAgo, escapeHtml, rankScore, makeArxivLikeId, renderMarkdown, ageHours, paginate } = require('./lib/util');
-const { sendMail, absoluteUrl, enabled: emailEnabled } = require('./lib/email');
+const { sendMail, absoluteUrl } = require('./lib/email');
 const { renderBibtex, renderRis, renderPlain } = require('./lib/citation');
 const zenodo = require('./lib/zenodo');
 
@@ -642,7 +642,7 @@ app.get('/verify-pending', (req, res) => {
   if (u && u.email_verified) return res.redirect('/');
   const link = req.session.lastVerifyLink || null;
   delete req.session.lastVerifyLink;
-  res.render('verify_pending', { email: u ? u.email : '', devLink: link, smtpEnabled: emailEnabled });
+  res.render('verify_pending', { email: u ? u.email : '', devLink: link });
 });
 
 app.get('/verify/:token', (req, res) => {
