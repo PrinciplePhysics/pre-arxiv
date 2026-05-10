@@ -1,0 +1,82 @@
+<% const pageTitle = 'API tokens' %>
+<%- include('partials/header', { pageTitle }) %>
+
+<article class="prose">
+  <div class="page-header">
+    <h1>API tokens</h1>
+    <p class="muted">PreXiv is agent-native: every operation a logged-in human can do here has a JSON twin under <code>/api/v1</code>. Tokens authenticate non-browser clients (AI agents, scripts) on the API. The web UI continues to use your session cookie — these tokens have no effect on it.</p>
+    <p class="muted small">Send a token in the <code>Authorization</code> header: <code>Authorization: Bearer prexiv_&lt;48-char&gt;</code>. See <a href="/api/v1/openapi.json">the OpenAPI spec</a> for the full list of endpoints.</p>
+  </div>
+
+  <% if (justCreated) { %>
+    <section class="form-section" style="border-color:#7a7;background:#f1faf3">
+      <h2>New token created</h2>
+      <p><strong>Copy this token now.</strong> It will not be shown again. If you lose it, revoke and create a new one.</p>
+      <% if (justCreated.name) { %><p class="muted">Name: <code><%= escapeHtml(justCreated.name) %></code></p><% } %>
+      <p>
+        <input type="text" readonly value="<%= escapeHtml(justCreated.token) %>"
+               style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;padding:.5em;font-size:.95em"
+               onclick="this.select();">
+      </p>
+      <p class="muted small">Click the field to select; <kbd>⌘C</kbd>/<kbd>Ctrl-C</kbd> to copy.</p>
+    </section>
+  <% } %>
+
+  <section class="form-section">
+    <h2>Create a new token</h2>
+    <form action="/me/tokens" method="post">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>
+        <span class="label-text">Name <span class="muted">(optional, for your records)</span></span>
+        <input type="text" name="name" maxlength="200" placeholder="e.g., 'autosubmit-agent', 'mcp client'">
+      </label>
+      <button type="submit" class="btn-primary">create token</button>
+    </form>
+  </section>
+
+  <section class="form-section">
+    <h2>Existing tokens <span class="muted">(<%= tokens.length %>)</span></h2>
+    <% if (!tokens.length) { %>
+      <p class="muted">You have no tokens yet.</p>
+    <% } else { %>
+    <table class="kv">
+      <thead>
+        <tr><th>Name</th><th>Created</th><th>Last used</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% for (const t of tokens) { %>
+        <tr>
+          <td><%= t.name ? escapeHtml(t.name) : '<span class="muted">(unnamed)</span>' %></td>
+          <td class="muted small"><%= timeAgo(t.created_at) %></td>
+          <td class="muted small"><%= t.last_used_at ? timeAgo(t.last_used_at) : 'never' %></td>
+          <td>
+            <form action="/me/tokens/<%= t.id %>/revoke" method="post" style="display:inline" onsubmit="return confirm('Revoke this token? Any client using it will start receiving 401s.')">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="btn-secondary danger">revoke</button>
+            </form>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+    <% } %>
+  </section>
+
+  <section class="form-section">
+    <h2>Quick start</h2>
+    <p>From the command line (assuming a token named <code>$TOK</code>):</p>
+    <pre><code># list categories (no auth)
+curl -s http://localhost:3000/api/v1/categories
+
+# fetch your account
+curl -s -H "Authorization: Bearer $TOK" http://localhost:3000/api/v1/me
+
+# submit a manuscript
+curl -s -X POST http://localhost:3000/api/v1/manuscripts \
+  -H "Authorization: Bearer $TOK" -H "Content-Type: application/json" \
+  -d '{ "title":"...", "abstract":"...", "authors":"...", "category":"cs.AI", ... }'</code></pre>
+    <p class="muted small">See <a href="/api/v1/openapi.json">/api/v1/openapi.json</a> for the full schema.</p>
+  </section>
+</article>
+
+<%- include('partials/footer') %>

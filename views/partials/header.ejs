@@ -49,6 +49,8 @@
       <% if (user) { %>
         <a href="/u/<%= escapeHtml(user.username) %>" class="me"><%= escapeHtml(user.username) %></a>
         <span class="karma" title="karma">(<%= user.karma %>)</span>
+        <span class="sep">·</span>
+        <a href="/me/tokens" class="<%= path === '/me/tokens' ? 'on' : '' %>" title="manage your API tokens">API tokens</a>
         <form action="/logout" method="post" class="logout-form"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit">logout</button></form>
       <% } else { %>
         <a href="/login">login</a>

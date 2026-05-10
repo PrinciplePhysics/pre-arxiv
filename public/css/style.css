@@ -59,44 +59,53 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   box-shadow: var(--shadow);
 }
 .topbar-inner {
-  max-width: 1080px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 0 14px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  height: 42px;
+  gap: 12px;
+  height: 46px;
+  flex-wrap: nowrap;
 }
 .brand {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    "mark name"
+    "mark tagline";
   align-items: center;
-  gap: 9px;
+  column-gap: 9px;
+  row-gap: 0;
   color: #fff;
   text-decoration: none;
+  flex-shrink: 0;
 }
 .brand:hover { text-decoration: none; color: #fff; }
 .brand:hover .bx { transform: translateY(-1px) rotate(-2deg); }
 .brand-mark {
+  grid-area: mark;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   background: #fff;
-  border-radius: 6px;
+  border-radius: 7px;
   box-shadow: 0 1px 0 rgba(0,0,0,0.15) inset, 0 0 0 1px rgba(255,255,255,0.3);
-  flex-shrink: 0;
 }
-.brand-mark svg { display: block; }
+.brand-mark svg { display: block; width: 32px; height: 32px; }
 .brand-name {
+  grid-area: name;
+  align-self: end;
   font-family: "Cormorant Garamond", "Source Serif Pro", "Iowan Old Style", Georgia, serif;
   font-weight: 600;
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
   letter-spacing: 0.4px;
-  display: inline-flex;
-  align-items: baseline;
+  white-space: nowrap;
   position: relative;
+  margin-bottom: -1px;
 }
 .brand-name .bp,
 .brand-name .bi {
@@ -107,42 +116,49 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   color: #fff;
   font-weight: 700;
   font-style: italic;
-  font-size: 30px;
+  font-size: 27px;
   margin: 0 -2px;
   display: inline-block;
   text-shadow: 0 1px 0 rgba(0,0,0,0.15);
   transition: transform 0.18s ease;
+  vertical-align: -0.5px;
 }
 .brand-tagline {
+  grid-area: tagline;
+  align-self: start;
   font-family: "Cormorant Garamond", "Source Serif Pro", Georgia, serif;
-  font-size: 13px;
+  font-size: 11px;
   color: #fde4d2;
   font-style: italic;
-  margin-left: 4px;
-  letter-spacing: 0.2px;
-  position: relative;
-  top: 1px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  line-height: 1.2;
+  margin-top: 1px;
 }
 
 .topnav {
-  display: flex; gap: 4px;
-  margin-left: 6px;
-  flex-wrap: wrap;
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 .topnav a {
   color: #fde4d2;
   font-size: 13px;
   padding: 4px 8px;
   border-radius: 3px;
+  white-space: nowrap;
 }
 .topnav a:hover { background: rgba(255,255,255,0.12); color: #fff; text-decoration: none; }
 .topnav a.on   { background: rgba(0,0,0,0.18); color: #fff; }
 .topnav a.submit-link { background: rgba(255,255,255,0.2); color: #fff; font-weight: 600; }
 .topnav a.submit-link.on { background: rgba(0,0,0,0.25); }
 
-.searchbox { margin-left: auto; }
+.searchbox { margin-left: auto; flex-shrink: 1; min-width: 0; }
 .searchbox input {
-  width: 220px;
+  width: 200px;
+  max-width: 100%;
   padding: 4px 8px;
   border: 1px solid #8b3308;
   background: #fffdf8;
@@ -153,10 +169,12 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 
 .userbox {
   display: flex; align-items: center; gap: 6px;
-  font-size: 13px;
+  font-size: 12.5px;
   color: #fde4d2;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
-.userbox a { color: #fde4d2; }
+.userbox a { color: #fde4d2; white-space: nowrap; }
 .userbox a:hover { color: #fff; }
 .userbox .me { font-weight: 600; color: #fff; }
 .userbox .karma { color: #f6c795; }
@@ -169,11 +187,15 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 }
 .userbox .logout-form button:hover { color: #fff; text-decoration: underline; }
 
-@media (max-width: 800px) {
-  .topbar-inner { flex-wrap: wrap; height: auto; padding: 6px 10px; gap: 8px; }
+@media (max-width: 1100px) {
   .brand-tagline { display: none; }
-  .searchbox input { width: 140px; }
-  .topnav { width: 100%; order: 99; }
+  .searchbox input { width: 160px; }
+}
+@media (max-width: 900px) {
+  .topbar-inner { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px; }
+  .topnav { width: 100%; order: 99; flex-wrap: wrap; }
+  .searchbox { margin-left: 0; flex: 1; }
+  .searchbox input { width: 100%; }
 }
 
 /* ─── flash messages ─────────────────────────────────────────────────────── */

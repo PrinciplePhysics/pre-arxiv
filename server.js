@@ -13,6 +13,8 @@ const { hashPassword, verifyPassword, loadUser, requireAuth, validateUsername } 
 const { timeAgo, escapeHtml, rankScore, makeArxivLikeId, renderMarkdown, ageHours, paginate } = require('./lib/util');
 const { sendMail, absoluteUrl } = require('./lib/email');
 const { renderBibtex, renderRis, renderPlain } = require('./lib/citation');
+const { generateToken, hashToken, extractBearer } = require('./lib/api-auth');
+const { buildApiRouter } = require('./lib/api');
 const zenodo = require('./lib/zenodo');
 
 const app = express();
@@ -94,6 +96,16 @@ function csrfTokenFor(req) {
 }
 function verifyCsrf(req, res, next) {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  // The /api/v1 surface is its own auth boundary — anything that lives there
+  // either needs a Bearer token (the API router enforces that) or is an
+  // unauthenticated public endpoint like login/register. Either way, browser
+  // cookie+CSRF semantics don't apply, so we skip the check entirely on
+  // /api/v1 paths. (Calls without a Bearer that try to do something
+  // privileged still get a clean 401 from the API router itself.)
+  if (req.path.startsWith('/api/v1/')) return next();
+  // Outside the API, Bearer auth on a normal web route is also unusual but
+  // similarly cookie-independent — let it through too.
+  if (extractBearer(req)) return next();
   // Multipart bodies aren't parsed yet at this point — defer to per-route check
   // (see /submit, which calls multer first then csrfCheckParsed).
   const ct = (req.get('Content-Type') || '').toLowerCase();
@@ -205,29 +217,42 @@ function escapeFtsQuery(q) {
     .join(' ');
 }
 
+// Read a "checkbox-y" form/JSON value as a boolean. HTML form checkboxes
+// arrive as the literal string 'on' (or '1' / 'true' if hand-crafted); JSON
+// API clients send a real boolean. Treat 0/null/undefined/'' as false.
+function checkboxBool(v) {
+  if (v === true) return true;
+  if (v === false || v == null) return false;
+  const s = String(v).trim().toLowerCase();
+  return s === 'on' || s === '1' || s === 'true' || s === 'yes';
+}
+
 function parseManuscriptValues(req) {
-  const ct = (req.body.conductor_type || '').trim();
+  // Coerce to string, but allow real booleans / numbers to pass through
+  // their string form. JSON callers may send `null` for an absent field.
+  const s = (v) => (v == null ? '' : String(v));
+  const ct = s(req.body.conductor_type).trim();
   return {
-    title: (req.body.title || '').trim(),
-    abstract: (req.body.abstract || '').trim(),
-    authors: (req.body.authors || '').trim(),
-    category: (req.body.category || '').trim(),
-    external_url: (req.body.external_url || '').trim() || null,
+    title: s(req.body.title).trim(),
+    abstract: s(req.body.abstract).trim(),
+    authors: s(req.body.authors).trim(),
+    category: s(req.body.category).trim(),
+    external_url: s(req.body.external_url).trim() || null,
     conductor_type: (ct === 'ai-agent') ? 'ai-agent' : 'human-ai',
-    conductor_ai_model: (req.body.conductor_ai_model || '').trim(),
-    conductor_human: (req.body.conductor_human || '').trim(),
-    conductor_role: (req.body.conductor_role || '').trim(),
-    conductor_notes: (req.body.conductor_notes || '').trim() || null,
-    agent_framework: (req.body.agent_framework || '').trim() || null,
-    conductor_ai_model_private: req.body.conductor_ai_model_private === 'on' || req.body.conductor_ai_model_private === '1',
-    conductor_human_private:    req.body.conductor_human_private    === 'on' || req.body.conductor_human_private    === '1',
-    has_auditor: req.body.has_auditor === 'on' || req.body.has_auditor === '1' || req.body.has_auditor === 'true',
-    auditor_name: (req.body.auditor_name || '').trim(),
-    auditor_affiliation: (req.body.auditor_affiliation || '').trim(),
-    auditor_role: (req.body.auditor_role || '').trim(),
-    auditor_statement: (req.body.auditor_statement || '').trim(),
-    no_auditor_ack: req.body.no_auditor_ack === 'on' || req.body.no_auditor_ack === '1',
-    ai_agent_ack:   req.body.ai_agent_ack   === 'on' || req.body.ai_agent_ack   === '1',
+    conductor_ai_model: s(req.body.conductor_ai_model).trim(),
+    conductor_human: s(req.body.conductor_human).trim(),
+    conductor_role: s(req.body.conductor_role).trim(),
+    conductor_notes: s(req.body.conductor_notes).trim() || null,
+    agent_framework: s(req.body.agent_framework).trim() || null,
+    conductor_ai_model_private: checkboxBool(req.body.conductor_ai_model_private),
+    conductor_human_private:    checkboxBool(req.body.conductor_human_private),
+    has_auditor: checkboxBool(req.body.has_auditor),
+    auditor_name: s(req.body.auditor_name).trim(),
+    auditor_affiliation: s(req.body.auditor_affiliation).trim(),
+    auditor_role: s(req.body.auditor_role).trim(),
+    auditor_statement: s(req.body.auditor_statement).trim(),
+    no_auditor_ack: checkboxBool(req.body.no_auditor_ack),
+    ai_agent_ack:   checkboxBool(req.body.ai_agent_ack),
   };
 }
 
@@ -1032,6 +1057,56 @@ app.get('/m/:id/cite.ris', (req, res) => {
 // ─── routes: about / static ─────────────────────────────────────────────────
 app.get('/about', (req, res) => res.render('about'));
 app.get('/guidelines', (req, res) => res.render('guidelines'));
+
+// ─── routes: API token management (web UI) ─────────────────────────────────
+// These pages let a logged-in user create / view / revoke their personal API
+// tokens through the normal cookie + CSRF flow. The plaintext token is
+// surfaced exactly once on creation.
+app.get('/me/tokens', requireAuth, (req, res) => {
+  const tokens = db.prepare(
+    'SELECT id, name, last_used_at, created_at, expires_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC'
+  ).all(req.user.id);
+  const justCreated = req.session.justCreatedToken || null;
+  delete req.session.justCreatedToken;
+  res.render('me_tokens', { tokens, justCreated });
+});
+
+app.post('/me/tokens', requireAuth, (req, res) => {
+  const name = (req.body.name || '').trim().slice(0, 200) || null;
+  const plain = generateToken();
+  const r = db.prepare('INSERT INTO api_tokens (user_id, token_hash, name) VALUES (?, ?, ?)')
+    .run(req.user.id, hashToken(plain), name);
+  req.session.justCreatedToken = { id: r.lastInsertRowid, name, token: plain };
+  flash(req, 'ok', 'API token created. Copy it now — it will not be shown again.');
+  res.redirect('/me/tokens');
+});
+
+app.post('/me/tokens/:id/revoke', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (id) {
+    const t = db.prepare('SELECT id, user_id FROM api_tokens WHERE id = ?').get(id);
+    if (t && t.user_id === req.user.id) {
+      db.prepare('DELETE FROM api_tokens WHERE id = ?').run(id);
+      flash(req, 'ok', 'Token revoked.');
+    } else {
+      flash(req, 'error', 'Token not found.');
+    }
+  }
+  res.redirect('/me/tokens');
+});
+
+// ─── routes: API mount (JSON only, /api/v1) ────────────────────────────────
+// Bearer tokens replace cookie+CSRF on this surface. JSON body parsing is
+// already in place above. Errors here render JSON, never HTML.
+app.use('/api/v1', buildApiRouter({
+  parseManuscriptValues,
+  validateManuscriptValues,
+  authLimiter,
+  submitLimiter,
+  commentLimiter,
+  voteLimiter,
+  escapeFtsQuery,
+}));
 
 // ─── 404 ────────────────────────────────────────────────────────────────────
 app.use((req, res) => {

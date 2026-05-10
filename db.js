@@ -119,6 +119,17 @@ CREATE TABLE IF NOT EXISTS flag_reports (
   UNIQUE(target_type, target_id, reporter_id)
 );
 CREATE INDEX IF NOT EXISTS idx_flags_unresolved ON flag_reports(resolved, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash    TEXT NOT NULL UNIQUE,
+  name          TEXT,
+  last_used_at  DATETIME,
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  expires_at    DATETIME
+);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
 `);
 
 // ─── lightweight migrations for databases created on earlier schemas ────────
