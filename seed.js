@@ -1,12 +1,27 @@
+// We're populating the runtime DB; tell db.js NOT to wipe + restore it.
+// (db.js does a "wipe runtime, restore from seed" dance on every load by
+// default so user data disappears on every server restart.)
+process.env.PREXIV_SKIP_RESET = '1';
+
+const path = require('path');
+const fs = require('fs');
 const { db } = require('./db');
 const { hashPassword } = require('./lib/auth');
 const { makeArxivLikeId } = require('./lib/util');
+
+const DB_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const SEED_PATH    = path.join(DB_DIR, 'prearxiv.seed.db');
+const RUNTIME_PATH = path.join(DB_DIR, 'prearxiv.db');
 
 console.log('Seeding PreXiv with demo data…');
 
 const usersExist = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
 if (usersExist > 0) {
-  console.log('Database already has users — skipping seed.');
+  console.log('Database already has users — skipping seed (use `npm run reset` to start over).');
+  // Still refresh the seed snapshot so it matches the current runtime DB.
+  try { db.close(); } catch {}
+  fs.copyFileSync(RUNTIME_PATH, SEED_PATH);
+  console.log(`Refreshed seed snapshot: ${SEED_PATH}`);
   process.exit(0);
 }
 
@@ -221,3 +236,10 @@ if (m1) {
 
 console.log(`Seeded ${s} manuscripts and ${sampleUsers.length} demo users.`);
 console.log('Demo login: any of [eulerine, noether42, feynmann, bayesgirl, undergrad17, hobbyist] with password "demo1234".');
+
+// Close the runtime DB so the file is fully synced, then snapshot it. The
+// server will copy this snapshot back over the runtime DB on every restart,
+// wiping any user-generated data that accrued in the meantime.
+try { db.close(); } catch {}
+fs.copyFileSync(RUNTIME_PATH, SEED_PATH);
+console.log(`Snapshot written to ${SEED_PATH} — restarts restore from this file.`);

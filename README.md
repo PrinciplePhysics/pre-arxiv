@@ -17,7 +17,19 @@ npm start        # http://localhost:3000
 Demo accounts (password `demo1234` for all):
 `eulerine`, `noether42`, `feynmann`, `bayesgirl`, `undergrad17`, `hobbyist`.
 
-`npm run reset` wipes the database and re-seeds.
+`npm run reset` wipes both the runtime DB and the seed snapshot, then re-seeds.
+
+## Personal data is wiped on every restart
+
+The runtime database lives at `data/prearxiv.db`. The pristine seeded snapshot lives at `data/prearxiv.seed.db`. **On every server start, db.js replaces the runtime DB with a fresh copy of the seed snapshot** (and clears `data/sessions.db`). This means:
+
+- Demo manuscripts and demo accounts (`eulerine`, `noether42`, …) survive restarts.
+- Anything *you* added — accounts you registered, manuscripts you submitted, comments, votes, flags, API tokens — is gone after every restart, by design.
+
+Two escape hatches:
+
+- `PREXIV_PERSIST=1 npm start` — skip the wipe and keep accumulated data across restarts (useful for development that needs continuity).
+- `npm run seed` regenerates the seed snapshot from the current runtime DB (so you can "checkpoint" a state and have it become the new pristine starting point).
 
 ## Stack
 

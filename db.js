@@ -5,7 +5,35 @@ const fs = require('fs');
 const DB_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
 
-const db = new Database(path.join(DB_DIR, 'prearxiv.db'));
+// ─── personal-data isolation ────────────────────────────────────────────────
+// Two physical files:
+//   data/prearxiv.seed.db  — pristine snapshot (created by `npm run seed`,
+//                            never written to by the running server)
+//   data/prearxiv.db       — runtime DB; everything users add accrues here
+// On every server start we replace the runtime DB with a fresh copy of the
+// seed (and clear the session store), so user accounts, submissions,
+// comments, votes, flags, and API tokens all disappear at restart.
+//
+// `npm run seed` sets PREXIV_SKIP_RESET=1 so the script can populate the
+// runtime DB without it being clobbered first. Set PREXIV_PERSIST=1 to opt
+// out of the wipe entirely (useful for development that needs continuity).
+const SEED_PATH     = path.join(DB_DIR, 'prearxiv.seed.db');
+const RUNTIME_PATH  = path.join(DB_DIR, 'prearxiv.db');
+const SESSIONS_PATH = path.join(DB_DIR, 'sessions.db');
+
+const SKIP_RESET = process.env.PREXIV_SKIP_RESET === '1' || process.env.PREXIV_PERSIST === '1';
+if (!SKIP_RESET && fs.existsSync(SEED_PATH)) {
+  for (const p of [
+    RUNTIME_PATH, RUNTIME_PATH + '-shm', RUNTIME_PATH + '-wal',
+    SESSIONS_PATH, SESSIONS_PATH + '-shm', SESSIONS_PATH + '-wal',
+  ]) {
+    try { fs.unlinkSync(p); } catch { /* may not exist */ }
+  }
+  fs.copyFileSync(SEED_PATH, RUNTIME_PATH);
+  console.log('[db] runtime DB restored from prearxiv.seed.db (user-generated data wiped)');
+}
+
+const db = new Database(RUNTIME_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
