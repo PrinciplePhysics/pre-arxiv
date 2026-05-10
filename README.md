@@ -67,6 +67,6 @@ data/                  SQLite DB (git-ignored)
 - No email verification, no password reset.
 - No full-text search of PDFs (search is title/abstract/author/id only).
 - No DOI minting, no citation export.
-- No anti-abuse beyond rate-of-effort. Public deployment would need at minimum CSRF tokens, rate limiting, and CAPTCHA on registration.
+- No CAPTCHA on registration, no IP/account-level abuse heuristics. CSRF protection and per-route rate limits *are* in place; CAPTCHA is the remaining gap before posting the URL anywhere a determined bot will find it.
 
 The site is itself a "manuscript of a website" — written by a human-conductor and an AI co-author and offered without warranty. Issues and pull requests welcome.
