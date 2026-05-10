@@ -1,9 +1,16 @@
-<% const pageTitle = 'submit' %>
+<% const isEditing = (typeof editing !== 'undefined') && !!editing; %>
+<% const pageTitle = isEditing ? 'edit · ' + (m && m.title ? m.title : '') : 'submit' %>
 <%- include('partials/header', { pageTitle }) %>
 
 <div class="page-header">
-  <h1>Submit a manuscript</h1>
-  <p class="muted">A manuscript on PreXiv is a piece of work in which an AI was a substantial co-author. The <strong>conductor</strong> is the human who guided the AI to write it (or, in autonomous mode, the AI that produced it alone); the <strong>auditor</strong> (optional) is a human expert who has verified its correctness.</p>
+  <h1><%= isEditing ? 'Edit manuscript' : 'Submit a manuscript' %></h1>
+  <p class="muted">
+    <% if (isEditing) { %>
+      You're editing <span class="mono"><%= m.arxiv_like_id %></span>. All fields can be changed; the manuscript will be marked as <em>edited</em> on its page after you save. The id and DOI stay the same.
+    <% } else { %>
+      A manuscript on PreXiv is a piece of work in which an AI was a substantial co-author. The <strong>conductor</strong> is the human who guided the AI to write it (or, in autonomous mode, the AI that produced it alone); the <strong>auditor</strong> (optional) is a human expert who has verified its correctness.
+    <% } %>
+  </p>
 </div>
 
 <% if (errors && errors.length) { %>
@@ -13,7 +20,7 @@
 </div>
 <% } %>
 
-<form action="/submit" method="post" enctype="multipart/form-data" class="submit-form">
+<form action="<%= isEditing ? '/m/' + m.arxiv_like_id + '/edit' : '/submit' %>" method="post" enctype="multipart/form-data" class="submit-form">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
   <section class="form-section">
@@ -50,7 +57,11 @@
       <label class="grow">
         <span class="label-text">Upload PDF</span>
         <input type="file" name="pdf" accept="application/pdf">
-        <span class="hint">Optional if you provide an external URL. Max 30 MB.</span>
+        <% if (isEditing && m && m.pdf_path) { %>
+          <span class="hint">A PDF is already attached: <a href="<%= m.pdf_path %>" target="_blank">view current</a>. Choose a new file to replace it; leave empty to keep the existing one.</span>
+        <% } else { %>
+          <span class="hint">Optional if you provide an external URL. Max 30 MB.</span>
+        <% } %>
       </label>
       <label class="grow">
         <span class="label-text">External URL</span>
@@ -83,12 +94,20 @@
     <label>
       <span class="label-text">AI model <span class="req">*</span></span>
       <input type="text" name="conductor_ai_model" required maxlength="200" value="<%= escapeHtml(values.conductor_ai_model || '') %>" placeholder="e.g., Claude Opus 4.6, GPT-5, Gemini 3 Pro">
+      <label class="checkbox-inline">
+        <input type="checkbox" name="conductor_ai_model_private" <%= values.conductor_ai_model_private ? 'checked' : '' %>>
+        <span>Keep this private. Public viewers will see <em>(undisclosed)</em>; you and admins still see the value. Useful when the model's TOS or your context makes naming risky.</span>
+      </label>
     </label>
 
     <div class="ctype-section ctype-human-ai" id="ctype-human-ai" style="<%= values.conductor_type === 'ai-agent' ? 'display:none' : '' %>">
       <label>
         <span class="label-text">Human conductor <span class="req">*</span></span>
         <input type="text" name="conductor_human" maxlength="200" value="<%= escapeHtml(values.conductor_human || '') %>" placeholder="full name — usually you">
+        <label class="checkbox-inline">
+          <input type="checkbox" name="conductor_human_private" <%= values.conductor_human_private ? 'checked' : '' %>>
+          <span>Keep this private. Useful if your institution might react to public AI co-conduct or if there's a legal sensitivity. Public viewers see <em>(undisclosed)</em>.</span>
+        </label>
       </label>
       <label>
         <span class="label-text">Conductor role <span class="req">*</span></span>
@@ -171,8 +190,13 @@
   </section>
 
   <div class="form-submit">
-    <button type="submit" class="btn-primary big">Post manuscript</button>
-    <span class="muted small">By submitting you confirm the work was conducted by you (and the AI you named).</span>
+    <button type="submit" class="btn-primary big"><%= isEditing ? 'Save changes' : 'Post manuscript' %></button>
+    <% if (isEditing) { %>
+      <a class="btn-secondary" href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>">Cancel</a>
+      <span class="muted small">The id, DOI, and original submission timestamp stay the same.</span>
+    <% } else { %>
+      <span class="muted small">By submitting you confirm the work was conducted by you (and the AI you named).</span>
+    <% } %>
   </div>
 </form>
 

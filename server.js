@@ -205,6 +205,66 @@ function escapeFtsQuery(q) {
     .join(' ');
 }
 
+function parseManuscriptValues(req) {
+  const ct = (req.body.conductor_type || '').trim();
+  return {
+    title: (req.body.title || '').trim(),
+    abstract: (req.body.abstract || '').trim(),
+    authors: (req.body.authors || '').trim(),
+    category: (req.body.category || '').trim(),
+    external_url: (req.body.external_url || '').trim() || null,
+    conductor_type: (ct === 'ai-agent') ? 'ai-agent' : 'human-ai',
+    conductor_ai_model: (req.body.conductor_ai_model || '').trim(),
+    conductor_human: (req.body.conductor_human || '').trim(),
+    conductor_role: (req.body.conductor_role || '').trim(),
+    conductor_notes: (req.body.conductor_notes || '').trim() || null,
+    agent_framework: (req.body.agent_framework || '').trim() || null,
+    conductor_ai_model_private: req.body.conductor_ai_model_private === 'on' || req.body.conductor_ai_model_private === '1',
+    conductor_human_private:    req.body.conductor_human_private    === 'on' || req.body.conductor_human_private    === '1',
+    has_auditor: req.body.has_auditor === 'on' || req.body.has_auditor === '1' || req.body.has_auditor === 'true',
+    auditor_name: (req.body.auditor_name || '').trim(),
+    auditor_affiliation: (req.body.auditor_affiliation || '').trim(),
+    auditor_role: (req.body.auditor_role || '').trim(),
+    auditor_statement: (req.body.auditor_statement || '').trim(),
+    no_auditor_ack: req.body.no_auditor_ack === 'on' || req.body.no_auditor_ack === '1',
+    ai_agent_ack:   req.body.ai_agent_ack   === 'on' || req.body.ai_agent_ack   === '1',
+  };
+}
+
+function validateManuscriptValues(v, opts = {}) {
+  const errors = [];
+  const isEdit = !!opts.editing;
+  if (!v.title || v.title.length < 5)         errors.push('Title is required (≥ 5 characters).');
+  if (v.title.length > 300)                   errors.push('Title is too long (≤ 300 characters).');
+  if (!v.abstract || v.abstract.length < 50)  errors.push('Abstract is required (≥ 50 characters).');
+  if (v.abstract.length > 5000)               errors.push('Abstract is too long (≤ 5000 characters).');
+  if (!v.authors)                             errors.push('Authors line is required (e.g., "Jane Doe; Claude Opus 4.6").');
+  if (!CATEGORIES.find(c => c.id === v.category)) errors.push('Pick a valid category.');
+  if (!v.conductor_ai_model)                  errors.push('Conductor: AI model is required.');
+
+  if (v.conductor_type === 'human-ai') {
+    if (!v.conductor_human)                   errors.push('Conductor: human conductor name is required.');
+    if (!ROLES.includes(v.conductor_role))    errors.push('Conductor: pick a valid role for the human conductor.');
+  } else {
+    // For new submissions, require an explicit autonomy ack. For edits the
+    // submitter already gave it on initial submission.
+    if (!isEdit && !v.ai_agent_ack) {
+      errors.push('You must acknowledge that this manuscript was produced by an AI agent acting autonomously and that NO human (including you) takes responsibility for its conduct or contents.');
+    }
+  }
+
+  if (v.has_auditor) {
+    if (!v.auditor_name)                      errors.push('Auditor name is required when an auditor is listed.');
+    if (!ROLES.includes(v.auditor_role))      errors.push('Auditor: pick a valid role.');
+    if (!v.auditor_statement || v.auditor_statement.length < 20)
+      errors.push('Auditor statement is required (≥ 20 characters).');
+  } else if (!isEdit && v.conductor_type === 'human-ai' && !v.no_auditor_ack) {
+    errors.push('You must acknowledge that without an auditor you are NOT responsible for the correctness of the work, and that this manuscript is unaudited.');
+  }
+
+  return errors;
+}
+
 // ─── routes: home / browse ──────────────────────────────────────────────────
 app.get('/', (req, res) => {
   const { page, per, offset } = paginate(req, 30);
@@ -338,61 +398,11 @@ app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
     next();
   });
 }, csrfCheckParsed, async (req, res) => {
-  const errors = [];
-  const ct = (req.body.conductor_type || '').trim();
-  const v = {
-    title: (req.body.title || '').trim(),
-    abstract: (req.body.abstract || '').trim(),
-    authors: (req.body.authors || '').trim(),
-    category: (req.body.category || '').trim(),
-    external_url: (req.body.external_url || '').trim() || null,
-    conductor_type: (ct === 'ai-agent') ? 'ai-agent' : 'human-ai',
-    conductor_ai_model: (req.body.conductor_ai_model || '').trim(),
-    conductor_human: (req.body.conductor_human || '').trim(),
-    conductor_role: (req.body.conductor_role || '').trim(),
-    conductor_notes: (req.body.conductor_notes || '').trim() || null,
-    agent_framework: (req.body.agent_framework || '').trim() || null,
-    has_auditor: req.body.has_auditor === 'on' || req.body.has_auditor === '1' || req.body.has_auditor === 'true',
-    auditor_name: (req.body.auditor_name || '').trim(),
-    auditor_affiliation: (req.body.auditor_affiliation || '').trim(),
-    auditor_role: (req.body.auditor_role || '').trim(),
-    auditor_statement: (req.body.auditor_statement || '').trim(),
-    no_auditor_ack: req.body.no_auditor_ack === 'on' || req.body.no_auditor_ack === '1',
-    ai_agent_ack:   req.body.ai_agent_ack   === 'on' || req.body.ai_agent_ack   === '1',
-  };
-
-  if (!v.title || v.title.length < 5)         errors.push('Title is required (≥ 5 characters).');
-  if (v.title.length > 300)                   errors.push('Title is too long (≤ 300 characters).');
-  if (!v.abstract || v.abstract.length < 50)  errors.push('Abstract is required (≥ 50 characters).');
-  if (v.abstract.length > 5000)               errors.push('Abstract is too long (≤ 5000 characters).');
-  if (!v.authors)                             errors.push('Authors line is required (e.g., "Jane Doe; Claude Opus 4.6").');
-  if (!CATEGORIES.find(c => c.id === v.category)) errors.push('Pick a valid category.');
-  if (!v.conductor_ai_model)                  errors.push('Conductor: AI model is required.');
-
-  if (v.conductor_type === 'human-ai') {
-    if (!v.conductor_human)                   errors.push('Conductor: human conductor name is required.');
-    if (!ROLES.includes(v.conductor_role))    errors.push('Conductor: pick a valid role for the human conductor.');
-  } else {
-    // ai-agent: human/role optional, but the submitter must explicitly attest
-    // that no human was involved beyond pressing the submit button.
-    if (!v.ai_agent_ack) {
-      errors.push('You must acknowledge that this manuscript was produced by an AI agent acting autonomously and that NO human (including you) takes responsibility for its conduct or contents.');
-    }
-  }
-
-  if (v.has_auditor) {
-    if (!v.auditor_name)                      errors.push('Auditor name is required when an auditor is listed.');
-    if (!ROLES.includes(v.auditor_role))      errors.push('Auditor: pick a valid role.');
-    if (!v.auditor_statement || v.auditor_statement.length < 20)
-      errors.push('Auditor statement is required (≥ 20 characters).');
-  } else if (v.conductor_type === 'human-ai' && !v.no_auditor_ack) {
-    errors.push('You must acknowledge that without an auditor you are NOT responsible for the correctness of the work, and that this manuscript is unaudited.');
-  }
-
+  const v = parseManuscriptValues(req);
+  const errors = validateManuscriptValues(v);
   if (!req.file && !v.external_url) {
     errors.push('Provide either a PDF upload or an external URL to the manuscript.');
   }
-
   if (errors.length) {
     if (req.file) fs.unlink(req.file.path, () => {});
     return res.render('submit', { values: v, errors });
@@ -411,15 +421,18 @@ app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
   const r = db.prepare(`
     INSERT INTO manuscripts (
       arxiv_like_id, doi, submitter_id, title, abstract, authors, category, pdf_path, pdf_text, external_url,
-      conductor_type, conductor_ai_model, conductor_human, conductor_role, conductor_notes, agent_framework,
+      conductor_type, conductor_ai_model, conductor_ai_model_public,
+      conductor_human, conductor_human_public, conductor_role, conductor_notes, agent_framework,
       has_auditor, auditor_name, auditor_affiliation, auditor_role, auditor_statement,
       score
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
   `).run(
     arxivId, doi, req.user.id, v.title, v.abstract, v.authors, v.category, pdf_path, pdf_text, v.external_url,
     v.conductor_type,
     v.conductor_ai_model,
+    v.conductor_ai_model_private ? 0 : 1,
     v.conductor_type === 'human-ai' ? v.conductor_human : null,
+    v.conductor_human_private ? 0 : 1,
     v.conductor_type === 'human-ai' ? v.conductor_role  : null,
     v.conductor_notes,
     v.conductor_type === 'ai-agent' ? v.agent_framework : null,
@@ -458,6 +471,112 @@ app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
 
   flash(req, 'ok', 'Manuscript posted as ' + arxivId + '.');
   res.redirect('/m/' + arxivId);
+});
+
+// ─── routes: edit a manuscript ──────────────────────────────────────────────
+function fetchEditableManuscript(req, res) {
+  const m = db.prepare(`
+    SELECT m.*, u.username AS submitter_username, u.display_name AS submitter_display
+    FROM manuscripts m JOIN users u ON u.id = m.submitter_id
+    WHERE m.arxiv_like_id = ? OR m.id = ?
+  `).get(req.params.id, req.params.id);
+  if (!m) { res.status(404).render('error', { code: 404, msg: 'Manuscript not found.' }); return null; }
+  const allowed = (m.submitter_id === req.user.id) || isAdmin(req.user);
+  if (!allowed) { res.status(403).render('error', { code: 403, msg: 'You can only edit your own manuscripts.' }); return null; }
+  return m;
+}
+
+app.get('/m/:id/edit', requireAuth, (req, res) => {
+  const m = fetchEditableManuscript(req, res);
+  if (!m) return;
+  // Pre-fill the form. The "private" booleans are derived from the public flags.
+  const values = {
+    title: m.title, abstract: m.abstract, authors: m.authors, category: m.category,
+    external_url: m.external_url || '',
+    conductor_type: m.conductor_type,
+    conductor_ai_model: m.conductor_ai_model,
+    conductor_human: m.conductor_human || '',
+    conductor_role: m.conductor_role || '',
+    conductor_notes: m.conductor_notes || '',
+    agent_framework: m.agent_framework || '',
+    conductor_ai_model_private: m.conductor_ai_model_public === 0,
+    conductor_human_private:    m.conductor_human_public    === 0,
+    has_auditor: !!m.has_auditor,
+    auditor_name: m.auditor_name || '',
+    auditor_affiliation: m.auditor_affiliation || '',
+    auditor_role: m.auditor_role || '',
+    auditor_statement: m.auditor_statement || '',
+  };
+  res.render('submit', { values, errors: [], editing: true, m });
+});
+
+app.post('/m/:id/edit', submitLimiter, requireAuth, (req, res, next) => {
+  upload.single('pdf')(req, res, (err) => {
+    if (err) {
+      flash(req, 'error', err.message || 'Upload failed.');
+      return res.redirect('/m/' + req.params.id + '/edit');
+    }
+    next();
+  });
+}, csrfCheckParsed, async (req, res) => {
+  const m = fetchEditableManuscript(req, res);
+  if (!m) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return;
+  }
+  const v = parseManuscriptValues(req);
+  const errors = validateManuscriptValues(v, { editing: true });
+  // For edit, a PDF or external URL must still be available — either the new
+  // upload, the new external URL, or the existing PDF / URL we already have.
+  if (!req.file && !v.external_url && !m.pdf_path && !m.external_url) {
+    errors.push('Provide either a PDF upload or an external URL to the manuscript.');
+  }
+  if (errors.length) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.render('submit', { values: v, errors, editing: true, m });
+  }
+
+  // Decide PDF state: keep existing, replace, or unchanged.
+  let pdf_path = m.pdf_path;
+  let pdf_text = m.pdf_text;
+  if (req.file) {
+    pdf_path = '/uploads/' + path.basename(req.file.path);
+    pdf_text = await extractPdfText(req.file.path);
+    // best-effort cleanup of old file
+    if (m.pdf_path) {
+      const old = path.join(__dirname, 'public', m.pdf_path.replace(/^\//, ''));
+      fs.unlink(old, () => {});
+    }
+  }
+
+  db.prepare(`
+    UPDATE manuscripts SET
+      title = ?, abstract = ?, authors = ?, category = ?,
+      pdf_path = ?, pdf_text = ?, external_url = ?,
+      conductor_type = ?, conductor_ai_model = ?, conductor_ai_model_public = ?,
+      conductor_human = ?, conductor_human_public = ?, conductor_role = ?,
+      conductor_notes = ?, agent_framework = ?,
+      has_auditor = ?, auditor_name = ?, auditor_affiliation = ?, auditor_role = ?, auditor_statement = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(
+    v.title, v.abstract, v.authors, v.category,
+    pdf_path, pdf_text, v.external_url,
+    v.conductor_type, v.conductor_ai_model, v.conductor_ai_model_private ? 0 : 1,
+    v.conductor_type === 'human-ai' ? v.conductor_human : null,
+    v.conductor_human_private ? 0 : 1,
+    v.conductor_type === 'human-ai' ? v.conductor_role : null,
+    v.conductor_notes, v.conductor_type === 'ai-agent' ? v.agent_framework : null,
+    v.has_auditor ? 1 : 0,
+    v.has_auditor ? v.auditor_name : null,
+    v.has_auditor ? (v.auditor_affiliation || null) : null,
+    v.has_auditor ? v.auditor_role : null,
+    v.has_auditor ? v.auditor_statement : null,
+    m.id
+  );
+
+  flash(req, 'ok', 'Manuscript updated.');
+  res.redirect('/m/' + m.arxiv_like_id);
 });
 
 // ─── routes: manuscript detail + comments ───────────────────────────────────

@@ -676,6 +676,18 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   font-size: 13.5px;
   margin: 12px 0 !important;
 }
+.checkbox-inline {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 4px 0 0 !important;
+  font-weight: normal;
+  cursor: pointer;
+}
+.checkbox-inline input { margin-top: 3px; flex-shrink: 0; }
+.checkbox-inline span em { color: var(--brand); font-style: italic; }
 .checkbox input { margin-top: 3px; }
 .checkbox .label-text { display: inline; }
 .checkbox-warn {
@@ -936,6 +948,32 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 }
 .cite-actions { margin: 0 0 8px; }
 .mono { font-family: var(--mono); }
+
+/* ─── redacted / private fields ──────────────────────────────────────────── */
+
+.redacted {
+  font-style: italic;
+  color: var(--muted);
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 4px,
+    rgba(184, 67, 10, 0.06) 4px 8px
+  );
+  padding: 0 4px;
+  border-radius: 2px;
+}
+.private-hint {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--brand);
+  background: var(--brand-bg);
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid #e6c8a6;
+  font-style: italic;
+}
+.private-hint em { font-style: normal; font-weight: 600; }
 
 /* ─── DOI pill on manuscript page ────────────────────────────────────────── */
 

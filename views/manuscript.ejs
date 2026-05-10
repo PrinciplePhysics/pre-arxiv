@@ -1,4 +1,9 @@
 <% const pageTitle = m.title %>
+<% const canSeeFull = (typeof isAdmin !== 'undefined' && isAdmin) || (typeof user !== 'undefined' && user && m.submitter_id === user.id); %>
+<% const aiModelDisplay = (m.conductor_ai_model_public !== 0 || canSeeFull) ? m.conductor_ai_model : '(undisclosed)'; %>
+<% const humanDisplay   = (m.conductor_human_public    !== 0 || canSeeFull) ? m.conductor_human    : '(undisclosed)'; %>
+<% const aiModelHidden  = m.conductor_ai_model_public === 0; %>
+<% const humanHidden    = m.conductor_human_public    === 0; %>
 <%- include('partials/header', { pageTitle }) %>
 
 <article class="manuscript">
@@ -15,7 +20,7 @@
     <% if (m.conductor_type === 'ai-agent') { %>
     <div class="agent-banner">
       <strong>AI agent (autonomous).</strong>
-      This manuscript was produced by <%= escapeHtml(m.conductor_ai_model) %> acting on its own, without ongoing human direction.
+      This manuscript was produced by <%= escapeHtml(aiModelDisplay) %> acting on its own, without ongoing human direction.
       <% if (!m.has_auditor) { %>
         <strong>No human</strong> &mdash; including the submitter &mdash; takes responsibility for its conduct or contents.
       <% } else { %>
@@ -49,6 +54,10 @@
       <% const _cat = CATEGORIES.find(c => c.id === m.category); if (_cat) { %><span class="muted"><%= _cat.name %></span><% } %>
       <span class="muted">·</span>
       <span class="muted">submitted <%= timeAgo(m.created_at) %></span>
+      <% if (m.updated_at && m.updated_at !== m.created_at) { %>
+      <span class="muted">·</span>
+      <span class="muted edited-mark" title="last edited <%= m.updated_at %>">edited <%= timeAgo(m.updated_at) %></span>
+      <% } %>
       <span class="muted">·</span>
       <span class="muted"><%= m.view_count %> views</span>
     </div>
@@ -82,6 +91,7 @@
   <% if (typeof user !== 'undefined' && user) { %>
   <div class="ms-mod-bar">
     <% if (!m.withdrawn && (m.submitter_id === user.id || isAdmin)) { %>
+      <a class="btn-secondary" href="/m/<%= m.arxiv_like_id %>/edit">Edit</a>
       <details class="mod-action">
         <summary>Withdraw…</summary>
         <form action="/m/<%= m.arxiv_like_id %>/withdraw" method="post" class="mod-form">
@@ -123,7 +133,10 @@
       <p class="muted small">No human conductor. This manuscript was produced by an AI agent acting autonomously.</p>
       <table class="kv">
         <tr><th>Mode</th><td><span class="role-tag agent-tag">AI agent (autonomous)</span></td></tr>
-        <tr><th>AI agent</th><td><strong><%= escapeHtml(m.conductor_ai_model) %></strong></td></tr>
+        <tr><th>AI agent</th><td>
+          <strong<%= aiModelHidden ? ' class="redacted"' : '' %>><%= escapeHtml(aiModelDisplay) %></strong>
+          <% if (aiModelHidden && canSeeFull) { %><span class="private-hint">private — public viewers see <em>(undisclosed)</em></span><% } %>
+        </td></tr>
         <% if (m.agent_framework) { %>
         <tr><th>Framework</th><td><%= escapeHtml(m.agent_framework) %></td></tr>
         <% } %>
@@ -135,8 +148,15 @@
     <% } else { %>
       <p class="muted small">The conductor is the pair (human, AI) responsible for producing the manuscript.</p>
       <table class="kv">
-        <tr><th>Human conductor</th><td><strong><%= escapeHtml(m.conductor_human) %></strong> · <span class="role-tag"><%= escapeHtml(m.conductor_role) %></span></td></tr>
-        <tr><th>AI co-author</th><td><%= escapeHtml(m.conductor_ai_model) %></td></tr>
+        <tr><th>Human conductor</th><td>
+          <strong<%= humanHidden ? ' class="redacted"' : '' %>><%= escapeHtml(humanDisplay) %></strong>
+          <% if (!humanHidden) { %> · <span class="role-tag"><%= escapeHtml(m.conductor_role) %></span><% } %>
+          <% if (humanHidden && canSeeFull) { %><span class="private-hint">private — public viewers see <em>(undisclosed)</em></span><% } %>
+        </td></tr>
+        <tr><th>AI co-author</th><td>
+          <span<%= aiModelHidden ? ' class="redacted"' : '' %>><%= escapeHtml(aiModelDisplay) %></span>
+          <% if (aiModelHidden && canSeeFull) { %><span class="private-hint">private — public viewers see <em>(undisclosed)</em></span><% } %>
+        </td></tr>
         <tr><th>Submitted by</th><td><a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a><% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %></td></tr>
         <% if (m.conductor_notes) { %>
         <tr><th>Notes</th><td><%- renderMarkdown(m.conductor_notes) %></td></tr>

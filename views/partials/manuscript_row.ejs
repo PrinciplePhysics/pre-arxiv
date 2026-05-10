@@ -1,6 +1,9 @@
 <%
   const myVote = voteMap && voteMap[m.id] ? voteMap[m.id] : 0;
   const cat = CATEGORIES.find(c => c.id === m.category) || { name: m.category };
+  const _canSeeFull = (typeof isAdmin !== 'undefined' && isAdmin) || (typeof user !== 'undefined' && user && m.submitter_id === user.id);
+  const _aiDisp    = (m.conductor_ai_model_public !== 0 || _canSeeFull) ? m.conductor_ai_model : '(undisclosed)';
+  const _humanDisp = (m.conductor_human_public    !== 0 || _canSeeFull) ? m.conductor_human    : '(undisclosed)';
 %>
 <li class="ms-row" id="m<%= m.id %>">
   <div class="ms-rank"><%= typeof rank !== 'undefined' ? rank + '.' : '' %></div>
@@ -44,10 +47,10 @@
       <span class="dot">·</span>
       <% if (m.conductor_type === 'ai-agent') { %>
         <span class="muted">produced by</span>
-        <span class="conductor-pair"><em><%= escapeHtml(m.conductor_ai_model) %></em> <span class="muted small">(autonomous)</span></span>
+        <span class="conductor-pair"><em><%= escapeHtml(_aiDisp) %></em> <span class="muted small">(autonomous)</span></span>
       <% } else { %>
         <span class="muted">conducted by</span>
-        <span class="conductor-pair"><strong><%= escapeHtml(m.conductor_human) %></strong> + <em><%= escapeHtml(m.conductor_ai_model) %></em></span>
+        <span class="conductor-pair"><strong><%= escapeHtml(_humanDisp) %></strong> + <em><%= escapeHtml(_aiDisp) %></em></span>
       <% } %>
       <span class="dot">·</span>
       <a href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>#comments"><%= m.comment_count %> comment<%= m.comment_count === 1 ? '' : 's' %></a>

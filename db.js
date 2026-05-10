@@ -45,7 +45,9 @@ CREATE TABLE IF NOT EXISTS manuscripts (
   conductor_type     TEXT NOT NULL DEFAULT 'human-ai'
                      CHECK (conductor_type IN ('human-ai', 'ai-agent')),
   conductor_ai_model TEXT NOT NULL,
+  conductor_ai_model_public INTEGER NOT NULL DEFAULT 1,
   conductor_human    TEXT,           -- required only when conductor_type='human-ai'
+  conductor_human_public    INTEGER NOT NULL DEFAULT 1,
   conductor_role     TEXT,           -- required only when conductor_type='human-ai'
   conductor_notes    TEXT,
   agent_framework    TEXT,           -- optional; only meaningful for conductor_type='ai-agent'
@@ -134,8 +136,10 @@ safeAlter(`ALTER TABLE manuscripts ADD COLUMN pdf_text         TEXT`);
 safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn        INTEGER NOT NULL DEFAULT 0`);
 safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn_reason TEXT`);
 safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn_at     DATETIME`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN conductor_type   TEXT NOT NULL DEFAULT 'human-ai'`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN agent_framework  TEXT`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN conductor_type            TEXT NOT NULL DEFAULT 'human-ai'`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN agent_framework           TEXT`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN conductor_ai_model_public INTEGER NOT NULL DEFAULT 1`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN conductor_human_public    INTEGER NOT NULL DEFAULT 1`);
 
 // ─── relax NOT NULL on conductor_human / conductor_role ──────────────────────
 // Old schema had both as NOT NULL. AI-agent manuscripts have neither, so we
