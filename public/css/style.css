@@ -450,10 +450,13 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   border: 1px solid var(--rule-strong);
   border-radius: 4px;
   font-size: 13.5px;
+  line-height: 1.5;
   text-decoration: none;
   display: inline-block;
   font-family: inherit;
   cursor: pointer;
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 .btn-secondary:hover { background: #f4eedb; text-decoration: none; }
 
@@ -1031,13 +1034,17 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 }
 .tombstone-reason { display: block; margin-top: 4px; font-style: italic; }
 
-.ms-mod-bar {
-  display: flex; flex-wrap: wrap; gap: 8px;
-  margin: -10px 0 18px;
-  font-size: 13px;
-  align-items: flex-start;
+.mod-action { position: relative; align-self: center; }
+.mod-action[open] > .mod-form {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  min-width: 320px;
+  margin-top: 4px;
+  border-top-left-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
-.mod-action { position: relative; }
 /* Hide the browser default disclosure triangle on every relevant browser. */
 .mod-action summary::-webkit-details-marker { display: none; }
 .mod-action summary { list-style: none; }
@@ -1052,7 +1059,9 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   border-radius: 4px;
   font-size: 13.5px;
   font-family: inherit;
-  line-height: 1.2;
+  line-height: 1.5;
+  vertical-align: middle;
+  box-sizing: border-box;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .mod-action summary:hover { background: #f4eedb; color: var(--brand); border-color: var(--brand); }
@@ -1062,19 +1071,15 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   background: var(--brand-bg);
   color: var(--brand);
   border-color: var(--brand);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
 }
 .mod-action[open] > summary.danger {
   background: #f8eaea; color: #a03030; border-color: #a03030;
 }
 .mod-form {
-  background: var(--bg-card-alt);
+  background: var(--bg-card);
   border: 1px solid var(--rule-strong);
   border-radius: 4px;
-  border-top-left-radius: 0;
   padding: 10px 12px;
-  margin-top: -1px;
   max-width: 460px;
 }
 .mod-form textarea {
