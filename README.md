@@ -19,17 +19,16 @@ Demo accounts (password `demo1234` for all):
 
 `npm run reset` wipes both the runtime DB and the seed snapshot, then re-seeds.
 
-## Personal data is wiped on every restart
+## Personal data persistence
 
-The runtime database lives at `data/prearxiv.db`. The pristine seeded snapshot lives at `data/prearxiv.seed.db`. **On every server start, db.js replaces the runtime DB with a fresh copy of the seed snapshot** (and clears `data/sessions.db`). This means:
+The runtime database is `data/prearxiv.db`. By default it persists across restarts — accounts you create, manuscripts you submit, comments, votes, flags, and API tokens are all remembered.
 
-- Demo manuscripts and demo accounts (`eulerine`, `noether42`, …) survive restarts.
-- Anything *you* added — accounts you registered, manuscripts you submitted, comments, votes, flags, API tokens — is gone after every restart, by design.
+If you want a "fresh demo state on every restart" behaviour instead, run with `PREXIV_WIPE_ON_RESTART=1 npm start`. On every server start, db.js then replaces the runtime DB with a fresh copy of `data/prearxiv.seed.db` (and clears `data/sessions.db`), so only the demo manuscripts and demo accounts survive. Anything you added is gone.
 
-Two escape hatches:
+Useful related commands:
 
-- `PREXIV_PERSIST=1 npm start` — skip the wipe and keep accumulated data across restarts (useful for development that needs continuity).
-- `npm run seed` regenerates the seed snapshot from the current runtime DB (so you can "checkpoint" a state and have it become the new pristine starting point).
+- `npm run seed` (re)builds `data/prearxiv.seed.db` from the current runtime DB, so you can "checkpoint" the current state as the pristine starting point used by `PREXIV_WIPE_ON_RESTART=1`.
+- `npm run reset` wipes both the runtime DB and the seed snapshot, then re-seeds from scratch.
 
 ## Stack
 
