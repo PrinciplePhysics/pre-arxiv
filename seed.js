@@ -11,8 +11,8 @@ if (usersExist > 0) {
 }
 
 const insertUser = db.prepare(`
-  INSERT INTO users (username, email, password_hash, display_name, affiliation, bio, karma)
-  VALUES (?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO users (username, email, password_hash, display_name, affiliation, bio, karma, email_verified)
+  VALUES (?, ?, ?, ?, ?, ?, ?, 1)
 `);
 
 const userIds = {};
@@ -31,12 +31,12 @@ for (const [un, em, pw, dn, aff, bio, k] of sampleUsers) {
 
 const insertManuscript = db.prepare(`
   INSERT INTO manuscripts (
-    arxiv_like_id, submitter_id, title, abstract, authors, category,
+    arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
     pdf_path, external_url,
     conductor_ai_model, conductor_human, conductor_role, conductor_notes,
     has_auditor, auditor_name, auditor_affiliation, auditor_role, auditor_statement,
     score, comment_count
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 const samples = [
@@ -142,8 +142,11 @@ let s = 0;
 for (const m of samples) {
   // backdate by random hours so the home page has a mix
   const hoursAgo = Math.floor(Math.random() * 240) + 1;
+  const arxivId = makeArxivLikeId();
+  const doi     = '10.99999/' + arxivId.toUpperCase();
   const r = insertManuscript.run(
-    makeArxivLikeId(),
+    arxivId,
+    doi,
     userIds[m.submitter],
     m.title,
     m.abstract,

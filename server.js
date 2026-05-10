@@ -11,6 +11,8 @@ const rateLimit = require('express-rate-limit');
 const { db, CATEGORIES, ROLES } = require('./db');
 const { hashPassword, verifyPassword, loadUser, requireAuth, validateUsername } = require('./lib/auth');
 const { timeAgo, escapeHtml, rankScore, makeArxivLikeId, renderMarkdown, ageHours, paginate } = require('./lib/util');
+const { sendMail, absoluteUrl, enabled: emailEnabled } = require('./lib/email');
+const { renderBibtex, renderRis, renderPlain } = require('./lib/citation');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 3000;
@@ -159,6 +161,39 @@ function rankManuscripts(rows) {
     .sort((a, b) => b.rankValue - a.rankValue);
 }
 
+// Synthetic DOI in Crossref's reserved 10.99999 prefix (test-only — never
+// resolves on doi.org). Used so manuscripts have a DOI-shaped citation
+// identifier without paying a registrar.
+function makeSyntheticDoi(arxivLikeId) {
+  return '10.99999/' + (arxivLikeId || '').toUpperCase();
+}
+
+// Best-effort PDF -> plain text. Bounded so a malformed PDF can't OOM us;
+// failures are logged and return null (we just won't have full-text search
+// for that manuscript).
+const MAX_PDF_TEXT = 500_000; // ~500 KB of text per manuscript
+async function extractPdfText(filepath) {
+  try {
+    const { PDFParse } = require('pdf-parse');
+    const buf = fs.readFileSync(filepath);
+    const parser = new PDFParse({ data: buf });
+    const result = await parser.getText();
+    let txt = (result && result.text) ? String(result.text) : '';
+    txt = txt.replace(/\s+/g, ' ').trim();
+    if (txt.length > MAX_PDF_TEXT) txt = txt.slice(0, MAX_PDF_TEXT);
+    return txt || null;
+  } catch (e) {
+    console.warn('[pdf-parse] failed for ' + filepath + ': ' + e.message);
+    return null;
+  }
+}
+
+function escapeFtsQuery(q) {
+  return q.split(/\s+/).filter(Boolean)
+    .map(t => '"' + t.replace(/"/g, '""') + '"')
+    .join(' ');
+}
+
 // ─── routes: home / browse ──────────────────────────────────────────────────
 app.get('/', (req, res) => {
   const { page, per, offset } = paginate(req, 30);
@@ -233,27 +268,57 @@ app.get('/browse/:cat', (req, res) => {
 
 app.get('/search', (req, res) => {
   const q = (req.query.q || '').trim();
-  let rows = [];
+  const rows = [];
+  const seen = new Set();
   if (q) {
-    const like = '%' + q.replace(/[%_]/g, m => '\\' + m) + '%';
-    rows = db.prepare(`
+    // Exact-id matches first (arxiv-like or DOI).
+    const idMatches = db.prepare(`
       SELECT m.*, u.username AS submitter_username, u.display_name AS submitter_display
       FROM manuscripts m JOIN users u ON u.id = m.submitter_id
-      WHERE m.title LIKE ? ESCAPE '\\' OR m.abstract LIKE ? ESCAPE '\\' OR m.authors LIKE ? ESCAPE '\\' OR m.arxiv_like_id LIKE ? ESCAPE '\\'
-      ORDER BY m.created_at DESC
-      LIMIT 100
-    `).all(like, like, like, like);
+      WHERE m.arxiv_like_id = ? OR m.doi = ? OR m.arxiv_like_id LIKE ? OR m.doi LIKE ?
+      LIMIT 20
+    `).all(q, q, q + '%', q + '%');
+    for (const r of idMatches) if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); }
+
+    // FTS over title + abstract + authors + pdf body.
+    const ftsQ = escapeFtsQuery(q);
+    if (ftsQ) {
+      try {
+        const ftsRows = db.prepare(`
+          SELECT m.*, u.username AS submitter_username, u.display_name AS submitter_display
+          FROM manuscripts m
+          JOIN users u ON u.id = m.submitter_id
+          JOIN manuscripts_fts fts ON fts.rowid = m.id
+          WHERE manuscripts_fts MATCH ?
+          ORDER BY rank
+          LIMIT 100
+        `).all(ftsQ);
+        for (const r of ftsRows) if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); }
+      } catch (_e) {
+        // bad query (rare) — fall through silently
+      }
+    }
   }
   const voteMap = req.user ? buildVoteMap(req.user.id, 'manuscript', rows.map(r => r.id)) : {};
   res.render('search', { manuscripts: rows, voteMap, q });
 });
 
 // ─── routes: submission ─────────────────────────────────────────────────────
-app.get('/submit', requireAuth, (req, res) => {
+function requireVerified(req, res, next) {
+  if (!req.user) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+  const u = db.prepare('SELECT email_verified FROM users WHERE id = ?').get(req.user.id);
+  if (!u || !u.email_verified) {
+    flash(req, 'error', 'Please verify your email address before submitting.');
+    return res.redirect('/verify-pending');
+  }
+  next();
+}
+
+app.get('/submit', requireVerified, (req, res) => {
   res.render('submit', { values: {}, errors: [] });
 });
 
-app.post('/submit', submitLimiter, requireAuth, (req, res, next) => {
+app.post('/submit', submitLimiter, requireVerified, (req, res, next) => {
   upload.single('pdf')(req, res, (err) => {
     if (err) {
       flash(req, 'error', err.message || 'Upload failed.');
@@ -261,7 +326,7 @@ app.post('/submit', submitLimiter, requireAuth, (req, res, next) => {
     }
     next();
   });
-}, csrfCheckParsed, (req, res) => {
+}, csrfCheckParsed, async (req, res) => {
   const errors = [];
   const v = {
     title: (req.body.title || '').trim(),
@@ -310,17 +375,24 @@ app.post('/submit', submitLimiter, requireAuth, (req, res, next) => {
   }
 
   const arxivId = makeArxivLikeId();
+  const doi     = makeSyntheticDoi(arxivId);
   const pdf_path = req.file ? '/uploads/' + path.basename(req.file.path) : null;
+
+  // Best-effort PDF text extraction. Synchronous-ish (we await once before insert).
+  let pdf_text = null;
+  if (req.file) {
+    pdf_text = await extractPdfText(req.file.path);
+  }
 
   const r = db.prepare(`
     INSERT INTO manuscripts (
-      arxiv_like_id, submitter_id, title, abstract, authors, category, pdf_path, external_url,
+      arxiv_like_id, doi, submitter_id, title, abstract, authors, category, pdf_path, pdf_text, external_url,
       conductor_ai_model, conductor_human, conductor_role, conductor_notes,
       has_auditor, auditor_name, auditor_affiliation, auditor_role, auditor_statement,
       score
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
   `).run(
-    arxivId, req.user.id, v.title, v.abstract, v.authors, v.category, pdf_path, v.external_url,
+    arxivId, doi, req.user.id, v.title, v.abstract, v.authors, v.category, pdf_path, pdf_text, v.external_url,
     v.conductor_ai_model, v.conductor_human, v.conductor_role, v.conductor_notes,
     v.has_auditor ? 1 : 0,
     v.has_auditor ? v.auditor_name : null,
@@ -463,7 +535,7 @@ app.get('/register', (req, res) => {
   res.render('register', { values: {}, errors: [] });
 });
 
-app.post('/register', authLimiter, (req, res) => {
+app.post('/register', authLimiter, async (req, res) => {
   const username     = (req.body.username || '').trim();
   const email        = (req.body.email || '').trim().toLowerCase();
   const password     = req.body.password || '';
@@ -481,17 +553,134 @@ app.post('/register', authLimiter, (req, res) => {
   if (errors.length) {
     return res.render('register', { values: { username, email, display_name, affiliation }, errors });
   }
+  const verifyToken = crypto.randomBytes(24).toString('base64url');
+  const verifyExpires = Date.now() + 1000 * 60 * 60 * 24 * 3; // 3 days
   const r = db.prepare(`
-    INSERT INTO users (username, email, password_hash, display_name, affiliation)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(username, email, hashPassword(password), display_name, affiliation);
+    INSERT INTO users (username, email, password_hash, display_name, affiliation,
+                       email_verified, email_verify_token, email_verify_expires)
+    VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+  `).run(username, email, hashPassword(password), display_name, affiliation, verifyToken, verifyExpires);
   req.session.userId = r.lastInsertRowid;
-  flash(req, 'ok', 'Welcome to pre-arxiv.');
+
+  const verifyLink = absoluteUrl(req, '/verify/' + verifyToken);
+  const result = await sendMail({
+    to: email,
+    subject: 'Verify your email for pre-arxiv',
+    text:
+`Welcome to pre-arxiv.
+
+Please confirm your email address by visiting:
+
+  ${verifyLink}
+
+This link expires in 3 days. If you didn't sign up, you can ignore this email.`,
+  });
+
+  // In dev/no-SMTP mode, surface the link directly on the next page.
+  req.session.lastVerifyLink = result.devMode ? verifyLink : null;
+  res.redirect('/verify-pending');
+});
+
+app.get('/verify-pending', (req, res) => {
+  if (!req.user) return res.redirect('/');
+  const u = db.prepare('SELECT email, email_verified FROM users WHERE id = ?').get(req.user.id);
+  if (u && u.email_verified) return res.redirect('/');
+  const link = req.session.lastVerifyLink || null;
+  delete req.session.lastVerifyLink;
+  res.render('verify_pending', { email: u ? u.email : '', devLink: link, smtpEnabled: emailEnabled });
+});
+
+app.get('/verify/:token', (req, res) => {
+  const tok = req.params.token;
+  const u = db.prepare('SELECT id, email_verify_expires FROM users WHERE email_verify_token = ?').get(tok);
+  if (!u) {
+    return res.status(400).render('error', { code: 400, msg: 'Verification link is invalid or has already been used.' });
+  }
+  if (u.email_verify_expires && u.email_verify_expires < Date.now()) {
+    return res.status(400).render('error', { code: 400, msg: 'Verification link has expired. Request a new one.' });
+  }
+  db.prepare(`UPDATE users SET email_verified = 1, email_verify_token = NULL, email_verify_expires = NULL WHERE id = ?`).run(u.id);
+  if (!req.user) req.session.userId = u.id;
+  flash(req, 'ok', 'Email verified. You can now submit manuscripts.');
   res.redirect('/');
+});
+
+app.post('/verify/resend', authLimiter, requireAuth, async (req, res) => {
+  const u = db.prepare('SELECT id, email, email_verified FROM users WHERE id = ?').get(req.user.id);
+  if (!u) return res.redirect('/');
+  if (u.email_verified) { flash(req, 'ok', 'Already verified.'); return res.redirect('/'); }
+  const verifyToken = crypto.randomBytes(24).toString('base64url');
+  const verifyExpires = Date.now() + 1000 * 60 * 60 * 24 * 3;
+  db.prepare('UPDATE users SET email_verify_token = ?, email_verify_expires = ? WHERE id = ?')
+    .run(verifyToken, verifyExpires, u.id);
+  const link = absoluteUrl(req, '/verify/' + verifyToken);
+  const result = await sendMail({
+    to: u.email,
+    subject: 'New pre-arxiv verification link',
+    text: `Use this link to verify your email:\n\n  ${link}\n\nThis one expires in 3 days.`,
+  });
+  req.session.lastVerifyLink = result.devMode ? link : null;
+  res.redirect('/verify-pending');
 });
 
 app.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/'));
+});
+
+// ─── routes: password reset ─────────────────────────────────────────────────
+app.get('/forgot', (req, res) => {
+  res.render('forgot', { values: {}, errors: [], devLink: req.session.lastResetLink || null });
+  delete req.session.lastResetLink;
+});
+
+app.post('/forgot', authLimiter, async (req, res) => {
+  const email = (req.body.email || '').trim().toLowerCase();
+  if (!email) return res.render('forgot', { values: {}, errors: ['Email is required.'], devLink: null });
+
+  const u = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  // Generic response either way to avoid email enumeration
+  let devLink = null;
+  if (u) {
+    const token = crypto.randomBytes(24).toString('base64url');
+    const expires = Date.now() + 1000 * 60 * 60; // 1 hour
+    db.prepare('UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?')
+      .run(token, expires, u.id);
+    const link = absoluteUrl(req, '/reset/' + token);
+    const result = await sendMail({
+      to: email,
+      subject: 'pre-arxiv password reset',
+      text: `A password reset was requested for this email.\n\nIf it was you, follow this link within 1 hour:\n\n  ${link}\n\nIf it wasn't, ignore this message — nothing has changed.`,
+    });
+    if (result.devMode) devLink = link;
+  }
+  req.session.lastResetLink = devLink;
+  flash(req, 'ok', 'If an account exists for that email, a reset link has been sent.');
+  res.redirect('/forgot');
+});
+
+app.get('/reset/:token', (req, res) => {
+  const u = db.prepare('SELECT id, password_reset_expires FROM users WHERE password_reset_token = ?').get(req.params.token);
+  if (!u || (u.password_reset_expires && u.password_reset_expires < Date.now())) {
+    return res.status(400).render('error', { code: 400, msg: 'Reset link is invalid or has expired.' });
+  }
+  res.render('reset', { token: req.params.token, errors: [] });
+});
+
+app.post('/reset/:token', authLimiter, (req, res) => {
+  const password = req.body.password || '';
+  const password2 = req.body.password2 || '';
+  const errors = [];
+  if (!password || password.length < 8) errors.push('Password must be ≥ 8 characters.');
+  if (password !== password2)             errors.push('Passwords do not match.');
+  const u = db.prepare('SELECT id, password_reset_expires FROM users WHERE password_reset_token = ?').get(req.params.token);
+  if (!u || (u.password_reset_expires && u.password_reset_expires < Date.now())) {
+    return res.status(400).render('error', { code: 400, msg: 'Reset link is invalid or has expired.' });
+  }
+  if (errors.length) return res.render('reset', { token: req.params.token, errors });
+  db.prepare('UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expires = NULL WHERE id = ?')
+    .run(hashPassword(password), u.id);
+  flash(req, 'ok', 'Password updated. Log in with your new password.');
+  res.redirect('/login');
 });
 
 // ─── routes: user profile ───────────────────────────────────────────────────
@@ -511,6 +700,41 @@ app.get('/u/:username', (req, res) => {
   `).all(u.display_name || '', u.username);
   const auditedCount = db.prepare(`SELECT COUNT(*) AS n FROM manuscripts WHERE auditor_name LIKE ? OR auditor_name = ?`).get(`%${u.display_name || u.username}%`, u.username).n;
   res.render('user', { profile: u, submissions, conductedAs, auditedCount });
+});
+
+// ─── routes: citation export ────────────────────────────────────────────────
+function getManuscriptForCite(idOrSlug) {
+  return db.prepare(`
+    SELECT m.*, u.username AS submitter_username, u.display_name AS submitter_display
+    FROM manuscripts m JOIN users u ON u.id = m.submitter_id
+    WHERE m.arxiv_like_id = ? OR m.id = ?
+  `).get(idOrSlug, idOrSlug);
+}
+function citeBaseUrl(req) {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, '');
+  const proto = req.get('x-forwarded-proto') || (req.secure ? 'https' : 'http');
+  return proto + '://' + req.get('host');
+}
+app.get('/m/:id/cite', (req, res) => {
+  const m = getManuscriptForCite(req.params.id);
+  if (!m) return res.status(404).render('error', { code: 404, msg: 'Manuscript not found.' });
+  const base = citeBaseUrl(req);
+  res.render('cite', {
+    m,
+    bib:   renderBibtex(m, base),
+    ris:   renderRis(m, base),
+    plain: renderPlain(m, base),
+  });
+});
+app.get('/m/:id/cite.bib', (req, res) => {
+  const m = getManuscriptForCite(req.params.id);
+  if (!m) return res.status(404).type('text/plain').send('not found');
+  res.type('application/x-bibtex').send(renderBibtex(m, citeBaseUrl(req)));
+});
+app.get('/m/:id/cite.ris', (req, res) => {
+  const m = getManuscriptForCite(req.params.id);
+  if (!m) return res.status(404).type('text/plain').send('not found');
+  res.type('application/x-research-info-systems').send(renderRis(m, citeBaseUrl(req)));
 });
 
 // ─── routes: about / static ─────────────────────────────────────────────────

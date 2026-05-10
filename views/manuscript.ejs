@@ -21,6 +21,7 @@
   <header class="ms-header">
     <div class="ms-id-row">
       <span class="ms-arxivid-big"><%= m.arxiv_like_id %></span>
+      <% if (m.doi) { %><span class="ms-doi muted mono" title="synthetic DOI — not registered with a DOI registrar"><%= m.doi %></span><% } %>
       <a class="ms-cat-pill" href="/browse/<%= encodeURIComponent(m.category) %>"><%= m.category %></a>
       <% const _cat = CATEGORIES.find(c => c.id === m.category); if (_cat) { %><span class="muted"><%= _cat.name %></span><% } %>
       <span class="muted">·</span>
@@ -36,6 +37,7 @@
     <div class="ms-actions-left">
       <% if (m.pdf_path) { %><a class="btn-primary" href="<%= m.pdf_path %>" target="_blank" rel="noopener">Download PDF</a><% } %>
       <% if (m.external_url) { %><a class="btn-secondary" href="<%= m.external_url %>" target="_blank" rel="nofollow noopener">External link ↗</a><% } %>
+      <a class="btn-secondary" href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>/cite">Cite</a>
     </div>
     <div class="ms-actions-right">
       <% if (typeof user !== 'undefined' && user) { %>

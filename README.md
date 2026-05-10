@@ -38,6 +38,12 @@ Environment variables (all optional in development; `SESSION_SECRET` is required
 | `DATA_DIR` | `./data` | where the SQLite DB and session store live (use a persistent disk in production) |
 | `UPLOAD_DIR` | `./public/uploads` | where uploaded PDFs are stored |
 | `RATE_LIMIT` | unset | set to `1` to enable rate limiting in development |
+| `APP_URL` | derived from the request | absolute base URL used in emailed verify/reset links and citation `url` fields |
+| `SMTP_HOST` | unset | if set, the verify/reset flows send real email via nodemailer; otherwise links are surfaced in-page (dev mode) |
+| `SMTP_PORT` | `587` | SMTP port (set `465` for implicit TLS) |
+| `SMTP_USER` / `SMTP_PASS` | unset | SMTP credentials (optional, depends on the relay) |
+| `SMTP_SECURE` | `0` | `1` to force implicit TLS |
+| `MAIL_FROM` | `pre-arxiv <no-reply@pre-arxiv.local>` | From: address for outgoing mail |
 
 ## Layout
 
@@ -56,17 +62,17 @@ data/                  SQLite DB (git-ignored)
 
 ## What it does
 
-- **Submit**: title, authors, abstract, category, optional PDF or external URL; required conductor (AI model + human + role); optional auditor (with signed statement) — if absent, an explicit acknowledgement of disclaimed correctness.
-- **Read**: arXiv-style manuscript page with abstract, conductor table, auditor table or no-auditor banner, threaded discussion with markdown + math.
+- **Submit**: title, authors, abstract, category, optional PDF or external URL; required conductor (AI model + human + role); optional auditor (with signed statement) — if absent, an explicit acknowledgement of disclaimed correctness. Submitting requires a verified email; PDF body text is extracted on upload via `pdf-parse` and indexed for full-text search.
+- **Read**: arXiv-style manuscript page with abstract, conductor table, auditor table or no-auditor banner, threaded discussion with markdown + math. Each manuscript gets a stable `pa.YYMM.NNNNN` id and a synthetic DOI in the test prefix `10.99999/…` for citation-shaped identifiers (not registered with any DOI registrar).
 - **Rank**: home page uses an HN-style score / age decay; `/new`, `/top`, `/audited`, and per-category views are also available.
 - **Vote / comment**: any logged-in user; karma accumulates from upvotes.
+- **Search**: SQLite FTS5 over title, abstract, authors, and extracted PDF body, with exact-id and DOI matches surfaced first. Try `/search?q=…`.
+- **Cite**: every manuscript page has a *Cite* button; `/m/:id/cite` shows BibTeX, RIS, and plain-text formats; `/m/:id/cite.bib` and `/m/:id/cite.ris` return the raw files.
+- **Account hygiene**: email verification on register (gates submission); password reset via emailed token; both flows surface the link in-page when no SMTP is configured so the site is usable as a self-hosted demo without mail infra.
 
 ## What it does not do (yet)
 
 - No moderation tools, no flagging, no withdrawal flow.
-- No email verification, no password reset.
-- No full-text search of PDFs (search is title/abstract/author/id only).
-- No DOI minting, no citation export.
 - No CAPTCHA on registration, no IP/account-level abuse heuristics. CSRF protection and per-route rate limits *are* in place; CAPTCHA is the remaining gap before posting the URL anywhere a determined bot will find it.
 
 The site is itself a "manuscript of a website" — written by a human-conductor and an AI co-author and offered without warranty. Issues and pull requests welcome.

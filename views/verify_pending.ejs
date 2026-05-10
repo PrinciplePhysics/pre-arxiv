@@ -1,0 +1,27 @@
+<% const pageTitle = 'verify your email' %>
+<%- include('partials/header', { pageTitle }) %>
+
+<div class="auth-card">
+  <h1>Check your inbox</h1>
+  <p>We sent a verification link to <strong><%= escapeHtml(email) %></strong>. Click the link in that message to confirm your address.</p>
+  <p class="muted small">You can browse and comment without verifying. Submitting a manuscript requires a verified email — to make spam slightly more annoying.</p>
+
+  <% if (devLink) { %>
+    <div class="dev-link-box">
+      <strong>Dev / no-SMTP mode:</strong> this server is not configured to send real email.
+      Use this link directly:
+      <p><a href="<%= devLink %>" class="dev-link"><%= devLink %></a></p>
+    </div>
+  <% } else if (!smtpEnabled) { %>
+    <div class="dev-link-box">
+      <strong>Note:</strong> SMTP is not configured on this server, so the link was logged to the server console rather than emailed. Ask the operator, or set <code>SMTP_HOST</code> + friends.
+    </div>
+  <% } %>
+
+  <form action="/verify/resend" method="post" style="margin-top: 18px">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button type="submit" class="btn-secondary">Resend verification link</button>
+  </form>
+</div>
+
+<%- include('partials/footer') %>

@@ -11,26 +11,33 @@ db.pragma('foreign_keys = ON');
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  username      TEXT UNIQUE NOT NULL,
-  email         TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  display_name  TEXT,
-  affiliation   TEXT,
-  bio           TEXT,
-  karma         INTEGER DEFAULT 0,
-  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+  id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+  username               TEXT UNIQUE NOT NULL,
+  email                  TEXT UNIQUE NOT NULL,
+  password_hash          TEXT NOT NULL,
+  display_name           TEXT,
+  affiliation            TEXT,
+  bio                    TEXT,
+  karma                  INTEGER DEFAULT 0,
+  email_verified         INTEGER NOT NULL DEFAULT 0,
+  email_verify_token     TEXT,
+  email_verify_expires   INTEGER,
+  password_reset_token   TEXT,
+  password_reset_expires INTEGER,
+  created_at             DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS manuscripts (
   id                 INTEGER PRIMARY KEY AUTOINCREMENT,
   arxiv_like_id      TEXT UNIQUE,
+  doi                TEXT UNIQUE,
   submitter_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title              TEXT NOT NULL,
   abstract           TEXT NOT NULL,
   authors            TEXT NOT NULL,
   category           TEXT NOT NULL,
   pdf_path           TEXT,
+  pdf_text           TEXT,
   external_url       TEXT,
 
   conductor_ai_model TEXT NOT NULL,
@@ -87,6 +94,61 @@ CREATE TABLE IF NOT EXISTS audit_endorsements (
   UNIQUE(manuscript_id, user_id)
 );
 `);
+
+// ─── lightweight migrations for databases created on earlier schemas ────────
+function safeAlter(stmt) {
+  try { db.exec(stmt); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+}
+safeAlter(`ALTER TABLE users ADD COLUMN email_verified         INTEGER NOT NULL DEFAULT 0`);
+safeAlter(`ALTER TABLE users ADD COLUMN email_verify_token     TEXT`);
+safeAlter(`ALTER TABLE users ADD COLUMN email_verify_expires   INTEGER`);
+safeAlter(`ALTER TABLE users ADD COLUMN password_reset_token   TEXT`);
+safeAlter(`ALTER TABLE users ADD COLUMN password_reset_expires INTEGER`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN doi      TEXT`);
+safeAlter(`ALTER TABLE manuscripts ADD COLUMN pdf_text TEXT`);
+
+// ─── FTS5 over manuscripts (title + abstract + authors + pdf body) ──────────
+db.exec(`
+CREATE VIRTUAL TABLE IF NOT EXISTS manuscripts_fts USING fts5(
+  title, abstract, authors, pdf_text,
+  content='manuscripts', content_rowid='id', tokenize='porter unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS manuscripts_ai AFTER INSERT ON manuscripts BEGIN
+  INSERT INTO manuscripts_fts(rowid, title, abstract, authors, pdf_text)
+  VALUES (new.id, new.title, new.abstract, new.authors, COALESCE(new.pdf_text, ''));
+END;
+CREATE TRIGGER IF NOT EXISTS manuscripts_ad AFTER DELETE ON manuscripts BEGIN
+  INSERT INTO manuscripts_fts(manuscripts_fts, rowid, title, abstract, authors, pdf_text)
+  VALUES ('delete', old.id, old.title, old.abstract, old.authors, COALESCE(old.pdf_text, ''));
+END;
+CREATE TRIGGER IF NOT EXISTS manuscripts_au AFTER UPDATE ON manuscripts BEGIN
+  INSERT INTO manuscripts_fts(manuscripts_fts, rowid, title, abstract, authors, pdf_text)
+  VALUES ('delete', old.id, old.title, old.abstract, old.authors, COALESCE(old.pdf_text, ''));
+  INSERT INTO manuscripts_fts(rowid, title, abstract, authors, pdf_text)
+  VALUES (new.id, new.title, new.abstract, new.authors, COALESCE(new.pdf_text, ''));
+END;
+`);
+
+// Backfill synthetic DOIs for legacy rows that were created before the DOI
+// column existed. Safe to run repeatedly — only fills NULLs.
+db.exec(`
+  UPDATE manuscripts
+  SET    doi = '10.99999/' || UPPER(arxiv_like_id)
+  WHERE  doi IS NULL AND arxiv_like_id IS NOT NULL;
+`);
+
+// Backfill FTS for any manuscripts that pre-date the FTS table. We use
+// FTS5's built-in 'rebuild' command so the doclist matches the live row
+// values exactly — a manual delete-all + reinsert can leave the index in a
+// state where subsequent UPDATE triggers fail with "database disk image is
+// malformed" because the OLD values referenced by the 'delete' command
+// don't match what the index thinks is there.
+const ftsCount = db.prepare('SELECT COUNT(*) AS n FROM manuscripts_fts').get().n;
+const msCount  = db.prepare('SELECT COUNT(*) AS n FROM manuscripts').get().n;
+if (ftsCount !== msCount) {
+  db.exec(`INSERT INTO manuscripts_fts(manuscripts_fts) VALUES ('rebuild');`);
+}
 
 const CATEGORIES = [
   { id: 'cs.AI',      name: 'Artificial Intelligence' },
