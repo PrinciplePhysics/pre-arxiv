@@ -1,0 +1,195 @@
+//! Password hashing, HIBP k-anonymity check, session+user extraction.
+//!
+//! Password hashes use bcrypt cost 10 so they're cross-compatible with the
+//! JS app's bcryptjs hashes — a user registered through either app can log
+//! in via the other.
+
+use std::time::Duration;
+
+use axum::extract::{FromRef, FromRequestParts};
+use axum::http::request::Parts;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Redirect, Response};
+use sha1::{Digest, Sha1};
+use sqlx::SqlitePool;
+use tower_sessions::Session;
+
+use crate::models::User;
+use crate::state::AppState;
+
+const SESSION_USER_KEY: &str = "user_id";
+const SESSION_CSRF_KEY: &str = "csrf_token";
+
+pub fn hash_password(plain: &str) -> Result<String, bcrypt::BcryptError> {
+    bcrypt::hash(plain, 10)
+}
+
+pub fn verify_password(plain: &str, hash: &str) -> bool {
+    bcrypt::verify(plain, hash).unwrap_or(false)
+}
+
+/// HIBP k-anonymity check: send only the first 5 SHA-1 hex chars to the
+/// pwnedpasswords range API and scan for our suffix. On any error or
+/// timeout, warn-and-allow (return false) — never block a registration on
+/// a network blip.
+pub async fn is_password_pwned(password: &str) -> bool {
+    if password.is_empty() {
+        return false;
+    }
+    let mut hasher = Sha1::new();
+    hasher.update(password.as_bytes());
+    let digest = hasher.finalize();
+    let hex = hex::encode_upper(digest);
+    let (prefix, suffix) = hex.split_at(5);
+
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .user_agent("PreXiv-pwned-check")
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+
+    let url = format!("https://api.pwnedpasswords.com/range/{prefix}");
+    let res = match client
+        .get(&url)
+        .header("Add-Padding", "true")
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => r,
+        _ => return false,
+    };
+    let body = match res.text().await {
+        Ok(t) => t,
+        Err(_) => return false,
+    };
+    body.lines().any(|line| {
+        line.split(':').next().map(|hex| hex.eq_ignore_ascii_case(suffix)).unwrap_or(false)
+    })
+}
+
+pub async fn current_user_id(session: &Session) -> Option<i64> {
+    session.get::<i64>(SESSION_USER_KEY).await.ok().flatten()
+}
+
+pub async fn login_session(session: &Session, user_id: i64) -> anyhow::Result<()> {
+    session.insert(SESSION_USER_KEY, user_id).await?;
+    Ok(())
+}
+
+pub async fn logout_session(session: &Session) -> anyhow::Result<()> {
+    session.flush().await?;
+    Ok(())
+}
+
+/// Get-or-generate the CSRF token for this session. Stable across requests
+/// in the same session so the form-field check works on POST.
+pub async fn csrf_token(session: &Session) -> String {
+    if let Ok(Some(t)) = session.get::<String>(SESSION_CSRF_KEY).await {
+        return t;
+    }
+    use rand::RngCore;
+    let mut bytes = [0u8; 24];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    let token = hex::encode(bytes);
+    let _ = session.insert(SESSION_CSRF_KEY, token.clone()).await;
+    token
+}
+
+pub async fn verify_csrf(session: &Session, submitted: &str) -> bool {
+    match session.get::<String>(SESSION_CSRF_KEY).await.ok().flatten() {
+        Some(expected) => constant_time_eq(expected.as_bytes(), submitted.as_bytes()),
+        None => false,
+    }
+}
+
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+pub async fn load_user(pool: &SqlitePool, user_id: i64) -> Result<Option<User>, sqlx::Error> {
+    sqlx::query_as::<_, User>(
+        r#"SELECT id, username, email, display_name, affiliation, bio,
+                  karma, is_admin, email_verified, orcid, created_at
+           FROM users WHERE id = ?"#,
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Optional current user — extracted on every request. Use when the page
+/// renders differently for logged-in vs anonymous (most pages).
+pub struct MaybeUser(pub Option<User>);
+
+impl<S> FromRequestParts<S> for MaybeUser
+where
+    AppState: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = Response;
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let session = match Session::from_request_parts(parts, state).await {
+            Ok(s) => s,
+            Err(_) => return Ok(MaybeUser(None)),
+        };
+        let app: AppState = AppState::from_ref(state);
+        let uid = current_user_id(&session).await;
+        let user = match uid {
+            Some(id) => load_user(&app.pool, id).await.ok().flatten(),
+            None => None,
+        };
+        Ok(MaybeUser(user))
+    }
+}
+
+/// Required current user — redirects to /login if absent. Use on private
+/// pages (/submit, /me/*, /admin, etc.).
+pub struct RequireUser(pub User);
+
+impl<S> FromRequestParts<S> for RequireUser
+where
+    AppState: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = Response;
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let MaybeUser(maybe) = MaybeUser::from_request_parts(parts, state).await?;
+        match maybe {
+            Some(u) => Ok(RequireUser(u)),
+            None => {
+                let path = parts.uri.path_and_query().map(|p| p.as_str()).unwrap_or("/");
+                let target = format!("/login?next={}", urlencoding::encode(path));
+                Err(Redirect::to(&target).into_response())
+            }
+        }
+    }
+}
+
+/// Admin-only — 403 if not admin.
+pub struct RequireAdmin(pub User);
+
+impl<S> FromRequestParts<S> for RequireAdmin
+where
+    AppState: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = Response;
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let RequireUser(user) = RequireUser::from_request_parts(parts, state).await?;
+        if user.is_admin() {
+            Ok(RequireAdmin(user))
+        } else {
+            Err((StatusCode::FORBIDDEN, "Admin only").into_response())
+        }
+    }
+}

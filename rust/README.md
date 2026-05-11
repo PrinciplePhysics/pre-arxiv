@@ -65,33 +65,59 @@ mode permits one writer + many readers).
 
 ## What works today
 
-- `GET /` — paginated listing of recent manuscripts
-- `GET /m/{id}` — manuscript detail page (title, conductor, abstract,
-  auditor block, comments) — accepts either the `arxiv_like_id`
-  (e.g. `prexiv:2605.45626`) or the numeric `id`
+**Read paths**
+- `GET /` — listing of recent manuscripts
+- `GET /m/{id}` — manuscript detail (accepts `arxiv_like_id` or numeric id)
 - `GET /search?q=...` — FTS5 search over title/abstract/authors/pdf_text
-- Static-file serving for `/static/*` (CSS, favicon, uploaded PDFs)
-- HTTP gzip compression
+- `GET /robots.txt` — crawler policy (allows listings, disallows
+  `/admin`, `/me/*`, `/api/*`, auth pages, write endpoints)
+- `GET /static/*` — CSS, favicon, uploaded PDFs
+
+**Auth + sessions**
+- `GET /register` + `POST /register` — bcrypt(cost=10) password hash
+  (cross-compatible with the JS app's bcryptjs hashes), HIBP
+  k-anonymity check rejects known-breached passwords
+- `GET /login` + `POST /login` — username-or-email login, supports `next=`
+- `POST /logout` — CSRF-protected
+- CSRF tokens stored in tower-sessions, validated on every POST
+- Sessions persisted in the same SQLite DB via tower-sessions-sqlx-store
+
+**Write paths (CSRF-protected, auth-gated)**
+- `POST /submit` — multipart upload (PDF ≤30 MB, mime+ext check), inserts
+  manuscript with auto-generated `prexiv:YYMM.NNNNN` id and synthetic DOI
+- `POST /m/{id}/comment` — inserts comment, increments
+  `manuscripts.comment_count` in same tx
+- `POST /vote` — idempotent upsert in `votes`, recomputes target `score`
+  from the votes table; clicking the same direction twice un-votes
+
+**Cross-cutting**
+- HTTP gzip compression (tower-http)
 - Structured tracing (`RUST_LOG=debug` for verbose)
+- `<meta name="robots" content="noindex,nofollow">` on private pages
+- `rel="nofollow ugc noopener" target="_blank"` on all user-submitted
+  external links (DOI links, abstract links, manuscript external_url)
+- Auth-gated routes auto-redirect to `/login?next=<path>` if anonymous
 
 ## Milestones to parity
 
-1. **✅ Foundation** — scaffold, DB layer, three read-only routes (this PR).
-2. **Auth** — register/login/logout, session middleware, CSRF, bcrypt
-   passwords. Port the rate-limit setup.
-3. **Submission flow** — `POST /submit` with multipart PDF upload, FTS
-   indexing of extracted text, synthetic-DOI fallback.
-4. **Comments + voting** — write paths for comments, votes, flags.
-5. **Account self-service** — `/me/edit`, `/me/2fa`, `/me/export`,
-   `/me/delete`, `/me/tokens`, `/me/webhooks`.
-6. **Moderation** — `/admin` queue, audit log, withdrawal/tombstone.
-7. **Discovery** — profile pages, follows, notifications, feed.
-8. **REST API** — `/api/v1/*` with API-token auth (parity with the JS
-   `OpenAPI` spec under `../lib/openapi.js`).
-9. **Integrations** — Zenodo deposit + PDF upload, OAI-PMH endpoint,
-   webhook dispatcher.
-10. **SSO** — ORCID + GitHub + Google OAuth, federated account linking.
-11. **Abuse heuristics** — brute-force / spam / scraping signals layered
+1. **✅ Foundation** — scaffold, DB layer, three read-only routes.
+2. **✅ Auth + sessions + CSRF + HIBP** — register/login/logout.
+3. **✅ Robots.txt + nofollow** — crawler policy + UGC link attributes.
+4. **✅ Submission flow** — `POST /submit` with multipart PDF.
+5. **✅ Comments + voting** — write paths with idempotent vote upsert.
+6. **PDF text extraction + FTS indexing** — currently new submissions
+   lack `pdf_text` content; need pdftotext or `pdf-extract` integration.
+7. **Account self-service** — `/me/edit`, `/me/2fa` (TOTP),
+   `/me/export`, `/me/delete`, `/me/tokens`, `/me/webhooks`.
+8. **Moderation** — `/admin` queue, audit log, withdrawal/tombstone,
+   flag resolution.
+9. **Discovery** — profile pages (`/u/:username`), follows,
+   notifications, feed.
+10. **REST API** — `/api/v1/*` with API-token bearer auth.
+11. **Integrations** — Zenodo deposit + PDF upload, OAI-PMH endpoint,
+    webhook dispatcher with HMAC-SHA256 signing.
+12. **SSO** — ORCID + GitHub + Google OAuth, federated account linking.
+13. **Abuse heuristics** — brute-force / spam / scraping signals layered
     on top of rate limits.
 12. **Promote to root** — once parity is verified end-to-end, delete the
     JS code, move `rust/` to the repo root, and `prexiv` becomes a single

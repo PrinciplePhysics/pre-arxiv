@@ -1,8 +1,11 @@
 use axum::extract::{Query, State};
 use axum::response::Html;
 use serde::Deserialize;
+use tower_sessions::Session;
 
+use crate::auth::MaybeUser;
 use crate::error::AppResult;
+use crate::helpers::build_ctx;
 use crate::models::ManuscriptListItem;
 use crate::state::AppState;
 use crate::templates;
@@ -15,11 +18,14 @@ pub struct SearchParams {
 
 pub async fn search(
     State(state): State<AppState>,
+    session: Session,
+    maybe_user: MaybeUser,
     Query(params): Query<SearchParams>,
 ) -> AppResult<Html<String>> {
     let q = params.q.trim();
+    let ctx = build_ctx(&session, maybe_user).await;
     if q.is_empty() {
-        return Ok(Html(templates::search::render(q, &[]).into_string()));
+        return Ok(Html(templates::search::render(&ctx, q, &[]).into_string()));
     }
 
     let fts_query = build_fts_query(q);
@@ -41,12 +47,9 @@ pub async fn search(
     .fetch_all(&state.pool)
     .await?;
 
-    Ok(Html(templates::search::render(q, &rows).into_string()))
+    Ok(Html(templates::search::render(&ctx, q, &rows).into_string()))
 }
 
-/// Tokenize the user query into a safe FTS5 MATCH expression. Each
-/// alphanumeric run becomes a prefix match (`token*`); everything else is
-/// dropped. This avoids FTS5 syntax errors from `:` `"` `(` etc. in user input.
 fn build_fts_query(q: &str) -> String {
     let tokens: Vec<String> = q
         .split(|c: char| !c.is_alphanumeric())
@@ -54,7 +57,6 @@ fn build_fts_query(q: &str) -> String {
         .map(|t| format!("{}*", t))
         .collect();
     if tokens.is_empty() {
-        // Force-empty-result query that's still valid FTS5 syntax.
         return "zzzznonexistentzzz".to_string();
     }
     tokens.join(" ")

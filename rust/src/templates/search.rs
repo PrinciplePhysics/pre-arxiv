@@ -2,9 +2,9 @@ use maud::{html, Markup};
 
 use crate::models::ManuscriptListItem;
 
-use super::layout::layout;
+use super::layout::{layout, PageCtx};
 
-pub fn render(query: &str, results: &[ManuscriptListItem]) -> Markup {
+pub fn render(ctx: &PageCtx, query: &str, results: &[ManuscriptListItem]) -> Markup {
     let body = html! {
         h1 { "Search results" }
         p.query { "for " strong { (query) } " — " (results.len()) " result" @if results.len() != 1 { "s" } }
@@ -29,5 +29,5 @@ pub fn render(query: &str, results: &[ManuscriptListItem]) -> Markup {
             }
         }
     };
-    layout(&format!("Search: {query}"), body)
+    layout(&format!("Search: {query}"), ctx, body)
 }

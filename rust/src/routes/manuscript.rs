@@ -1,7 +1,10 @@
 use axum::extract::{Path, State};
 use axum::response::Html;
+use tower_sessions::Session;
 
+use crate::auth::MaybeUser;
 use crate::error::{AppError, AppResult};
+use crate::helpers::build_ctx;
 use crate::models::comment::CommentWithAuthor;
 use crate::models::Manuscript;
 use crate::state::AppState;
@@ -9,6 +12,8 @@ use crate::templates;
 
 pub async fn view(
     State(state): State<AppState>,
+    session: Session,
+    maybe_user: MaybeUser,
     Path(id): Path<String>,
 ) -> AppResult<Html<String>> {
     let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
@@ -56,5 +61,6 @@ pub async fn view(
         .await
         .ok();
 
-    Ok(Html(templates::manuscript::render(&m, &comments).into_string()))
+    let ctx = build_ctx(&session, maybe_user).await;
+    Ok(Html(templates::manuscript::render(&ctx, &m, &comments).into_string()))
 }

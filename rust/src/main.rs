@@ -2,13 +2,18 @@ use std::net::SocketAddr;
 
 use anyhow::Context;
 use axum::Router;
+use time::Duration;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
+use tower_sessions::{Expiry, SessionManagerLayer};
+use tower_sessions_sqlx_store::SqliteStore;
 use tracing_subscriber::EnvFilter;
 
+mod auth;
 mod db;
 mod error;
+mod helpers;
 mod models;
 mod routes;
 mod state;
@@ -42,6 +47,19 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("running sqlx migrations")?;
 
+    // Session store — shares the same DB so we don't need a second file.
+    let session_store = SqliteStore::new(pool.clone());
+    session_store
+        .migrate()
+        .await
+        .context("running tower-sessions migrations")?;
+
+    let secure_cookies = std::env::var("NODE_ENV").as_deref() == Ok("production");
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(secure_cookies)
+        .with_name("prexiv_session")
+        .with_expiry(Expiry::OnInactivity(Duration::days(30)));
+
     let app_url = std::env::var("APP_URL").ok();
     let state = AppState { pool, app_url };
 
@@ -55,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
         .nest_service("/static", ServeDir::new(static_dir))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
+        .layer(session_layer)
         .with_state(state);
 
     let port: u16 = std::env::var("PORT")

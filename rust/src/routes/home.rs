@@ -1,12 +1,19 @@
 use axum::extract::State;
 use axum::response::Html;
+use tower_sessions::Session;
 
+use crate::auth::MaybeUser;
 use crate::error::AppResult;
+use crate::helpers::build_ctx;
 use crate::models::ManuscriptListItem;
 use crate::state::AppState;
 use crate::templates;
 
-pub async fn index(State(state): State<AppState>) -> AppResult<Html<String>> {
+pub async fn index(
+    State(state): State<AppState>,
+    session: Session,
+    maybe_user: MaybeUser,
+) -> AppResult<Html<String>> {
     let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(
         r#"
         SELECT id, arxiv_like_id, doi, title, authors, category,
@@ -21,5 +28,6 @@ pub async fn index(State(state): State<AppState>) -> AppResult<Html<String>> {
     .fetch_all(&state.pool)
     .await?;
 
-    Ok(Html(templates::home::render(&rows).into_string()))
+    let ctx = build_ctx(&session, maybe_user).await;
+    Ok(Html(templates::home::render(&ctx, &rows).into_string()))
 }

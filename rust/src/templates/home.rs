@@ -2,9 +2,9 @@ use maud::{html, Markup};
 
 use crate::models::ManuscriptListItem;
 
-use super::layout::layout;
+use super::layout::{layout, PageCtx};
 
-pub fn render(manuscripts: &[ManuscriptListItem]) -> Markup {
+pub fn render(ctx: &PageCtx, manuscripts: &[ManuscriptListItem]) -> Markup {
     let body = html! {
         h1 { "Recent manuscripts" }
         @if manuscripts.is_empty() {
@@ -36,5 +36,5 @@ pub fn render(manuscripts: &[ManuscriptListItem]) -> Markup {
             }
         }
     };
-    layout("Home", body)
+    layout("Home", ctx, body)
 }

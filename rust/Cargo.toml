@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/prexiv/prexiv"
 
 [dependencies]
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.8", default-features = false, features = [
     "sqlite",
@@ -26,6 +26,19 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
 anyhow = "1"
 thiserror = "2"
+
+# Auth + sessions
+tower-sessions = "0.14"
+tower-sessions-sqlx-store = { version = "0.15", features = ["sqlite"] }
+bcrypt = "0.16"
+sha1 = "0.10"
+hex = "0.4"
+rand = "0.8"
+urlencoding = "2"
+time = "0.3"
+
+# HIBP k-anonymity check
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
 [profile.release]
 lto = "thin"
