@@ -1,5 +1,6 @@
-use maud::{html, Markup};
+use maud::{html, Markup, PreEscaped};
 
+use crate::markdown;
 use crate::models::ManuscriptListItem;
 
 use super::layout::{layout, time_ago, PageCtx};
@@ -56,7 +57,7 @@ pub fn manuscript_row(ctx: &PageCtx, m: &ManuscriptListItem, rank: usize, logged
             }
             div.ms-body {
                 div.ms-title-line {
-                    a.ms-title href={ "/m/" (id_url) } { (m.title) }
+                    a.ms-title href={ "/m/" (id_url) } { (PreEscaped(markdown::render_inline(&m.title))) }
                     " "
                     span.ms-arxivid { "[" (id_url) "]" }
                 }

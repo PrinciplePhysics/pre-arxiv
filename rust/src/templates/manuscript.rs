@@ -10,6 +10,10 @@ fn md(s: &str) -> PreEscaped<String> {
     PreEscaped(markdown::render(s))
 }
 
+fn md_inline(s: &str) -> PreEscaped<String> {
+    PreEscaped(markdown::render_inline(s))
+}
+
 pub fn render(
     ctx: &PageCtx,
     m: &Manuscript,
@@ -33,7 +37,7 @@ pub fn render(
                 } @else {
                     span.bx-eyebrow { "New submission" }
                 }
-                h1.ms-h1 { (m.title) }
+                h1.ms-h1 { (md_inline(&m.title)) }
                 p.ms-authors-line { (m.authors) }
                 @if let Some(doi) = &m.doi {
                     p.muted.small.mono { "doi: " (doi) }

@@ -10,6 +10,22 @@
 use ammonia::Builder;
 use pulldown_cmark::{html, Options, Parser};
 
+/// Inline-only render for places like manuscript titles, where wrapping
+/// the whole output in <p>…</p> would produce invalid HTML inside <h1>.
+/// Strips a single outer paragraph wrapper if present.
+pub fn render_inline(input: &str) -> String {
+    let mut out = render(input);
+    let trimmed = out.trim_end_matches('\n');
+    if trimmed.starts_with("<p>") && trimmed.ends_with("</p>") {
+        let inner = &trimmed[3..trimmed.len() - 4];
+        // Only strip if there's no inner <p> (i.e., a single paragraph).
+        if !inner.contains("<p>") {
+            out = inner.to_string();
+        }
+    }
+    out
+}
+
 /// Render `input` from GitHub-flavoured markdown (tables, strikethrough,
 /// tasklists, fenced code, autolinks) into sanitised HTML.
 pub fn render(input: &str) -> String {

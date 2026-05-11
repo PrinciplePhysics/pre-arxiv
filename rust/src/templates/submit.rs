@@ -110,14 +110,22 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 label {
                     span.label-text { "Title " span.req { "*" } }
                     input type="text" name="title" required maxlength="300"
-                          placeholder="A descriptive title — like an arxiv title";
+                          placeholder="A descriptive title — Markdown + inline LaTeX OK";
+                    span.hint.no-katex {
+                        "Markdown ("
+                        code { "*italic*" } ", "
+                        code { "**bold**" } ", "
+                        code { "`code`" } ") and inline LaTeX ("
+                        code { "$E=mc^2$" }
+                        ") render in listings and on the manuscript page."
+                    }
                 }
 
                 label {
                     span.label-text { "Authors line " span.req { "*" } }
                     input type="text" name="authors" required maxlength="500"
                           placeholder="e.g., Jane Doe; Claude Opus 4.7";
-                    span.hint { "Separate authors with semicolons. List the AI as a co-author by its model name." }
+                    span.hint.no-katex { "Separate authors with semicolons. List the AI as a co-author by its model name." }
                 }
 
                 label {
@@ -134,14 +142,22 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     span.label-text { "Abstract " span.req { "*" } }
                     textarea name="abstract" required minlength="100" maxlength="5000" rows="8"
                              placeholder="State what the manuscript claims, what role the AI played, and what (if anything) you have verified by hand." {}
-                    span.hint { "~100–5000 chars. Plain text. Math via $…$ / $$…$$ will render in the manuscript view." }
+                    span.hint.no-katex {
+                        "100–5000 characters. Markdown supported ("
+                        code { "**bold**" } ", "
+                        code { "`code`" } ", lists, links, blockquotes). Inline LaTeX with "
+                        code { "$…$" }
+                        ", display math with "
+                        code { "$$…$$" }
+                        ". All rendering happens on the manuscript page."
+                    }
                 }
 
                 div.row-fields {
                     div.grow.field {
                         label for="pdf_upload" { span.label-text { "Upload PDF" } }
                         input id="pdf_upload" type="file" name="pdf" accept="application/pdf";
-                        span.hint { "Optional if you provide an external URL. Max 30 MB." }
+                        span.hint.no-katex { "Optional if you provide an external URL. Max 30 MB." }
                     }
                     label.grow {
                         span.label-text { "External URL" }
@@ -190,7 +206,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     datalist id="ai-models-list" {
                         @for m in AI_MODELS { option value=(m); }
                     }
-                    span.hint { "Pick from the dropdown for the current flagships, or type any precise model+version string." }
+                    span.hint.no-katex { "Pick from the dropdown for the current flagships, or type any precise model+version string." }
                     label.checkbox-inline {
                         input type="checkbox" name="conductor_ai_model_public" value="0";
                         span { "Keep this private. Public viewers will see " em { "(undisclosed)" } "; you and admins still see the value." }
@@ -214,7 +230,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                                 option value="" { "— select —" }
                                 @for r in ROLES { option value=(r) { (r) } }
                             }
-                            span.hint { "From undergraduate to professional expert — readers use this to calibrate." }
+                            span.hint.no-katex { "From undergraduate to professional expert — readers use this to calibrate." }
                         }
                     }
                 }
@@ -224,7 +240,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         label { span.label-text { "Agent framework" } }
                         input type="text" name="agent_framework" maxlength="120"
                               placeholder="e.g., claude-agent-sdk, langgraph, custom-runtime";
-                        span.hint { "What ran the agent? Helpful for readers trying to reproduce or evaluate." }
+                        span.hint.no-katex { "What ran the agent? Helpful for readers trying to reproduce or evaluate." }
                     }
                     label.checkbox.checkbox-warn {
                         input type="checkbox" name="ai_agent_ack";
