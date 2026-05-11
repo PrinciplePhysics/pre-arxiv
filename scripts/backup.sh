@@ -98,11 +98,13 @@ fi
 SIZE="$(du -h "$ARCHIVE" | awk '{print $1}')"
 
 # 6. Rotation: keep the $KEEP newest archives in this tier; delete
-#    the rest. Includes both .tar.gz and .tar.gz.age forms so we
-#    don't accidentally keep ancient plaintext copies around.
-cd "$DEST_DIR"
-ls -t *.tar.gz *.tar.gz.age 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r old; do
-  rm -f -- "$old"
-done
+#    the rest. Use `find` rather than `ls *.glob *.glob` because the
+#    shell errors out under `set -e` if either glob matches nothing
+#    (which is now common — after the encrypt-existing migration,
+#    most tiers have only .tar.gz.age and no .tar.gz).
+find "$DEST_DIR" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.tar.gz.age' \) -printf '%T@ %p\n' \
+  | sort -rn \
+  | awk -v k="$KEEP" 'NR > k { print $2 }' \
+  | xargs -r rm -f --
 
 echo "backup: wrote $ARCHIVE ($SIZE), tier=$TIER, kept=$KEEP newest"
