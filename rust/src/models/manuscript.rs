@@ -37,6 +37,10 @@ pub struct Manuscript {
     pub withdrawn_at: Option<NaiveDateTime>,
     pub created_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
+    #[sqlx(default)]
+    pub license: Option<String>,
+    #[sqlx(default)]
+    pub ai_training: Option<String>,
 }
 
 /// Slim row used in listings (home, search results, profile pages).

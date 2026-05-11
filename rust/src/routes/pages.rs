@@ -21,3 +21,4 @@ static_page!(tos,        "Terms",       "/tos",        templates::pages::TOS);
 static_page!(privacy,    "Privacy",     "/privacy",    templates::pages::PRIVACY);
 static_page!(dmca,       "DMCA",        "/dmca",       templates::pages::DMCA);
 static_page!(policies,   "Policies",    "/policies",   templates::pages::POLICIES);
+static_page!(licenses,   "Licenses",    "/licenses",   templates::pages::LICENSES);

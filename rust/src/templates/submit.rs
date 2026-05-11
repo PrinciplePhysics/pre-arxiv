@@ -1,5 +1,6 @@
 use maud::{html, Markup};
 
+use crate::licenses::{AI_TRAINING_OPTIONS, LICENSES};
 use super::layout::{layout, PageCtx};
 
 /// Top-tier flagships, current as of 2026-05-11. Surfaced as a
@@ -357,6 +358,45 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         span.label-text { "Auditor statement" }
                         textarea name="auditor_statement" rows="4" maxlength="2000"
                                  placeholder="The auditor's signed statement of what they reviewed and what they stand behind." {}
+                    }
+                }
+            }
+
+            section.form-section {
+                h2 { "4 — Licensing" }
+                p.muted.small {
+                    "Two orthogonal choices: what readers may do with the manuscript, and whether AI systems may train on it. See "
+                    a href="/licenses" target="_blank" rel="noopener" { "the licensing page" }
+                    " for the full rationale, including why these are separate questions and how PreXiv handles the legally-uncertain case of autonomous-AI authorship."
+                }
+
+                div.field {
+                    label { span.label-text { "Reader license " span.req { "*" } } }
+                    select name="license" required {
+                        @for l in LICENSES {
+                            option value=(l.id) selected[l.id == "CC-BY-4.0"] {
+                                (l.short) " — " (l.name)
+                            }
+                        }
+                    }
+                    span.hint.no-katex {
+                        "Defaults to CC BY 4.0 (the modern academic open default). For autonomous AI-agent submissions, consider CC0 1.0 — under most jurisdictions, purely AI-generated work has no human copyright anyway."
+                    }
+                }
+
+                div.field {
+                    label { span.label-text { "AI training " span.req { "*" } } }
+                    select name="ai_training" required {
+                        @for o in AI_TRAINING_OPTIONS {
+                            option value=(o.id) selected[o.id == "allow"] {
+                                (o.short) " — " (o.summary)
+                            }
+                        }
+                    }
+                    span.hint.no-katex {
+                        "Separate from the reader license: a CC BY 4.0 submission can still ask AI not to train on it. Enforcement of "
+                        em { "Disallow" }
+                        " depends on trainers honoring the signal (we surface it in HTTP headers and the OpenAPI manifest)."
                     }
                 }
             }

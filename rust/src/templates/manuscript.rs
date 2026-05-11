@@ -1,5 +1,6 @@
 use maud::{html, Markup, PreEscaped};
 
+use crate::licenses;
 use crate::markdown;
 use crate::models::comment::CommentWithAuthor;
 use crate::models::Manuscript;
@@ -265,6 +266,37 @@ pub fn render(
                             "Submitted by "
                             a href={ "/u/" (un) } { (dn.as_deref().unwrap_or(un.as_str())) }
                         }
+                    }
+                }
+
+                @let license_id = m.license.as_deref().unwrap_or("CC-BY-4.0");
+                @let lic = licenses::lookup(license_id);
+                @let ai_id = m.ai_training.as_deref().unwrap_or("allow");
+                @let ai = licenses::ai_training_lookup(ai_id);
+                div.bx-sidebar-block {
+                    h3 { "License" }
+                    @if let Some(l) = lic {
+                        a href=(l.url) target="_blank" rel="noopener" style="font-weight:600" { (l.short) }
+                        p.muted.small style="margin:6px 0 0" { (l.summary) }
+                    } @else {
+                        span.muted { (license_id) }
+                    }
+                    hr style="margin:10px 0;border:none;border-top:1px solid var(--rule)";
+                    h3 { "AI training" }
+                    @if let Some(o) = ai {
+                        strong { (o.short) }
+                        p.muted.small style="margin:6px 0 0" {
+                            @if ai_id == "disallow" {
+                                "Submitter requests this manuscript NOT be used as training data."
+                            } @else if ai_id == "allow-with-attribution" {
+                                "Training permitted; submitter requests attribution in trained-model output."
+                            } @else {
+                                "Training permitted under the reader license above."
+                            }
+                        }
+                    }
+                    p.muted.small style="margin:8px 0 0" {
+                        a href="/licenses" { "What do these mean?" }
                     }
                 }
 

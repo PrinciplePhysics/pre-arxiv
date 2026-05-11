@@ -76,6 +76,7 @@ pub fn router() -> Router<AppState> {
         .route("/privacy", get(pages::privacy))
         .route("/dmca", get(pages::dmca))
         .route("/policies", get(pages::policies))
+        .route("/licenses", get(pages::licenses))
 
         // Crawler policy
         .route("/robots.txt", get(static_routes::robots_txt))

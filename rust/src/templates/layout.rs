@@ -133,6 +133,7 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                             div {
                                 a href="/tos" { "ToS" }
                                 a href="/privacy" { "Privacy" }
+                                a href="/licenses" { "Licenses" }
                                 a href="/dmca" { "DMCA" }
                                 a href="/policies" { "Policies" }
                             }

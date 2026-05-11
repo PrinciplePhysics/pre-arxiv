@@ -147,6 +147,23 @@ pub async fn do_submit(
             _ => (false, None, None, None, None, None),
         };
 
+    // Licensing — validate against the canonical lists. Empty defaults
+    // accepted (sane fallback for legacy form posts).
+    let license = if fields.license.trim().is_empty() {
+        "CC-BY-4.0"
+    } else if crate::licenses::lookup(fields.license.trim()).is_some() {
+        fields.license.trim()
+    } else {
+        return Ok(err_page(&session, maybe_user, "Unknown reader license. Pick from the dropdown.").await);
+    };
+    let ai_training = if fields.ai_training.trim().is_empty() {
+        "allow"
+    } else if crate::licenses::ai_training_lookup(fields.ai_training.trim()).is_some() {
+        fields.ai_training.trim()
+    } else {
+        return Ok(err_page(&session, maybe_user, "Unknown AI-training option. Pick from the dropdown.").await);
+    };
+
     let arxiv_like_id = make_prexiv_id();
     let synthetic_doi = format!("10.99999/{}", arxiv_like_id);
 
@@ -158,7 +175,8 @@ pub async fn do_submit(
             conductor_human, conductor_human_public, conductor_role, conductor_notes,
             agent_framework,
             has_auditor, auditor_name, auditor_affiliation, auditor_role,
-            auditor_statement, auditor_orcid
+            auditor_statement, auditor_orcid,
+            license, ai_training
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?,
@@ -166,6 +184,7 @@ pub async fn do_submit(
             ?, ?, ?, ?,
             ?,
             ?, ?, ?, ?,
+            ?, ?,
             ?, ?
         )"#,
     )
@@ -192,6 +211,8 @@ pub async fn do_submit(
     .bind(auditor_role.as_deref())
     .bind(auditor_statement.as_deref())
     .bind(auditor_orcid.as_deref())
+    .bind(license)
+    .bind(ai_training)
     .execute(&state.pool)
     .await?;
 
@@ -265,6 +286,8 @@ struct SubmitFields {
     auditor_role: String,
     auditor_statement: String,
     auditor_orcid: String,
+    license: String,
+    ai_training: String,
 }
 
 impl SubmitFields {
@@ -291,6 +314,8 @@ impl SubmitFields {
             "auditor_role" => self.auditor_role = v,
             "auditor_statement" => self.auditor_statement = v,
             "auditor_orcid" => self.auditor_orcid = v,
+            "license" => self.license = v,
+            "ai_training" => self.ai_training = v,
             _ => {}
         }
     }
