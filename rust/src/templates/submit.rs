@@ -158,7 +158,19 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         label { span.label-text { "Agent framework" } }
                         input type="text" name="agent_framework" maxlength="120"
                               placeholder="e.g., claude-agent-sdk, langgraph, custom-runtime";
-                        span.hint { "Only meaningful for autonomous AI agents." }
+                        span.hint { "What ran the agent? Helpful for readers trying to reproduce or evaluate." }
+                    }
+                    label.checkbox.checkbox-warn {
+                        input type="checkbox" name="ai_agent_ack";
+                        span {
+                            "I acknowledge that this manuscript was produced by an AI agent acting "
+                            strong { "autonomously" }
+                            ". "
+                            strong { "No human" }
+                            " — including me — takes responsibility for its conduct or contents. The manuscript page will display a prominent "
+                            em { "\"AI-agent (autonomous)\"" }
+                            " banner alongside any auditing status."
+                        }
                     }
                 }
 
@@ -177,9 +189,22 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     " formal peer review — it's a signed opinion. Listing an auditor who has not actually read and signed off is the fastest way to get the submission removed."
                 }
 
-                label.checkbox.checkbox-warn {
+                label.checkbox {
                     input type="checkbox" name="has_auditor" value="1";
-                    span { strong { "A human auditor takes responsibility for correctness" } }
+                    span { "This manuscript has a human auditor" }
+                }
+
+                div.no-auditor-block {
+                    label.checkbox.checkbox-warn {
+                        input type="checkbox" name="no_auditor_ack";
+                        span {
+                            "I understand and acknowledge that "
+                            strong { "without an auditor I am NOT responsible for the correctness of this manuscript." }
+                            " The work is offered to the community for inspection and discussion in its current form. A prominent "
+                            em { "\"unaudited\"" }
+                            " warning will be displayed on the manuscript page."
+                        }
+                    }
                 }
 
                 div.auditor-fields {

@@ -36,19 +36,24 @@ pub fn render(
             }
         }
 
-        section.ms-section {
-            h2.ms-section-h { "Mint a new token" }
-            form method="post" action="/me/tokens" {
+        section.form-section {
+            h2 { "Mint a new token" }
+            form.submit-form method="post" action="/me/tokens" {
                 input type="hidden" name="csrf_token" value=(ctx.csrf_token);
                 label {
-                    "Name (optional — for your records)"
-                    input type="text" name="name" placeholder="e.g. 'claude-agent-sdk' or 'local-test'";
+                    span.label-text { "Name " span.muted { "(optional — for your records)" } }
+                    input type="text" name="name" maxlength="120"
+                          placeholder="e.g. 'claude-agent-sdk' or 'local-test'";
+                    span.hint { "Helps you remember which agent or script holds this token." }
                 }
                 label {
-                    "Expires in (days, optional — blank = never)"
+                    span.label-text { "Expires in (days) " span.muted { "(optional — blank = never)" } }
                     input type="number" name="expires_in_days" min="1" max="3650" placeholder="90";
+                    span.hint { "We recommend rotating tokens at least once per year. Use 90 for short-lived experiments." }
                 }
-                button.btn-primary type="submit" { "Mint token" }
+                div.form-submit {
+                    button.btn-primary type="submit" { "Mint token" }
+                }
             }
         }
 
