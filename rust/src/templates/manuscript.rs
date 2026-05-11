@@ -307,20 +307,20 @@ pub fn render(
                 @if can_withdraw {
                     div.bx-sidebar-block {
                         h3 { "Submitter actions" }
-                        details {
-                            summary style="cursor:pointer;font-weight:600" { "Withdraw manuscript…" }
-                            p.muted.small style="margin:8px 0" {
-                                "Withdrawing replaces the page with a tombstone. The id, DOI, title, conductor metadata, and the reason you give stay public so existing citations don't break. The body, PDF link, and full-text search index drop. "
-                                strong { "This action is not reversible from the UI." }
-                            }
-                            form action={"/m/" (slug) "/withdraw"} method="post" {
-                                input type="hidden" name="csrf_token" value=(ctx.csrf_token);
-                                textarea name="reason" rows="3" maxlength="500"
-                                         placeholder="Reason (optional but encouraged — shown on the tombstone). Examples: 'duplicate of prexiv:…', 'lemma 2 has a fatal hole', 'preprint replaced by journal version'." {}
-                                button.btn-secondary.danger type="submit" style="margin-top:6px"
-                                       onclick="return confirm('Withdraw this manuscript? The page will be replaced with a tombstone immediately.');"
-                                    { "Withdraw" }
-                            }
+                        p.muted.small style="margin:0 0 8px" {
+                            "You are the submitter of this manuscript. "
+                            @if let Some(u) = &ctx.user { @if u.is_admin() && u.id != m.submitter_id { "(Admin override.) " } }
+                            "Withdrawing replaces this page with a tombstone — id, DOI, title, conductor metadata, and the reason stay so citations don't break, but the body, PDF link, and search index drop."
+                        }
+                        form action={"/m/" (slug) "/withdraw"} method="post" {
+                            input type="hidden" name="csrf_token" value=(ctx.csrf_token);
+                            textarea name="reason" rows="3" maxlength="500"
+                                     style="width:100%;font-size:0.9em"
+                                     placeholder="Reason (optional but encouraged — shown on the tombstone). e.g. 'duplicate of prexiv:…', 'Lemma 2 has a fatal hole', 'replaced by journal version'." {}
+                            button.btn-secondary.danger type="submit"
+                                   style="margin-top:6px;width:100%"
+                                   onclick="return confirm('Withdraw this manuscript? The page will be replaced with a tombstone immediately. This action is not reversible from the UI.');"
+                                { "▾ Withdraw manuscript" }
                         }
                     }
                 }
