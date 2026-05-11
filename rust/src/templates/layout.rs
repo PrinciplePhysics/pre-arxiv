@@ -47,6 +47,13 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                 link rel="stylesheet" href="/static/css/style.css";
                 link rel="stylesheet" href="/static/css/prexiv-rust.css";
                 link rel="icon" type="image/svg+xml" href="/static/favicon.svg";
+
+                // KaTeX — render $…$ / $$…$$ / \(…\) / \[…\] math in
+                // abstracts, comments, and conductor notes.
+                link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
+                script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" {}
+                script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" {}
+                script defer src="/static/js/katex-init.js" {}
             }
             body {
                 a.skip-link href="#main-content" { "Skip to main content" }
