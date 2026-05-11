@@ -79,14 +79,29 @@ if [ -d "$UPLOAD_DIR" ]; then
   cp -al "$UPLOAD_DIR" "$TMP_DIR/uploads" 2>/dev/null || cp -r "$UPLOAD_DIR" "$TMP_DIR/uploads"
 fi
 
-# 5. Tar the staging dir into the final archive.
-ARCHIVE="$DEST_DIR/${NAME}.tar.gz"
-tar -C "$TMP_DIR" -czf "$ARCHIVE" .
+# 5. Tar the staging dir, then encrypt with age if a recipient is
+#    available. If /etc/prexiv/backup.pub doesn't exist (e.g., a local
+#    dev box where the operator hasn't set up encryption), fall back
+#    to plaintext .tar.gz so dev still works — restore.sh handles
+#    both extensions.
+ARCHIVE_PLAIN="$DEST_DIR/${NAME}.tar.gz"
+PUBKEY_FILE="${PREXIV_BACKUP_RECIPIENT_FILE:-/etc/prexiv/backup.pub}"
+if [ -r "$PUBKEY_FILE" ] && command -v age >/dev/null 2>&1; then
+  ARCHIVE="${ARCHIVE_PLAIN}.age"
+  tar -C "$TMP_DIR" -cz . | age -r "$(tr -d '[:space:]' < "$PUBKEY_FILE")" > "$ARCHIVE"
+  echo "backup: ENCRYPTED with age (recipient: $(awk '{print substr($0,1,16)"..."}' "$PUBKEY_FILE"))" >&2
+else
+  ARCHIVE="$ARCHIVE_PLAIN"
+  tar -C "$TMP_DIR" -czf "$ARCHIVE" .
+  [ -r "$PUBKEY_FILE" ] || echo "backup: WARNING — no recipient at $PUBKEY_FILE, writing plaintext" >&2
+fi
 SIZE="$(du -h "$ARCHIVE" | awk '{print $1}')"
 
-# 6. Rotation: keep the $KEEP newest .tar.gz files in this tier; delete the rest.
+# 6. Rotation: keep the $KEEP newest archives in this tier; delete
+#    the rest. Includes both .tar.gz and .tar.gz.age forms so we
+#    don't accidentally keep ancient plaintext copies around.
 cd "$DEST_DIR"
-ls -t *.tar.gz 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r old; do
+ls -t *.tar.gz *.tar.gz.age 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r old; do
   rm -f -- "$old"
 done
 

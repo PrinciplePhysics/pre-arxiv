@@ -124,7 +124,40 @@ Step 3 is the safety net: even a wrong restore leaves the previous live data int
 
 ## 6. Off-machine backup (TODO)
 
-Currently snapshots live only on victoria's disk. If victoria's disk dies, we lose everything between the last on-machine snapshot and the disaster. Planned mitigation: a daily `rsync /var/lib/prexiv/backups/` to the operator's Mac (or to an S3 bucket).
+Currently encrypted snapshots live only on victoria's disk. If victoria's disk dies, we lose everything between the last on-machine snapshot and the disaster. Planned mitigation: a daily `rsync /var/lib/prexiv/backups/` to the operator's Mac (or to an S3 bucket). Because the snapshots are age-encrypted (see §6a), they can safely be rsynced to untrusted storage — the off-machine target doesn't need to be a high-trust system, only the holder of the private key does.
+
+## 6a. Encryption at rest
+
+Personal data on PreXiv falls into four categories. Treating them all the same way would be wrong — the right protection depends on whether recovery is *possible* in the threat model, or *prevented by design*.
+
+| Category | What's in it | Protection | Why this is right |
+|---|---|---|---|
+| **Irrecoverable by design** | `users.password_hash` (bcrypt cost 10); `api_tokens.token_hash` (SHA-256 hex) | The plaintext is never persisted. Bcrypt hashes are intentionally slow one-way functions; SHA-256 of a 27-byte random token has no practical preimage. | **Stronger than encryption.** Encryption implies a key holder can recover the plaintext; coercing the operator or compromising the key gets that plaintext back. With irrecoverable hashes, *no one* can derive the original — not the operator, not a court order, not a database leaker. The user is the only one who ever knew the plaintext. |
+| **Intentionally public** | `users.username`, `display_name`, `affiliation`, `bio`, `orcid`; manuscript title/abstract/authors/conductor; comments; votes | Plaintext on disk and on the wire. | Public by user choice. The user filled in these fields *to be seen*; encrypting them would prevent the only legitimate use. |
+| **Plaintext, should be encrypted at rest** *(TODO)* | `users.email` (used for login + verification); `users.totp_secret` (when 2FA lands); `webhooks.secret` (HMAC signing key, when webhooks land) | Plaintext today. Plan: column-level AES-256-GCM with a server-side key (`PREXIV_DATA_KEY` env var, 32 random bytes base64), with a deterministic `email_hash` column for UNIQUE-constraint + login lookup so the encrypted plaintext doesn't have to be decrypted-and-compared at every login attempt. | Email is the highest-priority of the three because it's already populated for every user and is the most personally identifying field in the schema. Tracked as a near-term roadmap item. |
+| **Backup tarballs leaving the box** | The tar.gz that bundles the DB + sessions + uploads, snapshotted before every deploy and on cron schedules | **age-encrypted** via X25519 to a recipient public key. The plaintext never touches disk; backup.sh pipes `tar -cz` straight through `age -r <pub>` into the final `.tar.gz.age`. | Backups are the most-portable copies of all user data: they get rsynced off-machine, sit in cron-driven archive directories, and may end up in places the live DB never goes. Encrypting *them* specifically defends the threat model where the box itself stays trusted but a backup copy gets out. |
+
+### Key management for backup encryption
+
+- **Algorithm**: age 1.x — X25519 + ChaCha20-Poly1305 + scrypt for passphrase variants. Audited; widely deployed. We use the file-keyfile mode (not passphrase) so backups can be encrypted by an unattended cron job and decrypted by deploy.sh without interaction.
+
+- **Private key**: lives at `/etc/prexiv/backup-key.txt` on victoria, mode 0640 owned `root:dbai`. Readable by the `dbai` service account *and* by root. Not readable by anyone else on the box.
+
+- **Public recipient**: lives at `/etc/prexiv/backup.pub`, mode 0644. backup.sh reads this to encrypt; restore.sh and deploy.sh need the *private* key to decrypt.
+
+- **Override locations** (for local dev): `PREXIV_BACKUP_RECIPIENT_FILE` and `BACKUP_KEY` env vars override the default paths.
+
+- **Off-machine key copy** *(operator responsibility — do this before you trust the system)*: copy `/etc/prexiv/backup-key.txt` to a second location not on victoria. A password manager that holds files works; a printed paper copy in a locked drawer works; an offline USB stick works. Without an off-machine copy of the *private* key, an off-machine *backup* is useless — you can't decrypt your own data after a disk-loss event.
+
+- **Rotation**: generate a new keypair, encrypt new backups to the new public key, keep the old private key around long enough to decrypt the still-rotating retention windows (≤3 months given current retention policy). Old encrypted backups don't need re-encryption — they're decryptable as long as the old private key still exists somewhere.
+
+- **Compromise of the private key**: revoke it from victoria, rotate to a new keypair, and treat every backup encrypted to the old key as potentially-leaked. The live DB on victoria is *not* compromised by a private-key leak alone — the key only protects archives at rest.
+
+### Fallback for local dev
+
+If the recipient file (`/etc/prexiv/backup.pub`) doesn't exist, `backup.sh` falls back to writing plaintext `.tar.gz` and prints a warning. This is intentional: local dev boxes don't necessarily need encryption set up, and forcing a key-management story on every developer would be friction with no real protection (a local dev DB has no real users in it). Production deploys should always have the recipient file present.
+
+`restore.sh` and `deploy.sh` handle both extensions — they decrypt `.tar.gz.age` with the private key and treat `.tar.gz` as plaintext.
 
 ## 7. Code-level security audit — findings to date
 
@@ -139,6 +172,8 @@ Audit run 2026-05-12. Grepped for known antipatterns; verified the high-risk sur
 | **S-3.** Defense-in-depth: dynamic table name in `routes/votes.rs` | Informational | **FIXED** |
 | **S-4.** No rate limiting in the Rust port | Medium (abuse-aid) | Open — planned, tower-governor |
 | **S-5.** No off-machine backup | High (durability) | Open — planned, see §6 |
+| **S-6.** Backup tarballs plaintext on disk | Medium (leakage) | **FIXED** — age-encrypted to /etc/prexiv/backup.pub, see §6a |
+| **S-7.** `users.email` / future `totp_secret` / future `webhooks.secret` plaintext in DB | Medium (leakage) | Open — design documented in §6a, AES-256-GCM column-level encryption with a server-side key |
 
 ### Verified clean
 

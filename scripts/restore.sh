@@ -30,10 +30,19 @@ echo "[1/7] verifying archive…"
 tar -tzf "$ARCHIVE" >/dev/null 2>&1 || abort "tarball is unreadable"
 
 # 2. Extract to a staging dir, verify the DB inside is intact.
+#    age-encrypted archives (.tar.gz.age) require the private key at
+#    /etc/prexiv/backup-key.txt (override via BACKUP_KEY env var);
+#    plaintext .tar.gz is handled the old way.
 echo "[2/7] extracting + integrity-checking the snapshot DB…"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-tar -C "$STAGE" -xzf "$ARCHIVE"
+if [[ "$ARCHIVE" == *.age ]]; then
+  KEYFILE="${BACKUP_KEY:-/etc/prexiv/backup-key.txt}"
+  [ -r "$KEYFILE" ] || abort "encrypted archive but private key $KEYFILE is not readable"
+  age -d -i "$KEYFILE" "$ARCHIVE" | tar -C "$STAGE" -xz
+else
+  tar -C "$STAGE" -xzf "$ARCHIVE"
+fi
 [ -f "$STAGE/prearxiv.db" ] || abort "snapshot has no prearxiv.db"
 INTEG="$(sqlite3 "$STAGE/prearxiv.db" 'PRAGMA integrity_check;' | head -1)"
 [ "$INTEG" = "ok" ] || abort "snapshot integrity_check returned: $INTEG (refusing to restore corrupt data)"
@@ -62,7 +71,12 @@ echo "[4/7] moving current $DATA_DIR → $REPLACED"
 # 5. Install the snapshot in its place.
 echo "[5/7] installing snapshot at $DATA_DIR"
 mkdir -p "$DATA_DIR"
-tar -C "$DATA_DIR" -xzf "$ARCHIVE"
+if [[ "$ARCHIVE" == *.age ]]; then
+  KEYFILE="${BACKUP_KEY:-/etc/prexiv/backup-key.txt}"
+  age -d -i "$KEYFILE" "$ARCHIVE" | tar -C "$DATA_DIR" -xz
+else
+  tar -C "$DATA_DIR" -xzf "$ARCHIVE"
+fi
 
 # 6. Final integrity check on the installed copy.
 echo "[6/7] integrity-checking the installed DB…"

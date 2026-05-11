@@ -56,8 +56,10 @@ DATA_DIR="$DATA_DIR" BACKUP_ROOT="$BACKUP_ROOT" \
   || abort "backup.sh failed (Tier-1 NOT snapshotted; refusing to proceed)"
 
 # 2. Integrity-check the snapshot we just took.
+#    The newest archive may be either .tar.gz or .tar.gz.age depending
+#    on whether age encryption is enabled (recipient pub-key present).
 echo "[2/7] verifying snapshot integrity…"
-LATEST="$(ls -t "$BACKUP_ROOT/pre-deploy/"*.tar.gz 2>/dev/null | head -1)"
+LATEST="$(ls -t "$BACKUP_ROOT/pre-deploy/"*.tar.gz.age "$BACKUP_ROOT/pre-deploy/"*.tar.gz 2>/dev/null | head -1)"
 [ -n "$LATEST" ] || abort "could not locate the snapshot just written"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -65,7 +67,13 @@ trap 'rm -rf "$TMP"' EXIT
 # so entries are recorded as ./prearxiv.db etc. Extracting everything
 # and then looking at the result avoids whatever path-stripping the
 # specific tar implementation does or doesn't do.
-tar -C "$TMP" -xzf "$LATEST"
+if [[ "$LATEST" == *.age ]]; then
+  KEYFILE="${BACKUP_KEY:-/etc/prexiv/backup-key.txt}"
+  [ -r "$KEYFILE" ] || abort "encrypted snapshot but private key $KEYFILE not readable — re-check key perms"
+  age -d -i "$KEYFILE" "$LATEST" | tar -C "$TMP" -xz
+else
+  tar -C "$TMP" -xzf "$LATEST"
+fi
 [ -f "$TMP/prearxiv.db" ] || abort "snapshot is missing prearxiv.db (corrupt tarball?)"
 INTEG="$(sqlite3 "$TMP/prearxiv.db" 'PRAGMA integrity_check;' | head -1)"
 [ "$INTEG" = "ok" ] || abort "snapshot integrity_check returned: $INTEG"
