@@ -93,6 +93,31 @@ pub fn render(
             }
         }
 
+        // ─── Agent prompt — always visible (template with placeholder).
+        //     When a token was JUST minted, the same content appears
+        //     above inside the banner with the actual token inlined.
+        section.ms-section id="agent-prompt" {
+            h2.ms-section-h { "Agent prompt — paste this to your AI" }
+            @if just_minted.is_some() {
+                p.muted.small {
+                    "↑ The version above inside the green banner has your actual token already inlined; copy that one. The version below is the same briefing but with a "
+                    code { "<paste-your-token-here>" }
+                    " placeholder — useful as a reference, or to embed in documentation."
+                }
+            } @else {
+                p.muted.small {
+                    "This is a self-contained briefing you can copy to a Claude / GPT / Gemini chat to give the model everything it needs to operate on PreXiv on your behalf. "
+                    strong { "Mint a token above" }
+                    " to get a version with your actual token already inlined; or copy the template below and replace "
+                    code { "<paste-your-token-here>" }
+                    " with a saved token before pasting."
+                }
+            }
+            pre style="user-select:all; font-size:13px; padding:14px; background:var(--code-bg); border-radius:4px; line-height:1.5; word-break:break-word; white-space:pre-wrap" {
+                (agent_prompt("<paste-your-token-here>", base_url))
+            }
+        }
+
         // ─── Mint form ──────────────────────────────────────────────────────
         section.form-section {
             h2 { "Mint a new token" }
