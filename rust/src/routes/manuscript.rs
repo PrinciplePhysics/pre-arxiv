@@ -62,6 +62,20 @@ pub async fn view(
     .fetch_optional(&state.pool)
     .await?;
 
+    // Viewer's current vote on this manuscript: -1, 0, or +1.
+    let my_vote: i64 = match &maybe_user.0 {
+        Some(u) => sqlx::query_as::<_, (i64,)>(
+            "SELECT value FROM votes WHERE user_id = ? AND target_type = 'manuscript' AND target_id = ?",
+        )
+        .bind(u.id)
+        .bind(m.id)
+        .fetch_optional(&state.pool)
+        .await?
+        .map(|(v,)| v)
+        .unwrap_or(0),
+        None => 0,
+    };
+
     // Category counts for the sidebar "Subject Areas" index — same shape
     // as bioRxiv's category sidebar.
     let cats: Vec<(String, i64)> = sqlx::query_as::<_, (String, i64)>(
@@ -77,5 +91,5 @@ pub async fn view(
         .ok();
 
     let ctx = build_ctx(&session, maybe_user, "/m").await;
-    Ok(Html(templates::manuscript::render(&ctx, &m, &comments, submitter.as_ref(), &cats).into_string()))
+    Ok(Html(templates::manuscript::render(&ctx, &m, &comments, submitter.as_ref(), &cats, my_vote).into_string()))
 }

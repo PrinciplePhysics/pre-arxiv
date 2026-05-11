@@ -1,9 +1,14 @@
-use maud::{html, Markup};
+use maud::{html, Markup, PreEscaped};
 
+use crate::markdown;
 use crate::models::comment::CommentWithAuthor;
 use crate::models::Manuscript;
 
 use super::layout::{external_link, layout, time_ago, PageCtx};
+
+fn md(s: &str) -> PreEscaped<String> {
+    PreEscaped(markdown::render(s))
+}
 
 pub fn render(
     ctx: &PageCtx,
@@ -11,6 +16,7 @@ pub fn render(
     comments: &[CommentWithAuthor],
     submitter: Option<&(String, Option<String>)>,
     cats: &[(String, i64)],
+    my_vote: i64,
 ) -> Markup {
     let logged_in = ctx.user.is_some();
     let slug = m.arxiv_like_id.as_deref().unwrap_or("");
@@ -83,7 +89,7 @@ pub fn render(
 
                     section.ms-section id="abstract" {
                         h2.ms-section-h { "Abstract" }
-                        p.ms-abstract { (m.r#abstract) }
+                        div.ms-abstract.markdown { (md(&m.r#abstract)) }
                     }
 
                     section.ms-section.ms-conductor id="conductor" {
@@ -99,7 +105,7 @@ pub fn render(
                                     }
                                 } }
                                 @if let Some(f) = &m.agent_framework { tr { th { "Framework" } td { (f) } } }
-                                @if let Some(notes) = &m.conductor_notes { tr { th { "Notes" } td { (notes) } } }
+                                @if let Some(notes) = &m.conductor_notes { tr { th { "Notes" } td.markdown { (md(notes)) } } }
                             }
                         } @else {
                             table.kv {
@@ -120,7 +126,7 @@ pub fn render(
                                         @else { "(undisclosed)" }
                                     }
                                 } }
-                                @if let Some(notes) = &m.conductor_notes { tr { th { "Notes" } td { (notes) } } }
+                                @if let Some(notes) = &m.conductor_notes { tr { th { "Notes" } td.markdown { (md(notes)) } } }
                             }
                         }
                     }
@@ -135,7 +141,7 @@ pub fn render(
                                 @if let Some(o) = &m.auditor_orcid { tr { th { "ORCID" } td { (o) } } }
                             }
                             @if let Some(stmt) = &m.auditor_statement {
-                                blockquote.auditor-statement { (stmt) }
+                                blockquote.auditor-statement.markdown { (md(stmt)) }
                             }
                         }
                     }
@@ -146,9 +152,10 @@ pub fn render(
                     @if logged_in {
                         form.comment-form action={"/m/" (slug) "/comment"} method="post" {
                             input type="hidden" name="csrf_token" value=(ctx.csrf_token);
-                            textarea name="content" required rows="4" placeholder="Add a comment…" {}
+                            textarea name="content" required rows="4" placeholder="Add a comment…  Markdown supported (**bold**, `code`, lists, links, etc.). LaTeX math via $E=mc^2$ or $$\\int…$$" {}
                             div.comment-form-actions {
                                 button.btn-primary type="submit" { "Post comment" }
+                                span.hint style="margin-left:8px" { "Markdown + LaTeX math supported." }
                             }
                         }
                     } @else {
@@ -169,7 +176,7 @@ pub fn render(
                                             " · " span.muted { (time_ago(ts)) }
                                         }
                                     }
-                                    div.comment-body { (c.content) }
+                                    div.comment-body.markdown { (md(&c.content)) }
                                 }
                             }
                         }
@@ -199,9 +206,24 @@ pub fn render(
                             input type="hidden" name="csrf_token" value=(ctx.csrf_token);
                             input type="hidden" name="target_type" value="manuscript";
                             input type="hidden" name="target_id" value=(m.id);
-                            button.bx-sidebar-btn.secondary style="flex:1;margin:0" name="value" value="1" type="submit" { "▲ Upvote" }
-                            button.bx-sidebar-btn.secondary style="flex:1;margin:0" name="value" value="-1" type="submit" { "▼ Downvote" }
+                            button.bx-sidebar-btn.secondary.voted[my_vote == 1] style="flex:1;margin:0" name="value" value="1" type="submit"
+                                title=(if my_vote == 1 { "You upvoted. Click again to remove." } else { "Upvote" }) {
+                                @if my_vote == 1 { "▲ Upvoted ✓" } @else { "▲ Upvote" }
+                            }
+                            button.bx-sidebar-btn.secondary.voted[my_vote == -1] style="flex:1;margin:0" name="value" value="-1" type="submit"
+                                title=(if my_vote == -1 { "You downvoted. Click again to remove." } else { "Downvote" }) {
+                                @if my_vote == -1 { "▼ Downvoted ✓" } @else { "▼ Downvote" }
+                            }
                         }
+                        @if my_vote != 0 {
+                            p.muted.small style="margin:6px 0 0;text-align:center" {
+                                "You voted "
+                                @if my_vote == 1 { strong { "▲ up" } } @else { strong { "▼ down" } }
+                                ". Click the same button again to remove your vote."
+                            }
+                        }
+                    } @else if !m.is_withdrawn() {
+                        a.bx-sidebar-btn.secondary href={ "/login?next=/m/" (slug) } style="margin-top:8px" { "Sign in to vote" }
                     }
                 }
 

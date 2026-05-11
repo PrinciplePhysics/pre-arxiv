@@ -63,6 +63,13 @@
   border: 1px solid var(--rule-strong);
 }
 .bx-sidebar-btn.secondary:hover { background: var(--bg); }
+.bx-sidebar-btn.voted {
+  background: var(--brand-bg) !important;
+  border-color: var(--brand) !important;
+  color: var(--brand) !important;
+  font-weight: 700;
+}
+.bx-sidebar-btn.voted:hover { background: var(--bg-card) !important; }
 
 .bx-stats { list-style: none; margin: 0; padding: 0; }
 .bx-stats li {
@@ -138,3 +145,42 @@
 
 /* Smooth scroll for the anchor jumps. */
 html { scroll-behavior: smooth; }
+
+/* Rendered-markdown blocks (comments, abstracts, conductor notes,
+   auditor statements). Tight vertical rhythm — comment bodies shouldn't
+   blow up when they contain a paragraph or list. */
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child  { margin-bottom: 0; }
+.markdown p { margin: 0.4em 0; }
+.markdown ul, .markdown ol { margin: 0.4em 0; padding-left: 1.4em; }
+.markdown li { margin: 0.15em 0; }
+.markdown blockquote {
+  border-left: 3px solid var(--rule-strong);
+  margin: 0.5em 0;
+  padding: 0.1em 0.9em;
+  color: var(--ink-soft);
+}
+.markdown code {
+  background: var(--code-bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.markdown pre {
+  background: var(--code-bg);
+  padding: 8px 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+.markdown pre code { background: transparent; padding: 0; }
+.markdown table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+}
+.markdown th, .markdown td {
+  border: 1px solid var(--rule);
+  padding: 4px 8px;
+}
+.markdown th { background: var(--bg-card-alt); }
+.markdown hr { border: none; border-top: 1px solid var(--rule); margin: 0.8em 0; }
+.markdown a { word-break: break-word; }

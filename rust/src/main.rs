@@ -15,6 +15,7 @@ mod auth;
 mod db;
 mod error;
 mod helpers;
+mod markdown;
 mod models;
 mod routes;
 mod state;
