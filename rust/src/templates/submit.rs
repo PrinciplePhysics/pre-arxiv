@@ -2,6 +2,36 @@ use maud::{html, Markup};
 
 use super::layout::{layout, PageCtx};
 
+/// Top-tier flagships available as of 2026-05. Surfaced as a <datalist>
+/// (typeahead suggestions) rather than a hard <select> — model names go
+/// stale fast and agents need to record precise version strings.
+const AI_MODELS: &[&str] = &[
+    // Anthropic
+    "Claude Opus 4.7",
+    "Claude Sonnet 4.6",
+    "Claude Haiku 4.5",
+    // OpenAI
+    "GPT-5",
+    "GPT-5 mini",
+    "o3",
+    "o3-mini",
+    // Google
+    "Gemini 3 Pro",
+    "Gemini 3 Flash",
+    "Gemini 2.5 Pro",
+    // xAI
+    "Grok 4",
+    // DeepSeek
+    "DeepSeek V3.1",
+    "DeepSeek R1",
+    // Meta
+    "Llama 4 405B",
+    // Mistral
+    "Mistral Large 3",
+    // Multi-model authorship
+    "Multiple (see notes)",
+];
+
 const ROLES: &[&str] = &[
     "undergraduate",
     "graduate-student",
@@ -140,7 +170,12 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 div.field {
                     label for="conductor_ai_model" { span.label-text { "AI model " span.req { "*" } } }
                     input id="conductor_ai_model" type="text" name="conductor_ai_model" required maxlength="200"
-                          placeholder="e.g., Claude Opus 4.7, GPT-5, Gemini 3 Pro";
+                          list="ai-models-list" autocomplete="off"
+                          placeholder="Type or pick — Claude Opus 4.7, GPT-5, Gemini 3 Pro, …";
+                    datalist id="ai-models-list" {
+                        @for m in AI_MODELS { option value=(m); }
+                    }
+                    span.hint { "Pick from the dropdown for the current flagships, or type any precise model+version string." }
                     label.checkbox-inline {
                         input type="checkbox" name="conductor_ai_model_public" value="0";
                         span { "Keep this private. Public viewers will see " em { "(undisclosed)" } "; you and admins still see the value." }
