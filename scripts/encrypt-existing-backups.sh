@@ -25,7 +25,10 @@ while IFS= read -r plain; do
     SKIPPED=$((SKIPPED + 1))
     continue
   fi
-  if age -r "$RECIPIENT" "$plain" -o "$enc"; then
+  # age 1.x doesn't accept `age -r KEY INPUT -o OUTPUT` — the input
+  # must be the only non-flag positional, OR fed on stdin. Use the
+  # stream form for consistency with backup.sh.
+  if age -r "$RECIPIENT" -o "$enc" < "$plain"; then
     rm -f -- "$plain"
     CONVERTED=$((CONVERTED + 1))
     echo "  + $enc"
