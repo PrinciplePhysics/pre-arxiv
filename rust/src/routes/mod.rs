@@ -22,6 +22,7 @@ pub mod search;
 pub mod static_routes;
 pub mod submit;
 pub mod votes;
+pub mod withdraw;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -37,6 +38,7 @@ pub fn router() -> Router<AppState> {
         .route("/m/{id}", get(manuscript::view))
         .route("/m/{id}/comment", post(comments::post_comment))
         .route("/m/{id}/cite", get(cite::cite))
+        .route("/m/{id}/withdraw", post(withdraw::withdraw))
 
         // Profile + follow
         .route("/u/{username}", get(profile::show))
