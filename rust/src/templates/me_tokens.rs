@@ -54,8 +54,11 @@ pub fn render(
                     strong { "Copy and save this token now. " }
                     "It is shown to you exactly once. PreXiv stores only its SHA-256 hash; there is no way for anyone — including the operator — to recover the plaintext if you lose it. Closing this tab without saving means minting a new one."
                 }
-                pre style="user-select:all; font-size:14px; padding:12px; background:var(--code-bg); border-radius:4px; margin:0 0 14px; word-break:break-all" {
-                    (plain)
+                div.copy-pre-wrap style="margin:0 0 14px" {
+                    button.copy-pre-btn type="button" { "Copy token" }
+                    pre style="user-select:all; font-size:14px; padding:12px; background:var(--code-bg); border-radius:4px; margin:0; word-break:break-all" {
+                        (plain)
+                    }
                 }
 
                 p style="margin: 0 0 6px" { strong { "What to do next" } }
@@ -71,8 +74,11 @@ pub fn render(
                     li style="margin-bottom:8px" {
                         strong { "Confirm it works." }
                         " Paste this in a terminal — you should see your account JSON come back:"
-                        pre style="user-select:all; font-size:13px; padding:8px 10px; margin:6px 0 0; background:var(--code-bg); border-radius:4px; word-break:break-all" {
-                            "curl -H 'Authorization: Bearer " (plain) "' " (base_url) "/api/v1/me"
+                        div.copy-pre-wrap style="margin:6px 0 0" {
+                            button.copy-pre-btn type="button" { "Copy command" }
+                            pre style="user-select:all; font-size:13px; padding:8px 10px; margin:0; background:var(--code-bg); border-radius:4px; word-break:break-all" {
+                                "curl -H 'Authorization: Bearer " (plain) "' " (base_url) "/api/v1/me"
+                            }
                         }
                     }
                     li style="margin-bottom:8px" {
@@ -103,8 +109,11 @@ pub fn render(
                     strong { "already inlined" }
                     ". Treat the whole block as sensitive: anyone with the pasted text can act as you on PreXiv. If you paste it into a logged or shared workspace, plan to rotate the token afterwards."
                 }
-                pre style="user-select:all; font-size:13px; padding:14px; background:var(--code-bg); border-radius:4px; line-height:1.5; word-break:break-word; white-space:pre-wrap" {
-                    (agent_prompt(plain, base_url))
+                div.copy-pre-wrap {
+                    button.copy-pre-btn type="button" { "Copy prompt" }
+                    pre style="user-select:all; font-size:13px; padding:14px; background:var(--code-bg); border-radius:4px; line-height:1.5; word-break:break-word; white-space:pre-wrap" {
+                        (agent_prompt(plain, base_url))
+                    }
                 }
             }
         }
@@ -156,8 +165,11 @@ pub fn render(
                     " with a saved token before pasting."
                 }
             }
-            pre style="user-select:all; font-size:13px; padding:14px; background:var(--code-bg); border-radius:4px; line-height:1.5; word-break:break-word; white-space:pre-wrap" {
-                (agent_prompt("<paste-your-token-here>", base_url))
+            div.copy-pre-wrap {
+                button.copy-pre-btn type="button" { "Copy prompt" }
+                pre style="user-select:all; font-size:13px; padding:14px; background:var(--code-bg); border-radius:4px; line-height:1.5; word-break:break-word; white-space:pre-wrap" {
+                    (agent_prompt("<paste-your-token-here>", base_url))
+                }
             }
         }
 

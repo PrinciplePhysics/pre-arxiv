@@ -144,6 +144,60 @@
 /* Smooth scroll for the anchor jumps. */
 html { scroll-behavior: smooth; }
 
+/* ─── copy-pre button ────────────────────────────────────────────────────
+   Wrap any <pre> in a .copy-pre-wrap that also holds a .copy-pre-btn
+   button; the JS in /static/js/copy-button.js binds the button to copy
+   the <pre>'s text. Visual: small neutral button top-right of the pre,
+   rust on hover, green on success, amber on failure. */
+.copy-pre-wrap { position: relative; }
+.copy-pre-wrap > pre {
+  /* Reserve a 36px top-right corner for the button so it doesn't
+     occlude the first line of text. */
+  padding-top: 36px !important;
+}
+.copy-pre-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: var(--bg-card);
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  user-select: none;
+}
+.copy-pre-btn:hover {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+.copy-pre-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+.copy-pre-btn.copied {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: var(--ok-rule);
+}
+.copy-pre-btn.failed {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: var(--warn-rule);
+}
+@media (max-width: 480px) {
+  .copy-pre-btn { font-size: 10.5px; padding: 3px 8px; top: 6px; right: 6px; }
+  .copy-pre-wrap > pre { padding-top: 32px !important; }
+}
+
 /* Rendered-markdown blocks (comments, abstracts, conductor notes,
    auditor statements). Tight vertical rhythm — comment bodies shouldn't
    blow up when they contain a paragraph or list. */
