@@ -2,32 +2,47 @@ use maud::{html, Markup};
 
 use super::layout::{layout, PageCtx};
 
-/// Top-tier flagships available as of 2026-05. Surfaced as a <datalist>
-/// (typeahead suggestions) rather than a hard <select> — model names go
-/// stale fast and agents need to record precise version strings.
+/// Top-tier flagships, current as of 2026-05-11. Surfaced as a
+/// <datalist> (typeahead suggestions) rather than a hard <select> — model
+/// names go stale fast and agents need to record precise version strings.
+/// Newest within each lab first; superseded flagships kept because
+/// historical submissions reference them.
 const AI_MODELS: &[&str] = &[
-    // Anthropic
+    // Anthropic — Opus 4.7 GA'd April 16, 2026.
     "Claude Opus 4.7",
     "Claude Sonnet 4.6",
     "Claude Haiku 4.5",
-    // OpenAI
+    "Claude Opus 4.6",
+
+    // OpenAI — GPT-5.5 family launched April/May 2026.
+    "GPT-5.5 Pro",
+    "GPT-5.5 Thinking",
+    "GPT-5.5 Instant",
     "GPT-5",
-    "GPT-5 mini",
     "o3",
-    "o3-mini",
-    // Google
+
+    // Google — Gemini 3.1 Pro preview Feb 19, 2026.
+    "Gemini 3.1 Pro",
     "Gemini 3 Pro",
     "Gemini 3 Flash",
-    "Gemini 2.5 Pro",
-    // xAI
+    "Gemini 3.1 Flash-Lite",
+
+    // xAI — Grok 4.20 Beta currently exposes 2M-token context.
+    "Grok 4.20",
     "Grok 4",
-    // DeepSeek
+
+    // DeepSeek — V4-Pro released April 24, 2026 (MIT-licensed).
+    "DeepSeek V4-Pro",
     "DeepSeek V3.1",
     "DeepSeek R1",
-    // Meta
-    "Llama 4 405B",
-    // Mistral
+
+    // Open-weights frontier
+    "Llama 4 Maverick",
+    "Llama 4 Scout",
+    "Qwen 3.5",
+    "GLM-5",
     "Mistral Large 3",
+
     // Multi-model authorship
     "Multiple (see notes)",
 ];
