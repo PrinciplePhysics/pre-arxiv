@@ -61,7 +61,12 @@ LATEST="$(ls -t "$BACKUP_ROOT/pre-deploy/"*.tar.gz 2>/dev/null | head -1)"
 [ -n "$LATEST" ] || abort "could not locate the snapshot just written"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-tar -C "$TMP" -xzf "$LATEST" prearxiv.db
+# backup.sh tars from inside a temp dir with `tar -C $TMP_DIR -czf .`
+# so entries are recorded as ./prearxiv.db etc. Extracting everything
+# and then looking at the result avoids whatever path-stripping the
+# specific tar implementation does or doesn't do.
+tar -C "$TMP" -xzf "$LATEST"
+[ -f "$TMP/prearxiv.db" ] || abort "snapshot is missing prearxiv.db (corrupt tarball?)"
 INTEG="$(sqlite3 "$TMP/prearxiv.db" 'PRAGMA integrity_check;' | head -1)"
 [ "$INTEG" = "ok" ] || abort "snapshot integrity_check returned: $INTEG"
 echo "      → $LATEST ok"
