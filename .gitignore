@@ -8,3 +8,4 @@ backups/*
 .env
 .DS_Store
 *.log
+rust/target/

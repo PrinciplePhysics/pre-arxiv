@@ -1,0 +1,60 @@
+use axum::extract::{Path, State};
+use axum::response::Html;
+
+use crate::error::{AppError, AppResult};
+use crate::models::comment::CommentWithAuthor;
+use crate::models::Manuscript;
+use crate::state::AppState;
+use crate::templates;
+
+pub async fn view(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> AppResult<Html<String>> {
+    let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
+        r#"
+        SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
+               pdf_path, external_url,
+               conductor_type, conductor_ai_model, conductor_ai_model_public,
+               conductor_human, conductor_human_public, conductor_role, conductor_notes,
+               agent_framework,
+               has_auditor, auditor_name, auditor_affiliation, auditor_role,
+               auditor_statement, auditor_orcid,
+               view_count, score, comment_count,
+               withdrawn, withdrawn_reason, withdrawn_at,
+               created_at, updated_at
+        FROM manuscripts
+        WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
+        LIMIT 1
+        "#,
+    )
+    .bind(&id)
+    .bind(&id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let m = m.ok_or(AppError::NotFound)?;
+
+    let comments: Vec<CommentWithAuthor> = sqlx::query_as::<_, CommentWithAuthor>(
+        r#"
+        SELECT c.id, c.manuscript_id, c.author_id,
+               u.username AS author_username,
+               c.parent_id, c.content, c.score, c.created_at
+        FROM comments c
+        JOIN users u ON u.id = c.author_id
+        WHERE c.manuscript_id = ?
+        ORDER BY c.created_at ASC
+        "#,
+    )
+    .bind(m.id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    sqlx::query("UPDATE manuscripts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")
+        .bind(m.id)
+        .execute(&state.pool)
+        .await
+        .ok();
+
+    Ok(Html(templates::manuscript::render(&m, &comments).into_string()))
+}
