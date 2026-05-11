@@ -81,12 +81,23 @@ pub fn render(
                                 " responsible for the correctness of this work."
                             }
                         } @else if m.has_auditor != 0 {
+                            @let self_audited = match (&m.auditor_name, &m.conductor_human) {
+                                (Some(an), Some(ch)) => an.trim() == ch.trim() && !ch.trim().is_empty(),
+                                _ => false,
+                            };
                             div.audit-banner {
-                                strong { "Audited." }
-                                " "
-                                @if let Some(n) = &m.auditor_name { (n) }
-                                @if let Some(a) = &m.auditor_affiliation { " (" (a) ")" }
-                                " has read the manuscript and provided a signed correctness statement (see below)."
+                                @if self_audited {
+                                    strong { "Self-audited." }
+                                    " "
+                                    @if let Some(n) = &m.auditor_name { (n) }
+                                    " is both the conductor and the auditor: they directed the AI and have read the manuscript line by line, signing a correctness statement (see below). This is a stronger claim than conducting alone, but weaker than a third-party audit."
+                                } @else {
+                                    strong { "Audited." }
+                                    " "
+                                    @if let Some(n) = &m.auditor_name { (n) }
+                                    @if let Some(a) = &m.auditor_affiliation { " (" (a) ")" }
+                                    " has read the manuscript and provided a signed correctness statement (see below)."
+                                }
                             }
                         }
                     }
@@ -136,8 +147,14 @@ pub fn render(
                     }
 
                     @if m.has_auditor != 0 {
+                        @let self_audited = match (&m.auditor_name, &m.conductor_human) {
+                            (Some(an), Some(ch)) => an.trim() == ch.trim() && !ch.trim().is_empty(),
+                            _ => false,
+                        };
                         section.ms-section.ms-auditor id="auditor" {
-                            h2.ms-section-h { "Auditor" }
+                            h2.ms-section-h {
+                                @if self_audited { "Self-audit" } @else { "Auditor" }
+                            }
                             table.kv {
                                 @if let Some(n) = &m.auditor_name { tr { th { "Name" } td { strong { (n) } } } }
                                 @if let Some(a) = &m.auditor_affiliation { tr { th { "Affiliation" } td { (a) } } }

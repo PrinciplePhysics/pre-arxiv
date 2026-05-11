@@ -184,3 +184,34 @@ html { scroll-behavior: smooth; }
 .markdown th { background: var(--bg-card-alt); }
 .markdown hr { border: none; border-top: 1px solid var(--rule); margin: 0.8em 0; }
 .markdown a { word-break: break-word; }
+
+/* ─── audit-status 3-way choice on the submit form ─────────────────────── */
+.audit-choice {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+.audit-none-block, .audit-self-block, .audit-other-block { display: none; }
+.audit-section:has(input[name="audit_status"][value="none"]:checked)  .audit-none-block  { display: block; }
+.audit-section:has(input[name="audit_status"][value="self"]:checked)  .audit-self-block  { display: block; }
+.audit-section:has(input[name="audit_status"][value="other"]:checked) .audit-other-block { display: block; }
+
+/* Self-audit only makes sense for human-AI; an autonomous agent cannot
+   independently audit itself. Hide the option (and its block, if
+   stale-selected) when conductor_type=ai-agent is active. */
+body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-radio,
+body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-block {
+  display: none !important;
+}
+
+.audit-self-callout {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-rule);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  color: var(--ink-soft);
+  font-size: 0.95em;
+}
+.audit-self-callout strong { color: var(--warn); }

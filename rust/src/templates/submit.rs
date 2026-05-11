@@ -263,20 +263,43 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 }
             }
 
-            section.form-section {
+            section.form-section.audit-section {
                 h2 { "3 — Auditor " span.muted { "(optional but encouraged)" } }
-                p.muted.small {
+                p.muted.small.no-katex {
                     "A human auditor is someone who has read the manuscript line by line and is willing to attach their professional reputation to a correctness statement. This is "
                     em { "not" }
                     " formal peer review — it's a signed opinion. Listing an auditor who has not actually read and signed off is the fastest way to get the submission removed."
                 }
 
-                label.checkbox {
-                    input type="checkbox" name="has_auditor" value="1";
-                    span { "This manuscript has a human auditor" }
+                div.audit-choice role="radiogroup" aria-label="Audit status" {
+                    label.ctype-card {
+                        input type="radio" name="audit_status" value="none" checked;
+                        div.ctype-body {
+                            strong { "No auditor" }
+                            span.muted.small { "Nobody is signing a correctness statement. The manuscript page will show a prominent " em { "unaudited" } " warning." }
+                        }
+                    }
+                    label.ctype-card.audit-self-radio {
+                        input type="radio" name="audit_status" value="self";
+                        div.ctype-body {
+                            strong { "Self-audit — I am the conductor " em { "and" } " the auditor" }
+                            span.muted.small.no-katex {
+                                "Only valid for "
+                                strong { "Human + AI" }
+                                " submissions. Pick this when you, the conductor, have also read the work line by line and stand behind its correctness. The auditor name and role are copied from your Conductor section above; you only need to write the audit statement."
+                            }
+                        }
+                    }
+                    label.ctype-card {
+                        input type="radio" name="audit_status" value="other";
+                        div.ctype-body {
+                            strong { "Someone else audited this" }
+                            span.muted.small { "A third party — separate from the conductor — has read it and is willing to sign. Fill in their details below." }
+                        }
+                    }
                 }
 
-                div.no-auditor-block {
+                div.audit-none-block {
                     label.checkbox.checkbox-warn {
                         input type="checkbox" name="no_auditor_ack";
                         span {
@@ -289,7 +312,22 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     }
                 }
 
-                div.auditor-fields {
+                div.audit-self-block {
+                    div.audit-self-callout {
+                        strong { "Self-audit is a stronger claim than just conducting." }
+                        " You're asserting that you've reviewed every line of the manuscript and that the result holds up. Readers will see "
+                        em { "“Self-audited by [your name]”" }
+                        " on the page — calibrate accordingly. Don't tick this if you only directed the AI and trusted its output."
+                    }
+                    label {
+                        span.label-text { "Self-audit statement " span.req { "*" } }
+                        textarea name="self_audit_statement" rows="4" maxlength="2000"
+                                 placeholder="What did you actually verify? Which parts did you NOT verify? Any caveats? Markdown + LaTeX render on the manuscript page." {}
+                        span.hint.no-katex { "Be specific. " code { "Verified the proof of Lemma 3.2; did not check the numerical experiment in §5." } " is more useful than " code { "Looks right to me." } "" }
+                    }
+                }
+
+                div.audit-other-block {
                     div.row-fields {
                         label.grow {
                             span.label-text { "Auditor name" }

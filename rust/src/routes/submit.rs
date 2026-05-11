@@ -101,6 +101,52 @@ pub async fn do_submit(
         return Ok(err_page(&session, maybe_user, "Human conductor name required for Human + AI submissions.").await);
     }
 
+    // Audit-status post-processing.
+    //
+    //   "none"  → no auditor row at all
+    //   "self"  → has_auditor=1, auditor_name/role copied from conductor;
+    //             ORCID left blank (the conductor has already identified
+    //             themselves once in the conductor section); only valid for
+    //             human-ai conductors
+    //   "other" → has_auditor=1, all auditor_* fields from the form
+    //
+    // The form's CSS hides the inactive blocks but their fields still
+    // submit, so we deliberately ignore them and pick only the ones that
+    // belong to the chosen audit_status.
+    let (has_auditor, auditor_name, auditor_affiliation, auditor_role, auditor_statement, auditor_orcid)
+        = match fields.audit_status.as_str() {
+            "self" if fields.conductor_type == "human-ai" => {
+                if fields.self_audit_statement.trim().is_empty() {
+                    return Ok(err_page(&session, maybe_user, "Self-audit statement is required when you tick 'I am the auditor'. Say what you actually verified.").await);
+                }
+                (
+                    true,
+                    Some(fields.conductor_human.trim().to_string()),
+                    None,
+                    if fields.conductor_role.trim().is_empty() { None } else { Some(fields.conductor_role.trim().to_string()) },
+                    Some(fields.self_audit_statement.trim().to_string()),
+                    None,
+                )
+            }
+            "other" => {
+                if fields.auditor_name.trim().is_empty() {
+                    return Ok(err_page(&session, maybe_user, "Auditor name is required when you select 'Someone else audited this'.").await);
+                }
+                if fields.auditor_statement.trim().is_empty() {
+                    return Ok(err_page(&session, maybe_user, "Auditor statement is required when you select 'Someone else audited this'.").await);
+                }
+                (
+                    true,
+                    Some(fields.auditor_name.trim().to_string()),
+                    if fields.auditor_affiliation.trim().is_empty() { None } else { Some(fields.auditor_affiliation.trim().to_string()) },
+                    if fields.auditor_role.trim().is_empty() { None } else { Some(fields.auditor_role.trim().to_string()) },
+                    Some(fields.auditor_statement.trim().to_string()),
+                    if fields.auditor_orcid.trim().is_empty() { None } else { Some(fields.auditor_orcid.trim().to_string()) },
+                )
+            }
+            _ => (false, None, None, None, None, None),
+        };
+
     let arxiv_like_id = make_prexiv_id();
     let synthetic_doi = format!("10.99999/{}", arxiv_like_id);
 
@@ -140,12 +186,12 @@ pub async fn do_submit(
     .bind(opt(&fields.conductor_role))
     .bind(opt(&fields.conductor_notes))
     .bind(opt(&fields.agent_framework))
-    .bind(if fields.has_auditor { 1i64 } else { 0 })
-    .bind(opt(&fields.auditor_name))
-    .bind(opt(&fields.auditor_affiliation))
-    .bind(opt(&fields.auditor_role))
-    .bind(opt(&fields.auditor_statement))
-    .bind(opt(&fields.auditor_orcid))
+    .bind(if has_auditor { 1i64 } else { 0 })
+    .bind(auditor_name.as_deref())
+    .bind(auditor_affiliation.as_deref())
+    .bind(auditor_role.as_deref())
+    .bind(auditor_statement.as_deref())
+    .bind(auditor_orcid.as_deref())
     .execute(&state.pool)
     .await?;
 
@@ -211,7 +257,9 @@ struct SubmitFields {
     conductor_role: String,
     conductor_notes: String,
     agent_framework: String,
-    has_auditor: bool,
+    /// "none" / "self" / "other"
+    audit_status: String,
+    self_audit_statement: String,
     auditor_name: String,
     auditor_affiliation: String,
     auditor_role: String,
@@ -236,7 +284,8 @@ impl SubmitFields {
             "conductor_role" => self.conductor_role = v,
             "conductor_notes" => self.conductor_notes = v,
             "agent_framework" => self.agent_framework = v,
-            "has_auditor" => self.has_auditor = is_truthy(&v),
+            "audit_status" => self.audit_status = v,
+            "self_audit_statement" => self.self_audit_statement = v,
             "auditor_name" => self.auditor_name = v,
             "auditor_affiliation" => self.auditor_affiliation = v,
             "auditor_role" => self.auditor_role = v,
