@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod auth;
 pub mod cite;
+pub mod feed;
 pub mod home;
 pub mod layout;
 pub mod listing;

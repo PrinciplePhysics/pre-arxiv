@@ -8,6 +8,8 @@ pub mod api;
 pub mod auth;
 pub mod cite;
 pub mod comments;
+pub mod feed;
+pub mod follow;
 pub mod home;
 pub mod listings;
 pub mod manuscript;
@@ -36,8 +38,10 @@ pub fn router() -> Router<AppState> {
         .route("/m/{id}/comment", post(comments::post_comment))
         .route("/m/{id}/cite", get(cite::cite))
 
-        // Profile
+        // Profile + follow
         .route("/u/{username}", get(profile::show))
+        .route("/u/{username}/follow", post(follow::follow))
+        .route("/u/{username}/unfollow", post(follow::unfollow))
 
         // Search
         .route("/search", get(search::search))
@@ -55,7 +59,7 @@ pub fn router() -> Router<AppState> {
         .route("/me/tokens", get(me_tokens::show).post(me_tokens::create))
         .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
         .route("/me/edit", get(me_edit::show).post(me_edit::submit))
-        .route("/feed", get(me::feed))
+        .route("/feed", get(feed::show))
 
         // Admin
         .route("/admin", get(admin::queue))
