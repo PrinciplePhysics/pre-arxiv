@@ -2,6 +2,17 @@ use maud::{html, Markup};
 
 use super::layout::{layout, PageCtx};
 
+const ROLES: &[&str] = &[
+    "undergraduate",
+    "graduate-student",
+    "postdoc",
+    "industry-researcher",
+    "professor",
+    "professional-expert",
+    "independent-researcher",
+    "hobbyist",
+];
+
 const CATEGORIES: &[(&str, &str)] = &[
     ("cs.AI", "Artificial Intelligence"),
     ("cs.LG", "Machine Learning"),
@@ -147,9 +158,14 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         }
                     }
                     div.field {
-                        label { span.label-text { "Conductor role" } }
-                        input type="text" name="conductor_role" maxlength="120"
-                              placeholder="e.g., director, prompt engineer, editor";
+                        label {
+                            span.label-text { "Conductor role" }
+                            select name="conductor_role" {
+                                option value="" { "— select —" }
+                                @for r in ROLES { option value=(r) { (r) } }
+                            }
+                            span.hint { "From undergraduate to professional expert — readers use this to calibrate." }
+                        }
                     }
                 }
 
@@ -221,8 +237,10 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     div.row-fields {
                         label.grow {
                             span.label-text { "Role" }
-                            input type="text" name="auditor_role" maxlength="120"
-                                  placeholder="e.g., postdoc, professor, professional expert";
+                            select name="auditor_role" {
+                                option value="" { "— select —" }
+                                @for r in ROLES { option value=(r) { (r) } }
+                            }
                         }
                         label.grow {
                             span.label-text { "ORCID" }
