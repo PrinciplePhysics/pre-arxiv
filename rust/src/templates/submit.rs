@@ -365,38 +365,42 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
             section.form-section {
                 h2 { "4 — Licensing" }
                 p.muted.small {
-                    "Two orthogonal choices: what readers may do with the manuscript, and whether AI systems may train on it. See "
-                    a href="/licenses" target="_blank" rel="noopener" { "the licensing page" }
-                    " for the full rationale, including why these are separate questions and how PreXiv handles the legally-uncertain case of autonomous-AI authorship."
+                    "Two orthogonal choices: what readers may do with the manuscript, and whether AI systems may train on it. Read "
+                    a href="/licenses" target="_blank" rel="noopener" { "the full licensing page" }
+                    " for per-license details and the autonomous-AI copyright caveat."
                 }
 
                 div.field {
                     label { span.label-text { "Reader license " span.req { "*" } } }
                     select name="license" required {
                         @for l in LICENSES {
-                            option value=(l.id) selected[l.id == "CC-BY-4.0"] {
-                                (l.short) " — " (l.name)
+                            option value=(l.id) selected[l.id == "CC-BY-4.0"] title=(l.summary) {
+                                (l.tagline)
                             }
                         }
                     }
                     span.hint.no-katex {
-                        "Defaults to CC BY 4.0 (the modern academic open default). For autonomous AI-agent submissions, consider CC0 1.0 — under most jurisdictions, purely AI-generated work has no human copyright anyway."
+                        "Hover an option for the one-paragraph summary. Defaults to CC BY 4.0. For autonomous AI-agent submissions, CC0 is the safer choice — under most jurisdictions, purely AI-generated work has no human copyright anyway."
                     }
                 }
 
                 div.field {
                     label { span.label-text { "AI training " span.req { "*" } } }
-                    select name="ai_training" required {
+                    div.conductor-type-choice role="radiogroup" aria-label="AI training" {
                         @for o in AI_TRAINING_OPTIONS {
-                            option value=(o.id) selected[o.id == "allow"] {
-                                (o.short) " — " (o.summary)
+                            label.ctype-card {
+                                input type="radio" name="ai_training" value=(o.id) checked[o.id == "allow"];
+                                div.ctype-body {
+                                    strong { (o.short) }
+                                    span.muted.small.no-katex { (o.summary) }
+                                }
                             }
                         }
                     }
                     span.hint.no-katex {
-                        "Separate from the reader license: a CC BY 4.0 submission can still ask AI not to train on it. Enforcement of "
+                        "Separate from the reader license — a CC BY 4.0 submission can still opt out of AI training. Enforcement of "
                         em { "Disallow" }
-                        " depends on trainers honoring the signal (we surface it in HTTP headers and the OpenAPI manifest)."
+                        " depends on trainers honoring the signal (surfaced in HTTP headers and the OpenAPI manifest)."
                     }
                 }
             }
