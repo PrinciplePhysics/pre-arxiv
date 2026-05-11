@@ -102,6 +102,8 @@ pub struct RegisterPost {
     pub email: String,
     pub password: String,
     #[serde(default)]
+    pub password_confirm: String,
+    #[serde(default)]
     pub display_name: String,
 }
 
@@ -138,6 +140,9 @@ pub async fn do_register(
     }
     if form.password.len() < 8 {
         return Ok(mk_err("Password must be at least 8 characters.", &form, maybe_user).await);
+    }
+    if form.password != form.password_confirm {
+        return Ok(mk_err("The two passwords don't match. Re-type the confirmation.", &form, maybe_user).await);
     }
     if is_password_pwned(&form.password).await {
         return Ok(mk_err("That password appears in a known data breach. Please pick another.", &form, maybe_user).await);

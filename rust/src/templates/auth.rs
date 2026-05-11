@@ -94,6 +94,14 @@ pub fn render_register(ctx: &PageCtx, error: Option<&str>, form: &RegisterForm) 
                     }
                 }
                 label {
+                    span.label-text { "Confirm password " span.req { "*" } }
+                    input type="password" name="password_confirm" required
+                          minlength="8" autocomplete="new-password";
+                    span.hint.no-katex {
+                        "Re-type the password above. Mismatches won't be silently submitted."
+                    }
+                }
+                label {
                     span.label-text { "Display name " span.muted { "(optional)" } }
                     input type="text" name="display_name" maxlength="120"
                           autocomplete="name"
