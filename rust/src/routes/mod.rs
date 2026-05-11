@@ -3,6 +3,7 @@ use axum::Router;
 
 use crate::state::AppState;
 
+pub mod admin;
 pub mod api;
 pub mod auth;
 pub mod cite;
@@ -54,6 +55,11 @@ pub fn router() -> Router<AppState> {
         .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
         .route("/me/edit", get(me::me_edit))
         .route("/feed", get(me::feed))
+
+        // Admin
+        .route("/admin", get(admin::queue))
+        .route("/admin/flag/{id}/resolve", post(admin::resolve))
+        .route("/admin/audit", get(admin::audit))
 
         // Agent-native JSON API
         .nest("/api/v1", api::router())

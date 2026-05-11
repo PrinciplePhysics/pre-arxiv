@@ -27,115 +27,196 @@ const CATEGORIES: &[(&str, &str)] = &[
 
 pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
     let body = html! {
-        h1 { "Submit a manuscript" }
-        @if let Some(e) = error {
-            div.error { (e) }
+        div.page-header {
+            h1 { "Submit a manuscript" }
+            p.muted {
+                "A manuscript on PreXiv is a piece of work in which an AI was a substantial co-author. The "
+                strong { "conductor" }
+                " is the human who guided the AI to write it (or, in autonomous mode, the AI that produced it alone); the "
+                strong { "auditor" }
+                " (optional) is a human expert who has verified its correctness."
+            }
         }
-        form method="post" action="/submit" enctype="multipart/form-data" {
+
+        @if let Some(e) = error {
+            div.form-errors {
+                strong { "Please fix the following:" }
+                ul { li { (e) } }
+            }
+        }
+
+        form.submit-form method="post" action="/submit" enctype="multipart/form-data" {
             input type="hidden" name="csrf_token" value=(ctx.csrf_token);
 
-            fieldset {
-                legend { "Manuscript" }
+            section.form-section {
+                h2 { "1 — The manuscript" }
+
                 label {
-                    "Title"
-                    input type="text" name="title" required maxlength="300";
+                    span.label-text { "Title " span.req { "*" } }
+                    input type="text" name="title" required maxlength="300"
+                          placeholder="A descriptive title — like an arxiv title";
                 }
+
                 label {
-                    "Authors"
-                    input type="text" name="authors" required placeholder="A. Lastname; B. Lastname; …";
-                    small.minor { "Semicolon-separated." }
+                    span.label-text { "Authors line " span.req { "*" } }
+                    input type="text" name="authors" required maxlength="500"
+                          placeholder="e.g., Jane Doe; Claude Opus 4.7";
+                    span.hint { "Separate authors with semicolons. List the AI as a co-author by its model name." }
                 }
+
                 label {
-                    "Abstract"
-                    textarea name="abstract" required rows="8" minlength="100" maxlength="5000" {}
-                }
-                label {
-                    "Category"
+                    span.label-text { "Category " span.req { "*" } }
                     select name="category" required {
+                        option value="" { "— select —" }
                         @for (id, name) in CATEGORIES {
                             option value=(id) { (id) " — " (name) }
                         }
                     }
                 }
+
                 label {
-                    "PDF (optional, ≤30 MB)"
-                    input type="file" name="pdf" accept="application/pdf";
+                    span.label-text { "Abstract " span.req { "*" } }
+                    textarea name="abstract" required minlength="100" maxlength="5000" rows="8"
+                             placeholder="State what the manuscript claims, what role the AI played, and what (if anything) you have verified by hand." {}
+                    span.hint { "~100–5000 chars. Plain text. Math via $…$ / $$…$$ will render in the manuscript view." }
                 }
-                label {
-                    "External URL (optional)"
-                    input type="url" name="external_url" placeholder="https://…";
+
+                div.row-fields {
+                    div.grow.field {
+                        label for="pdf_upload" { span.label-text { "Upload PDF" } }
+                        input id="pdf_upload" type="file" name="pdf" accept="application/pdf";
+                        span.hint { "Optional if you provide an external URL. Max 30 MB." }
+                    }
+                    label.grow {
+                        span.label-text { "External URL" }
+                        input type="url" name="external_url" maxlength="500"
+                              placeholder="https://… (e.g., GitHub repo or hosted PDF)";
+                    }
                 }
             }
 
-            fieldset {
-                legend { "Conductor" }
-                label.radio {
-                    input type="radio" name="conductor_type" value="human-ai" checked;
-                    " Human + AI co-author"
+            section.form-section {
+                h2 { "2 — Conductor " span.muted { "(required)" } }
+                p.muted.small {
+                    "How was this manuscript produced? PreXiv accepts both human-conducted (a person directed an AI) and fully autonomous AI-agent work. Pick one."
                 }
-                label.radio {
-                    input type="radio" name="conductor_type" value="ai-agent";
-                    " Autonomous AI agent (no named human)"
+
+                div.conductor-type-choice {
+                    label.ctype-card {
+                        input type="radio" name="conductor_type" value="human-ai" checked;
+                        div.ctype-body {
+                            strong { "Human + AI co-conductor" }
+                            span.muted.small {
+                                "A named human directed the AI to produce this work. The human accepts responsibility for the "
+                                em { "conduct" }
+                                " of the work (not necessarily its correctness — that's what an auditor is for)."
+                            }
+                        }
+                    }
+                    label.ctype-card {
+                        input type="radio" name="conductor_type" value="ai-agent";
+                        div.ctype-body {
+                            strong { "AI agent alone " span.muted { "(autonomous)" } }
+                            span.muted.small {
+                                "The manuscript was produced by an AI agent acting on its own — no human direction beyond an initial task description. "
+                                em { "No human" }
+                                " takes responsibility for either conduct or content; you (the submitter) only post it on the site."
+                            }
+                        }
+                    }
                 }
+
+                div.field {
+                    label for="conductor_ai_model" { span.label-text { "AI model " span.req { "*" } } }
+                    input id="conductor_ai_model" type="text" name="conductor_ai_model" required maxlength="200"
+                          placeholder="e.g., Claude Opus 4.7, GPT-5, Gemini 3 Pro";
+                    label.checkbox-inline {
+                        input type="checkbox" name="conductor_ai_model_public" value="0";
+                        span { "Keep this private. Public viewers will see " em { "(undisclosed)" } "; you and admins still see the value." }
+                    }
+                }
+
+                section.ctype-section.ctype-human-ai {
+                    div.field {
+                        label { span.label-text { "Human conductor (your displayed name)" } }
+                        input type="text" name="conductor_human" maxlength="200"
+                              placeholder="Your name as it should appear on the manuscript";
+                        label.checkbox-inline {
+                            input type="checkbox" name="conductor_human_public" value="0";
+                            span { "Keep this private. Public viewers will see " em { "(undisclosed)" } "." }
+                        }
+                    }
+                    div.field {
+                        label { span.label-text { "Conductor role" } }
+                        input type="text" name="conductor_role" maxlength="120"
+                              placeholder="e.g., director, prompt engineer, editor";
+                    }
+                }
+
+                section.ctype-section.ctype-ai-agent {
+                    div.field {
+                        label { span.label-text { "Agent framework" } }
+                        input type="text" name="agent_framework" maxlength="120"
+                              placeholder="e.g., claude-agent-sdk, langgraph, custom-runtime";
+                        span.hint { "Only meaningful for autonomous AI agents." }
+                    }
+                }
+
                 label {
-                    "AI model"
-                    input type="text" name="conductor_ai_model" required placeholder="e.g. Claude Opus 4.7";
-                }
-                label.checkbox {
-                    input type="checkbox" name="conductor_ai_model_public" value="1" checked;
-                    " Show AI model publicly"
-                }
-                label {
-                    "Human conductor (if Human + AI)"
-                    input type="text" name="conductor_human" placeholder="Your name as it should appear";
-                }
-                label.checkbox {
-                    input type="checkbox" name="conductor_human_public" value="1" checked;
-                    " Show human conductor publicly"
-                }
-                label {
-                    "Conductor role"
-                    input type="text" name="conductor_role" placeholder="e.g. director, prompt engineer";
-                }
-                label {
-                    "Agent framework (if Autonomous)"
-                    input type="text" name="agent_framework" placeholder="e.g. claude-agent-sdk";
-                }
-                label {
-                    "Conductor notes"
-                    textarea name="conductor_notes" rows="3" placeholder="How the manuscript was produced." {}
+                    span.label-text { "Conductor notes" }
+                    textarea name="conductor_notes" rows="3" maxlength="2000"
+                             placeholder="How the manuscript was produced — prompts, iteration cycles, tools, anything a reader needs to understand the conduct." {}
                 }
             }
 
-            fieldset {
-                legend { "Auditor (optional)" }
-                label.checkbox {
+            section.form-section {
+                h2 { "3 — Auditor " span.muted { "(optional but encouraged)" } }
+                p.muted.small {
+                    "A human auditor is someone who has read the manuscript line by line and is willing to attach their professional reputation to a correctness statement. This is "
+                    em { "not" }
+                    " formal peer review — it's a signed opinion. Listing an auditor who has not actually read and signed off is the fastest way to get the submission removed."
+                }
+
+                label.checkbox.checkbox-warn {
                     input type="checkbox" name="has_auditor" value="1";
-                    " A human auditor takes responsibility for correctness"
+                    span { strong { "A human auditor takes responsibility for correctness" } }
                 }
-                label {
-                    "Auditor name"
-                    input type="text" name="auditor_name";
-                }
-                label {
-                    "Auditor affiliation"
-                    input type="text" name="auditor_affiliation";
-                }
-                label {
-                    "Auditor role"
-                    input type="text" name="auditor_role";
-                }
-                label {
-                    "Auditor ORCID"
-                    input type="text" name="auditor_orcid" pattern="\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]";
-                }
-                label {
-                    "Auditor statement"
-                    textarea name="auditor_statement" rows="3" {}
+
+                div.auditor-fields {
+                    div.row-fields {
+                        label.grow {
+                            span.label-text { "Auditor name" }
+                            input type="text" name="auditor_name" maxlength="200";
+                        }
+                        label.grow {
+                            span.label-text { "Affiliation" }
+                            input type="text" name="auditor_affiliation" maxlength="200";
+                        }
+                    }
+                    div.row-fields {
+                        label.grow {
+                            span.label-text { "Role" }
+                            input type="text" name="auditor_role" maxlength="120"
+                                  placeholder="e.g., postdoc, professor, professional expert";
+                        }
+                        label.grow {
+                            span.label-text { "ORCID" }
+                            input type="text" name="auditor_orcid"
+                                  pattern="\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]"
+                                  placeholder="0000-0000-0000-0000";
+                        }
+                    }
+                    label {
+                        span.label-text { "Auditor statement" }
+                        textarea name="auditor_statement" rows="4" maxlength="2000"
+                                 placeholder="The auditor's signed statement of what they reviewed and what they stand behind." {}
+                    }
                 }
             }
 
-            button type="submit" { "Submit" }
+            div.form-submit {
+                button.btn-primary.big type="submit" { "Submit manuscript" }
+            }
         }
     };
     layout("Submit", ctx, body)
