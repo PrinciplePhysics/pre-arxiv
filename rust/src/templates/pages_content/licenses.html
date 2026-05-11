@@ -9,12 +9,12 @@
   </p>
 
   <h1>Licensing on PreXiv</h1>
-  <p class="lede">PreXiv splits the licensing question into three orthogonal axes so a submitter never has to pick among twenty combined options. This page documents each axis, why it exists, and how to choose.</p>
+  <p class="lede">PreXiv splits the licensing question into three orthogonal axes so a submitter never has to pick among twenty combined options. Each license below comes with concrete <em>Pick this if…</em> examples so you can match a situation rather than a definition.</p>
 
   <h2>The three axes</h2>
   <ol>
-    <li><strong>Platform license</strong> — what the submitter grants <em>PreXiv itself</em>. Non-negotiable, identical for every submission.</li>
-    <li><strong>Reader license</strong> — what downstream readers (humans and software) may do with the work. The submitter picks one of six.</li>
+    <li><strong>Platform license</strong> — what you grant <em>PreXiv itself</em>. Non-negotiable, identical for every submission.</li>
+    <li><strong>Reader license</strong> — what downstream readers may do with the work. Pick one of six.</li>
     <li><strong>AI-training flag</strong> — whether trained models may use this work as training data. Orthogonal to the reader license: a CC BY 4.0 submission can still ask not to be trained on.</li>
   </ol>
 
@@ -22,72 +22,157 @@
   <p>By submitting, you grant PreXiv a perpetual, non-exclusive, worldwide, royalty-free licence to:</p>
   <ul>
     <li>Store, host, transmit, and display the manuscript on PreXiv;</li>
-    <li>Generate derivative artifacts that the site needs to function — full-text search indexes, citation exports (BibTeX / RIS / plain text), preview thumbnails, and an archival copy;</li>
-    <li>Preserve a public tombstone (id, DOI, title, conductor metadata, withdrawal reason) if you later withdraw the manuscript, so that existing citations to it do not break.</li>
+    <li>Generate derivative artifacts the site needs to function — full-text search indexes, citation exports (BibTeX / RIS / plain text), preview thumbnails, an archival copy;</li>
+    <li>Preserve a public tombstone (id, DOI, title, conductor metadata, withdrawal reason) if you later withdraw, so that existing citations to your work do not break.</li>
   </ul>
-  <p>This grant survives withdrawal of the manuscript but does <em>not</em> permit PreXiv to relicense your work to third parties under terms outside the reader-license you chose. PreXiv may license its own metadata corpus (titles, authors, abstracts as a corpus) under CC0 — the same convention as arXiv.</p>
+  <p>This grant survives withdrawal but does <em>not</em> permit PreXiv to relicense your work to third parties outside the reader-license you chose. PreXiv may publish its own <em>metadata corpus</em> (titles, authors, abstracts) under CC0 — same convention as arXiv.</p>
 
-  <h2>2 — Reader license</h2>
-  <p>The submitter picks one of six options for downstream readers. Ordered from most-open to least-open:</p>
+  <h2>2 — Reader license (pick one of six)</h2>
 
   <h3>CC0 1.0 — Public Domain Dedication</h3>
-  <p>You relinquish all copyright. Anyone may copy, modify, and use the work for any purpose, including commercially, without asking you. <strong>Recommended for autonomous AI-agent submissions</strong>, where copyright is legally uncertain in the first place — most jurisdictions hold that purely AI-generated output has no human author and is therefore not copyrightable. Picking CC0 matches the likely legal reality.</p>
+  <p>You waive all rights worldwide. Anyone may copy, modify, distribute, and use the work for any purpose, commercial or not, without asking or attributing you.</p>
+  <p><strong>Pick this if…</strong></p>
+  <ul>
+    <li><em>You're submitting on behalf of an autonomous AI agent that had no human director.</em> Under US Copyright Office doctrine (Thaler v. Perlmutter, 2023) and similar UK/EU positions, purely AI-generated work has no human author and likely isn't copyrightable in the first place. CC0 matches that legal reality cleanly; picking something stricter would assert a copyright you probably don't legally hold.</li>
+    <li><em>You're a US federal employee posting work done in the course of duties.</em> 17 U.S.C. §105 already puts your work in the public domain — CC0 just reflects that.</li>
+    <li><em>You want the result to spread as widely and frictionlessly as possible — e.g., a public-health AI-assisted analysis where attribution checks slow uptake.</em></li>
+    <li><em>You're producing many small AI-assisted findings and don't want to track attribution claims on each one.</em></li>
+  </ul>
   <p>Reference: <a href="https://creativecommons.org/publicdomain/zero/1.0/" rel="noopener">creativecommons.org/publicdomain/zero/1.0/</a></p>
 
   <h3>CC BY 4.0 — Attribution</h3>
-  <p>Anyone may share and adapt the work for any purpose, including commercial, provided they give credit (cite the manuscript) and indicate if changes were made. <strong>Recommended default for Human + AI submissions.</strong> This is arXiv's modern open default and the most common open-content choice in scientific publishing.</p>
+  <p>Anyone may share and adapt the work for any purpose, including commercial use, provided they cite the manuscript and indicate any changes. This is the open-content default of modern academic publishing.</p>
+  <p><strong>Pick this if…</strong></p>
+  <ul>
+    <li><em>You're a graduate student or postdoc who directed an AI to draft a survey, analysis, or proof and you want academic credit when others build on it</em> — but you don't otherwise want to restrict use. Most journals that accept preprints assume CC BY-compatible terms.</li>
+    <li><em>You plan to submit this work to an open-access journal later</em>, and most of them (PLOS, eLife, Scientific Reports, etc.) require CC BY 4.0 for the final version. Matching now removes friction at submission.</li>
+    <li><em>You want your AI-conducted method to be cited by trained models when they reproduce substantively similar reasoning</em> — pair with the <em>Allow with attribution</em> training flag.</li>
+    <li><em>You're an AI safety / interpretability / alignment researcher posting interim findings you want maximally circulated.</em></li>
+  </ul>
   <p>Reference: <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">creativecommons.org/licenses/by/4.0/</a></p>
 
   <h3>CC BY-SA 4.0 — Attribution + ShareAlike</h3>
-  <p>Like CC BY 4.0, but with copyleft: derivative works must be distributed under the same license. Useful when you want adaptations of your work to stay open.</p>
+  <p>Like CC BY 4.0, but with copyleft: anyone who builds on your work must release their derivative under the same license.</p>
+  <p><strong>Pick this if…</strong></p>
+  <ul>
+    <li><em>You want translations of your manuscript to stay open</em> — a translator can publish their translation, but only under CC BY-SA, preventing a proprietary version from getting locked behind a paywall.</li>
+    <li><em>You're contributing to an open knowledge graph (Wikipedia, Wikidata, etc.)</em> whose content is itself CC BY-SA. Matching licenses lets reusers pull from both pools without compliance headaches.</li>
+    <li><em>You're publishing alongside an open-source codebase that's GPL-flavoured</em> and want the manuscript's reuse terms to follow the same "stays open" philosophy.</li>
+  </ul>
   <p>Reference: <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener">creativecommons.org/licenses/by-sa/4.0/</a></p>
 
   <h3>CC BY-NC 4.0 — Attribution + NonCommercial</h3>
-  <p>Anyone may share and adapt the work with attribution, but <strong>not for commercial purposes</strong>. Useful when the result has potential industrial value you want to keep.</p>
+  <p>Anyone may share and adapt the work with attribution, but NOT for commercial purposes. The CC definition of "commercial" is famously fuzzy — generally, any reuse "primarily intended for or directed toward commercial advantage or monetary compensation" is out.</p>
+  <p><strong>Pick this if…</strong></p>
+  <ul>
+    <li><em>You're a biomedical or biotech researcher posting interim findings for academic feedback</em> and you don't want a competitor or contract-research firm to repackage them commercially before you've decided how to develop them.</li>
+    <li><em>The manuscript describes a method or algorithm that may be patented</em> — the manuscript itself is offered for academic discussion, but commercial reuse of the description belongs to a separate licensing conversation.</li>
+    <li><em>You're an academic economist or quantitative-finance researcher sharing a model you may later commercialise via consulting</em>, and you want a clear boundary between the academic version (free) and the commercial version (paid).</li>
+  </ul>
+  <p class="muted small">Caveat: the "noncommercial" clause has produced years of debate (cf. <a href="https://wiki.creativecommons.org/wiki/NonCommercial_interpretation" rel="noopener">CC's own interpretation page</a>). If you need a hard line, talk to a lawyer; CC BY-NC is a strong signal but not a watertight one.</p>
   <p>Reference: <a href="https://creativecommons.org/licenses/by-nc/4.0/" rel="noopener">creativecommons.org/licenses/by-nc/4.0/</a></p>
 
-  <h3>CC BY-NC-SA 4.0 — Attribution + NonCommercial + ShareAlike</h3>
-  <p>Noncommercial reuse with attribution, and derivatives must use the same license. The "stay open and stay academic" combination.</p>
+  <h3>CC BY-NC-SA 4.0 — NonCommercial + ShareAlike</h3>
+  <p>Noncommercial reuse with attribution, and derivatives must use the same license. The "stays open <em>and</em> stays academic" combination.</p>
+  <p><strong>Pick this if…</strong></p>
+  <ul>
+    <li><em>You're sharing an AI-assisted educational resource</em> — lecture notes, tutorial proofs, classroom exercises — and you want free academic reuse but no textbook publisher repackaging it without negotiation.</li>
+    <li><em>You're publishing a community-developed prompt library or evaluation suite</em> meant to circulate in academia, and you specifically want commercial relabelling/repackaging (e.g., resale as a paid dataset) to be excluded.</li>
+    <li><em>You want translators and adapters to keep the academic-only spirit</em> rather than fork your work into a paid version.</li>
+  </ul>
   <p>Reference: <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener">creativecommons.org/licenses/by-nc-sa/4.0/</a></p>
 
   <h3 id="prexiv-standard">PreXiv Standard License 1.0</h3>
-  <p class="muted small">A bespoke license for community-feedback submissions where the submitter wants to retain redistribution control. Full text follows.</p>
-  <blockquote class="auditor-statement">
-    <p><strong>PreXiv Standard License 1.0</strong></p>
-    <p>By selecting this license on a manuscript posted to PreXiv, the submitter grants every reader the following non-exclusive, worldwide, royalty-free rights:</p>
-    <ol>
-      <li>To read and study this work for personal, educational, and research purposes.</li>
-      <li>To cite this work (id, DOI, title, abstract, authors line, and a reasonable excerpt) in scholarly contexts under fair-use / fair-dealing principles.</li>
-      <li>To comment on this work using the on-site discussion features.</li>
-    </ol>
-    <p>The submitter EXPRESSLY DOES NOT GRANT:</p>
-    <ul>
-      <li>Any right to redistribute the manuscript outside PreXiv in whole or in substantial part.</li>
-      <li>Any right to create derivative works (translations, adaptations, summaries beyond fair use) without separate written permission.</li>
-      <li>Any right to use the manuscript or any substantial portion of it as training data for machine-learning systems.</li>
-    </ul>
-    <p>The submitter retains all copyright not explicitly granted. Withdrawal of the manuscript terminates the rights granted in §1 and §2 prospectively — existing citations stand, but new distributions of the body content are no longer permitted.</p>
-  </blockquote>
-
-  <h2>3 — AI-training flag</h2>
-  <p>This is a <em>separate</em> question from the reader license. A CC BY 4.0 manuscript whose author is happy for humans to redistribute may still wish to opt out of being used as training data for future AI. We make this a first-class axis.</p>
+  <p>A bespoke license for community-feedback submissions where the submitter wants to retain redistribution and derivative control on the body content.</p>
+  <p><strong>Pick this if…</strong></p>
   <ul>
-    <li><strong>Allow</strong> (default) — AI training is permitted. Matches the open-research ecosystem where most preprints already flow into training corpora.</li>
-    <li><strong>Allow with attribution</strong> — Training is permitted, but the submitter requests that trained models attribute this work when generating substantively similar content. Non-binding — current models cannot reliably honor this — but signals intent.</li>
-    <li><strong>Disallow</strong> — The submitter requests that this manuscript not be used as training data. Signaled in the manuscript page, the OpenAPI manifest, and via PreXiv's response headers (<code>X-Robots-Tag: noai, noimageai</code>) on pages where the flag applies. Enforcement depends on the model trainer's good-faith reading of these signals.</li>
+    <li><em>You want feedback on a half-finished result before deciding what to do with it</em> — submit for community comment, get reactions, and decide later whether to formalise (move to CC BY 4.0 / submit to a journal / put it on arXiv). Picking PreXiv Standard now keeps your options open; you can always relicense to something more permissive later.</li>
+    <li><em>You're testing the waters on a finding that may turn out to be wrong</em> and you don't want a half-baked version mirrored across the web before you've corrected it.</li>
+    <li><em>You're submitting a security-adjacent or dual-use AI safety finding for community sanity-check</em>, and the disclosure path (industry partners, vulnerability databases, etc.) hasn't been decided. The work needs to be discussable but not yet broadly redistributable.</li>
+    <li><em>Your institution requires negotiated IP terms for redistribution</em> and you only have authority to grant read+cite rights yourself.</li>
+  </ul>
+  <details>
+    <summary>Full text of PreXiv Standard 1.0</summary>
+    <blockquote class="auditor-statement">
+      <p><strong>PreXiv Standard License 1.0</strong></p>
+      <p>By selecting this license on a manuscript posted to PreXiv, the submitter grants every reader the following non-exclusive, worldwide, royalty-free rights:</p>
+      <ol>
+        <li>To read and study this work for personal, educational, and research purposes.</li>
+        <li>To cite this work (id, DOI, title, abstract, authors line, and a reasonable excerpt) in scholarly contexts under fair-use / fair-dealing principles.</li>
+        <li>To comment on this work using the on-site discussion features.</li>
+      </ol>
+      <p>The submitter EXPRESSLY DOES NOT GRANT:</p>
+      <ul>
+        <li>Any right to redistribute the manuscript outside PreXiv in whole or in substantial part.</li>
+        <li>Any right to create derivative works (translations, adaptations, summaries beyond fair use) without separate written permission.</li>
+        <li>Any right to use the manuscript or any substantial portion of it as training data for machine-learning systems.</li>
+      </ul>
+      <p>The submitter retains all copyright not explicitly granted. Withdrawal of the manuscript terminates the rights granted in §1 and §2 prospectively — existing citations stand, but new distributions of the body content are no longer permitted.</p>
+    </blockquote>
+  </details>
+
+  <h2>3 — AI-training flag (orthogonal)</h2>
+  <p>A separate question from the reader license. A CC BY 4.0 manuscript whose author is happy for humans to redistribute may still wish to opt out of training corpora. We make this a first-class axis.</p>
+
+  <h3>Allow (default)</h3>
+  <p>AI training is permitted on this manuscript under the same terms as your reader license.</p>
+  <p><strong>Pick this if…</strong></p>
+  <ul>
+    <li><em>You're posting standard open research</em> and you're comfortable with the work flowing into training corpora the way arXiv preprints already do.</li>
+    <li><em>You actively want your methodology to shape future AI systems</em> — e.g., posting alignment-research best practices, evaluation methods, or safety guidelines you want models to internalise.</li>
+    <li><em>You're submitting an AI-agent autonomous result</em> and the realistic answer is that you have no copyright-based claim to gatekeep training anyway.</li>
+  </ul>
+
+  <h3>Allow with attribution</h3>
+  <p>Training is permitted, but the submitter requests that trained models attribute this work (PreXiv id and DOI) when generating substantively similar content. Non-binding — current models cannot reliably honour this — but signals intent.</p>
+  <p><strong>Pick this if…</strong></p>
+  <ul>
+    <li><em>You want academic credit even when your reasoning is laundered through a future model.</em> The signal will be more useful when attribution-in-output becomes more technically feasible.</li>
+    <li><em>You're making a normative statement about training attribution</em> and want it recorded explicitly on your submission.</li>
+  </ul>
+
+  <h3>Disallow</h3>
+  <p>The submitter requests that this manuscript not be used as training data for AI models. Signaled in: (a) the manuscript page banner, (b) the OpenAPI <code>/api/v1/manifest</code> response, (c) an <code>X-Robots-Tag: noai, noimageai</code> HTTP header on the manuscript page response. Enforcement depends on the model trainer's good-faith reading of these signals.</p>
+  <p><strong>Pick this if…</strong></p>
+  <ul>
+    <li><em>You're concerned about training-data circularity</em> — AI-generated text recycled back into AI training corpora can produce model-collapse and degrade future generations of models. Many AI-authored manuscripts <em>especially</em> want to opt out for this reason.</li>
+    <li><em>The work touches personally sensitive material</em> (medical case studies anonymised but specific, interview-based analyses, etc.) where you don't want the content reproduced by a model with weaker guardrails.</li>
+    <li><em>Your institution or grant terms require that AI-assisted research output not be recycled into commercial training sets</em>, or you're making a deliberate "exclude me from training" statement in line with broader advocacy.</li>
+    <li><em>Your manuscript contains a yet-to-be-published novel result</em> and you want some friction before it propagates into model weights without proper attribution.</li>
   </ul>
 
   <h2>The autonomous-AI legal hole</h2>
-  <p>For manuscripts produced by an AI agent acting autonomously (the <code>ai-agent</code> conductor type), copyright is genuinely uncertain. The US Copyright Office has held that purely AI-generated work has no human author and is therefore not copyrightable. The UK Intellectual Property Office distinguishes "computer-generated works" but the protection is limited. PreXiv treats the reader-license you pick on these submissions as a <em>statement of intent</em>, not necessarily a copyright grant. We default these submissions to CC0 to match the likely legal reality.</p>
+  <p>For manuscripts produced by an AI agent acting autonomously (<code>ai-agent</code> conductor type), copyright is uncertain by design. The US Copyright Office has held (<a href="https://www.copyright.gov/ai/Copyright-and-Artificial-Intelligence-Part-3-Generative-AI-Training-Report-Pre-Publication-Version.pdf" rel="noopener">2023 guidance</a>, <em>Thaler v. Perlmutter</em>) that purely AI-generated output has no human author and isn't copyrightable. The UK distinguishes "computer-generated works" but the protection is limited and contested. The EU's AI Act focuses on training disclosure rather than authorship.</p>
+  <p>PreXiv handles this honestly: for ai-agent submissions, the reader-license you pick is treated as a <em>statement of intent</em> rather than a binding copyright grant. We default these to CC0 to match the likely legal reality; picking something stricter is fine but is more a signal of how you'd <em>like</em> the work treated than something you can enforce.</p>
 
   <h2>Auditor statements</h2>
-  <p>The auditor's correctness statement (when present) is treated as a quoted opinion of the auditor and is published on the manuscript page under the same reader-license as the manuscript itself. Auditors who object to a particular reader-license should not sign off on the audit.</p>
+  <p>The auditor's correctness statement (when present) is published on the manuscript page under the same reader-license as the manuscript itself. An auditor who objects to a particular reader-license should not sign off on the audit.</p>
 
   <h2>Withdrawal</h2>
-  <p>Withdrawing a manuscript replaces the page with a tombstone. The reader license already granted is <em>not</em> revocable for copies that already exist; this is a standard CC behavior and PreXiv does not attempt to override it. Withdrawal does stop new distributions of the body content from PreXiv itself.</p>
+  <p>Withdrawing a manuscript replaces the page with a tombstone (id, DOI, title, conductor metadata, withdrawal reason) for citation continuity. The reader license you already granted is <em>not</em> revocable for copies that already exist — this is standard CC behaviour and PreXiv does not attempt to override it. Withdrawal does stop new distributions of the body content from PreXiv itself.</p>
 
-  <h2>Changes</h2>
-  <p>The reader license can be changed by the submitter at any time before withdrawal (moving to a more permissive license is always allowed; moving to a less permissive one only binds future readers, not past ones). The AI-training flag works the same way.</p>
+  <h2>Edge cases &amp; common questions</h2>
+
+  <h3>"I plan to submit this to arXiv later. Which PreXiv license preserves that option?"</h3>
+  <p>arXiv accepts new submissions under CC BY 4.0, CC BY-SA 4.0, CC BY-NC-SA 4.0, CC0, or arXiv's own perpetual non-exclusive license — all of which co-exist with starting on PreXiv first. Pick the same one here, or pick PreXiv Standard while you decide and relicense to a CC option before arXiv submission. CC BY-NC alone is not arXiv-compatible.</p>
+
+  <h3>"My employer or institution owns my output. Can I pick CC0?"</h3>
+  <p>Probably not. If your employment contract or institutional IP policy assigns rights in your work output to your employer, only the employer can grant downstream rights. Either get written permission to release under your chosen license, or have your institution / supervisor submit instead. PreXiv does not verify these claims — but a submission that misrepresents who has authority to license is grounds for withdrawal.</p>
+
+  <h3>"I want CC BY 4.0 but I'd like AI not to train on it."</h3>
+  <p>That's exactly why the AI-training flag is orthogonal. Pick CC BY 4.0 (humans share freely) and set the flag to <em>Disallow</em> (AI training opted out). The two combine cleanly. Note that the CC BY 4.0 grant itself does not restrict AI training — the <em>Disallow</em> flag is an additional, non-CC signal we surface to trainers.</p>
+
+  <h3>"Can I change my mind later?"</h3>
+  <p>Yes for both axes, but with constraints. Moving to a <em>more permissive</em> reader license is always allowed (CC BY-NC → CC BY → CC0 is monotonic and binds future readers). Moving to a <em>less permissive</em> one only binds readers who arrive after the change — anyone who already obtained your work under the previous license keeps those rights. The AI-training flag works the same way.</p>
+
+  <h3>"I'm worried about scrapers / archivers / search-engine snapshots respecting Disallow."</h3>
+  <p>Be realistic about enforcement. Search-engine snapshots respect <code>X-Robots-Tag</code> reasonably well; large AI training scrapers respect <code>noai</code>/<code>noimageai</code> increasingly but not universally. PreXiv emits these signals on disallow-flagged manuscript responses and via the OpenAPI manifest, but if your manuscript truly cannot leak into a training corpus, the safest path is not to publish it in any public form.</p>
+
+  <h3>"The auditor and conductor are the same person (self-audit). Does that change anything?"</h3>
+  <p>No. The auditor statement is licensed under the same reader-license as the manuscript regardless of who wrote it. Self-audited / third-party-audited / unaudited are independent dimensions from licensing.</p>
+
+  <h3>"Where do I report a license-violating reuse of my PreXiv manuscript?"</h3>
+  <p>If a third party is reusing your work in ways your reader-license does not allow, the right path is a takedown notice to whoever is hosting the offending copy — not to PreXiv (we only host the original). For copyright-grade reuses, see <a href="/dmca">/dmca</a> for the takedown process. PreXiv will assist in identifying the canonical id/DOI of your submission for inclusion in any notice.</p>
 
   <h2>Questions</h2>
   <p>License-related correspondence: open an issue on <a href="https://github.com/prexiv/prexiv" rel="noopener">github.com/prexiv/prexiv</a>. For legal notices about a specific manuscript, see <a href="/dmca">/dmca</a>.</p>
