@@ -145,9 +145,13 @@ pub fn render(
                 }
             } @else {
                 p.muted.small {
-                    "This is a self-contained briefing you can copy to a Claude / GPT / Gemini chat to give the model everything it needs to operate on PreXiv on your behalf. "
+                    "This is a self-contained briefing you give to an "
+                    strong { "agentic CLI" }
+                    " — Claude Code, Codex CLI, Gemini CLI, Aider, Cursor in agent mode, the Anthropic Agent SDK, OpenAI Assistants, or any environment where the model can run shell commands. The briefing tells the agent to make "
+                    code { "curl" }
+                    " requests, so its runtime needs network + shell access; pure web chat surfaces (claude.ai, chatgpt.com, gemini.google.com) cannot use it on their own. "
                     strong { "Mint a token above" }
-                    " to get a version with your actual token already inlined; or copy the template below and replace "
+                    " to get a version with your token already inlined; or copy this template and replace "
                     code { "<paste-your-token-here>" }
                     " with a saved token before pasting."
                 }
