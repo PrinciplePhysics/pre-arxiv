@@ -12,6 +12,7 @@ pub mod home;
 pub mod listings;
 pub mod manuscript;
 pub mod me;
+pub mod me_edit;
 pub mod me_tokens;
 pub mod pages;
 pub mod profile;
@@ -53,7 +54,7 @@ pub fn router() -> Router<AppState> {
         // /me/tokens (real impl) and other /me/* (stubs for now)
         .route("/me/tokens", get(me_tokens::show).post(me_tokens::create))
         .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
-        .route("/me/edit", get(me::me_edit))
+        .route("/me/edit", get(me_edit::show).post(me_edit::submit))
         .route("/feed", get(me::feed))
 
         // Admin

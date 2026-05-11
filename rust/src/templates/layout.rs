@@ -45,6 +45,7 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                 link rel="preconnect" href="https://fonts.gstatic.com" crossorigin;
                 link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,700&display=swap" rel="stylesheet";
                 link rel="stylesheet" href="/static/css/style.css";
+                link rel="stylesheet" href="/static/css/prexiv-rust.css";
                 link rel="icon" type="image/svg+xml" href="/static/favicon.svg";
             }
             body {

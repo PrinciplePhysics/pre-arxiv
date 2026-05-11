@@ -55,6 +55,21 @@ pub async fn view(
     .fetch_all(&state.pool)
     .await?;
 
+    let submitter: Option<(String, Option<String>)> = sqlx::query_as(
+        "SELECT username, display_name FROM users WHERE id = ?",
+    )
+    .bind(m.submitter_id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    // Category counts for the sidebar "Subject Areas" index — same shape
+    // as bioRxiv's category sidebar.
+    let cats: Vec<(String, i64)> = sqlx::query_as::<_, (String, i64)>(
+        "SELECT category, COUNT(*) FROM manuscripts WHERE withdrawn = 0 GROUP BY category ORDER BY category"
+    )
+    .fetch_all(&state.pool)
+    .await?;
+
     sqlx::query("UPDATE manuscripts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")
         .bind(m.id)
         .execute(&state.pool)
@@ -62,5 +77,5 @@ pub async fn view(
         .ok();
 
     let ctx = build_ctx(&session, maybe_user, "/m").await;
-    Ok(Html(templates::manuscript::render(&ctx, &m, &comments).into_string()))
+    Ok(Html(templates::manuscript::render(&ctx, &m, &comments, submitter.as_ref(), &cats).into_string()))
 }
