@@ -3,6 +3,8 @@ data/
 !data/.gitkeep
 public/uploads/*
 !public/uploads/.gitkeep
+backups/*
+!backups/.gitkeep
 .env
 .DS_Store
 *.log

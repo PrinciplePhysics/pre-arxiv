@@ -4,6 +4,7 @@
 <li class="comment" id="c<%= c.id %>">
   <div class="comment-head">
     <div class="cvote">
+      <% if (typeof user !== 'undefined' && user) { %>
       <form action="/vote/comment/<%= c.id %>" method="post" class="vote-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="value" value="1">
@@ -15,6 +16,11 @@
         <input type="hidden" name="value" value="-1">
         <button type="submit" class="vote-btn vote-dn <%= myVote === -1 ? 'voted' : '' %>" aria-label="downvote">▼</button>
       </form>
+      <% } else { %>
+      <a class="vote-btn vote-up" href="/login?next=<%= encodeURIComponent('/m/' + manuscriptArxivId + '#c' + c.id) %>" aria-label="log in to upvote">▲</a>
+      <span class="cvote-score"><%= c.score %></span>
+      <a class="vote-btn vote-dn" href="/login?next=<%= encodeURIComponent('/m/' + manuscriptArxivId + '#c' + c.id) %>" aria-label="log in to downvote">▼</a>
+      <% } %>
     </div>
     <div class="comment-byline">
       <a href="/u/<%= escapeHtml(c.username) %>" class="comment-author"><%= escapeHtml(c.username) %></a>

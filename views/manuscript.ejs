@@ -58,6 +58,10 @@
       <span class="muted">·</span>
       <span class="muted edited-mark" title="last edited <%= m.updated_at %>">edited <%= timeAgo(m.updated_at) %></span>
       <% } %>
+      <% if (typeof liveVersion !== 'undefined' && liveVersion > 0) { %>
+      <span class="muted">·</span>
+      <a class="muted" href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>/versions" title="show full version history">v<%= liveVersion %> · earlier versions</a>
+      <% } %>
       <span class="muted">·</span>
       <span class="muted"><%= m.view_count %> views</span>
     </div>
@@ -68,7 +72,7 @@
   <div class="ms-actions-bar">
     <div class="ms-actions-left">
       <% if (m.pdf_path) { %><a class="btn-primary" href="<%= m.pdf_path %>" target="_blank" rel="noopener">Download PDF</a><% } %>
-      <% if (m.external_url) { %><a class="btn-secondary" href="<%= m.external_url %>" target="_blank" rel="nofollow noopener">External link ↗</a><% } %>
+      <% if (m.external_url && isSafeExternalUrl(m.external_url)) { %><a class="btn-secondary" href="<%= m.external_url %>" target="_blank" rel="nofollow noopener">External link ↗</a><% } %>
       <a class="btn-secondary" href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>/cite">Cite</a>
       <% if (typeof user !== 'undefined' && user) { %>
         <% if (!m.withdrawn && (m.submitter_id === user.id || isAdmin)) { %>
@@ -84,11 +88,20 @@
         <% } %>
         <% if (isAdmin) { %>
           <details class="mod-action">
-            <summary class="danger">Delete (admin)</summary>
-            <form action="/m/<%= m.arxiv_like_id %>/delete" method="post" class="mod-form" onsubmit="return confirm('Permanently delete this manuscript? This cannot be undone.')">
+            <summary class="danger">Delete (admin) — prefer withdraw</summary>
+            <form action="/m/<%= m.arxiv_like_id %>/delete" method="post" class="mod-form" onsubmit="return confirm('Are you sure? Without force=1 this will simply withdraw the manuscript.')">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <p class="muted small">Permanent. Use only for spam, abuse, or duplicate posts. Prefer withdrawal for normal cleanup.</p>
-              <button type="submit" class="btn-secondary danger">delete permanently</button>
+              <p class="muted small">
+                Without <code>?force=1</code>, this auto-converts to a <strong>withdrawal</strong> for anything older than 24 h
+                or with incoming citations — preserving the id and DOI for citation continuity. Use force only for
+                spam, abuse, or illegal content (audit-logged).
+              </p>
+              <button type="submit" class="btn-secondary">delete (auto-withdraw)</button>
+            </form>
+            <form action="/m/<%= m.arxiv_like_id %>/delete?force=1" method="post" class="mod-form" onsubmit="return confirm('FORCE DELETE — id and DOI will be gone. Cannot be undone. Continue?')">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="force" value="1">
+              <button type="submit" class="btn-secondary danger">force delete (audit-logged)</button>
             </form>
           </details>
         <% } %>
@@ -103,16 +116,16 @@
       <% } %>
     </div>
     <div class="ms-actions-right">
-      <% if (typeof user !== 'undefined' && user) { %>
-      <form action="/vote/manuscript/<%= m.id %>" method="post" class="inline-vote-form">
+      <% if (!m.withdrawn && typeof user !== 'undefined' && user) { %>
+      <form action="/vote/manuscript/<%= m.id %>" method="post" class="inline-vote-form vote-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="value" value="1">
-        <button type="submit" class="vote-pill <%= myMsVote === 1 ? 'voted' : '' %>">▲ upvote</button>
+        <button type="submit" class="vote-pill vote-up <%= myMsVote === 1 ? 'voted' : '' %>">▲ upvote</button>
       </form>
-      <form action="/vote/manuscript/<%= m.id %>" method="post" class="inline-vote-form">
+      <form action="/vote/manuscript/<%= m.id %>" method="post" class="inline-vote-form vote-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="value" value="-1">
-        <button type="submit" class="vote-pill <%= myMsVote === -1 ? 'voted' : '' %>">▼ downvote</button>
+        <button type="submit" class="vote-pill vote-dn <%= myMsVote === -1 ? 'voted' : '' %>">▼ downvote</button>
       </form>
       <% } %>
       <span class="score-pill" title="net score"><%= m.score %> pts</span>
@@ -137,7 +150,14 @@
         <% if (m.agent_framework) { %>
         <tr><th>Framework</th><td><%= escapeHtml(m.agent_framework) %></td></tr>
         <% } %>
-        <tr><th>Submitted by</th><td><a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a><% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %> <span class="muted small">— posting only; not responsible for the content</span></td></tr>
+        <tr><th>Submitted by</th><td>
+          <a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a>
+          <% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %>
+          <% if (m.submitter_orcid) { %>
+            <a class="orcid-badge" href="https://orcid.org/<%= encodeURIComponent(m.submitter_orcid) %>" target="_blank" rel="nofollow noopener" title="self-claimed ORCID — unverified">ORCID: <%= escapeHtml(m.submitter_orcid) %></a>
+          <% } %>
+          <span class="muted small">— posting only; not responsible for the content</span>
+        </td></tr>
         <% if (m.conductor_notes) { %>
         <tr><th>Notes</th><td><%- renderMarkdown(m.conductor_notes) %></td></tr>
         <% } %>
@@ -148,13 +168,22 @@
         <tr><th>Human conductor</th><td>
           <strong<%= humanHidden ? ' class="redacted"' : '' %>><%= escapeHtml(humanDisplay) %></strong>
           <% if (!humanHidden) { %> · <span class="role-tag"><%= escapeHtml(m.conductor_role) %></span><% } %>
+          <% if (!humanHidden && typeof conductorOrcid !== 'undefined' && conductorOrcid) { %>
+            <a class="orcid-badge" href="https://orcid.org/<%= encodeURIComponent(conductorOrcid) %>" target="_blank" rel="nofollow noopener" title="self-claimed ORCID — unverified">ORCID: <%= escapeHtml(conductorOrcid) %></a>
+          <% } %>
           <% if (humanHidden && canSeeFull) { %><span class="private-hint">private — public viewers see <em>(undisclosed)</em></span><% } %>
         </td></tr>
         <tr><th>AI co-author</th><td>
           <span<%= aiModelHidden ? ' class="redacted"' : '' %>><%= escapeHtml(aiModelDisplay) %></span>
           <% if (aiModelHidden && canSeeFull) { %><span class="private-hint">private — public viewers see <em>(undisclosed)</em></span><% } %>
         </td></tr>
-        <tr><th>Submitted by</th><td><a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a><% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %></td></tr>
+        <tr><th>Submitted by</th><td>
+          <a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a>
+          <% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %>
+          <% if (m.submitter_orcid) { %>
+            <a class="orcid-badge" href="https://orcid.org/<%= encodeURIComponent(m.submitter_orcid) %>" target="_blank" rel="nofollow noopener" title="self-claimed ORCID — unverified">ORCID: <%= escapeHtml(m.submitter_orcid) %></a>
+          <% } %>
+        </td></tr>
         <% if (m.conductor_notes) { %>
         <tr><th>Notes</th><td><%- renderMarkdown(m.conductor_notes) %></td></tr>
         <% } %>
@@ -166,10 +195,16 @@
     <h2 class="ms-section-h">Auditor</h2>
     <% if (m.has_auditor) { %>
       <table class="kv">
-        <tr><th>Auditor</th><td><strong><%= escapeHtml(m.auditor_name) %></strong> · <span class="role-tag"><%= escapeHtml(m.auditor_role) %></span></td></tr>
+        <tr><th>Auditor</th><td>
+          <strong><%= escapeHtml(m.auditor_name) %></strong> · <span class="role-tag"><%= escapeHtml(m.auditor_role) %></span>
+          <% if (m.auditor_orcid) { %>
+            <a class="orcid-badge" href="https://orcid.org/<%= encodeURIComponent(m.auditor_orcid) %>" target="_blank" rel="nofollow noopener" title="self-claimed ORCID — unverified">ORCID: <%= escapeHtml(m.auditor_orcid) %></a>
+          <% } %>
+        </td></tr>
         <% if (m.auditor_affiliation) { %><tr><th>Affiliation</th><td><%= escapeHtml(m.auditor_affiliation) %></td></tr><% } %>
         <tr><th>Statement</th><td class="auditor-statement"><%= escapeHtml(m.auditor_statement) %></td></tr>
       </table>
+      <p class="muted small">ORCID iDs displayed here are <strong>self-claimed and unverified</strong>; PreXiv does not yet run an OAuth handshake.</p>
     <% } else { %>
       <div class="no-auditor">
         <p><strong>No auditor.</strong> The submitter elected not to designate a human auditor and has acknowledged that they are <em>not</em> responsible for the correctness of this work.</p>

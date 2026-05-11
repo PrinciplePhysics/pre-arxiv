@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="<%= typeof theme !== 'undefined' ? theme : 'auto' %>">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -13,9 +13,11 @@
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   <script defer src="/js/katex-init.js"></script>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23b8430a'/%3E%3Cpath d='M 14 14 L 50 50' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3Cpath d='M 50 14 L 14 50' stroke='white' stroke-width='3.5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='32' r='2.6' fill='%23b8430a'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.json">
 </head>
 <body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" href="/" aria-label="PreXiv home">
@@ -30,39 +32,83 @@
       <span class="brand-name"><span class="bp">Pre</span><span class="bx">X</span><span class="bi">iv</span></span>
       <span class="brand-tagline">preprint of preprints</span>
     </a>
-    <nav class="topnav">
+    <nav class="topnav" aria-label="Main navigation">
       <a href="/"        class="<%= path === '/' ? 'on' : '' %>">ranked</a>
       <a href="/new"     class="<%= path === '/new' ? 'on' : '' %>">new</a>
       <a href="/top"     class="<%= path === '/top' ? 'on' : '' %>">top</a>
       <a href="/audited" class="<%= path === '/audited' ? 'on' : '' %>">audited</a>
       <a href="/browse"  class="<%= path && path.startsWith('/browse') ? 'on' : '' %>">browse</a>
+      <% if (typeof user !== 'undefined' && user) { %>
+      <a href="/feed"    class="<%= path === '/feed' ? 'on' : '' %>">feed</a>
+      <% } %>
       <a href="/submit"  class="<%= path === '/submit' ? 'on submit-link' : 'submit-link' %>">submit</a>
       <a href="/about"   class="<%= path === '/about' ? 'on' : '' %>">about</a>
       <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
       <a href="/admin"   class="<%= path === '/admin' ? 'on admin-link' : 'admin-link' %>">admin</a>
       <% } %>
     </nav>
-    <form class="searchbox" action="/search" method="get">
-      <input type="search" name="q" placeholder="search title, author, id…" value="<%= escapeHtml((currentQuery && currentQuery.q) || '') %>">
+    <form class="searchbox" action="/search" method="get" role="search">
+      <label for="topbar-search" class="visually-hidden">Search manuscripts</label>
+      <input id="topbar-search" type="search" name="q" placeholder="search title, author, id…" value="<%= escapeHtml((currentQuery && currentQuery.q) || '') %>">
     </form>
     <div class="userbox">
       <% if (user) { %>
+        <a href="/me/notifications" class="bell <%= (typeof unreadCount !== 'undefined' && unreadCount > 0) ? 'has-unread' : '' %>"
+           aria-label="Notifications<%= (typeof unreadCount !== 'undefined' && unreadCount > 0) ? ' (' + unreadCount + ' unread)' : '' %>"
+           title="Notifications">
+          <span aria-hidden="true">&#128276;</span>
+          <% if (typeof unreadCount !== 'undefined' && unreadCount > 0) { %>
+            <span class="bell-badge">(<%= unreadCount %>)</span>
+          <% } %>
+        </a>
+        <span class="sep">·</span>
         <a href="/u/<%= escapeHtml(user.username) %>" class="me"><%= escapeHtml(user.username) %></a>
         <span class="karma" title="karma">(<%= user.karma %>)</span>
         <span class="sep">·</span>
+        <a href="/me/edit" class="<%= path === '/me/edit' ? 'on' : '' %>" title="edit your profile">edit profile</a>
+        <span class="sep">·</span>
         <a href="/me/tokens" class="<%= path === '/me/tokens' ? 'on' : '' %>" title="manage your API tokens">API tokens</a>
+        <span class="sep">·</span>
+        <form action="/me/theme" method="post" class="theme-form" aria-label="Theme">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <% const _theme = (typeof theme !== 'undefined') ? theme : 'auto'; %>
+          <% const _next = _theme === 'light' ? 'dark' : (_theme === 'dark' ? 'auto' : 'light'); %>
+          <input type="hidden" name="theme" value="<%= _next %>">
+          <button type="submit" class="theme-toggle" title="cycle theme: light → dark → auto" aria-label="Cycle theme (current: <%= _theme %>)">
+            <% if (_theme === 'dark') { %><span aria-hidden="true">&#9789;</span>
+            <% } else if (_theme === 'light') { %><span aria-hidden="true">&#9728;</span>
+            <% } else { %><span aria-hidden="true">&#9788;</span>
+            <% } %>
+            <span class="theme-toggle-label"><%= _theme %></span>
+          </button>
+        </form>
+        <span class="sep">·</span>
         <form action="/logout" method="post" class="logout-form"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit">logout</button></form>
       <% } else { %>
         <a href="/login">login</a>
         <span class="sep">·</span>
         <a href="/register">register</a>
+        <span class="sep">·</span>
+        <form action="/me/theme" method="post" class="theme-form" aria-label="Theme">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <% const _theme = (typeof theme !== 'undefined') ? theme : 'auto'; %>
+          <% const _next = _theme === 'light' ? 'dark' : (_theme === 'dark' ? 'auto' : 'light'); %>
+          <input type="hidden" name="theme" value="<%= _next %>">
+          <button type="submit" class="theme-toggle" title="cycle theme: light → dark → auto" aria-label="Cycle theme (current: <%= _theme %>)">
+            <% if (_theme === 'dark') { %><span aria-hidden="true">&#9789;</span>
+            <% } else if (_theme === 'light') { %><span aria-hidden="true">&#9728;</span>
+            <% } else { %><span aria-hidden="true">&#9788;</span>
+            <% } %>
+            <span class="theme-toggle-label"><%= _theme %></span>
+          </button>
+        </form>
       <% } %>
     </div>
   </div>
 </header>
 
 <% if (flash) { %>
-  <div class="flash flash-<%= flash.type %>"><%= flash.msg %></div>
+  <div class="flash flash-<%= flash.type %>" role="status"><%= flash.msg %></div>
 <% } %>
 
-<main class="container">
+<main class="container" id="main-content">

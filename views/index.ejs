@@ -24,7 +24,7 @@
 <% } else { %>
 <ol class="ms-list">
   <% for (let i = 0; i < manuscripts.length; i++) { const m = manuscripts[i]; const rank = (page - 1) * per + i + 1; %>
-    <%- include('partials/manuscript_row', { m, rank, voteMap, CATEGORIES, escapeHtml, timeAgo }) %>
+    <%- include('partials/manuscript_row', { m, rank, voteMap, CATEGORIES, escapeHtml, timeAgo, isSafeExternalUrl }) %>
   <% } %>
 </ol>
 

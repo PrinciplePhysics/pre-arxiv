@@ -54,15 +54,15 @@
     </label>
 
     <div class="row-fields">
-      <label class="grow">
-        <span class="label-text">Upload PDF</span>
-        <input type="file" name="pdf" accept="application/pdf">
+      <div class="grow field">
+        <label for="pdf_upload"><span class="label-text">Upload PDF</span></label>
+        <input id="pdf_upload" type="file" name="pdf" accept="application/pdf">
         <% if (isEditing && m && m.pdf_path) { %>
-          <span class="hint">A PDF is already attached: <a href="<%= m.pdf_path %>" target="_blank">view current</a>. Choose a new file to replace it; leave empty to keep the existing one.</span>
+          <span class="hint">A PDF is already attached: <a href="<%= m.pdf_path %>" target="_blank" rel="noopener">view current</a>. Choose a new file to replace it; leave empty to keep the existing one.</span>
         <% } else { %>
           <span class="hint">Optional if you provide an external URL. Max 30 MB.</span>
         <% } %>
-      </label>
+      </div>
       <label class="grow">
         <span class="label-text">External URL</span>
         <input type="url" name="external_url" maxlength="500" value="<%= escapeHtml(values.external_url || '') %>" placeholder="https://… (e.g., GitHub repo or hosted PDF)">
@@ -91,24 +91,24 @@
       </label>
     </div>
 
-    <label>
-      <span class="label-text">AI model <span class="req">*</span></span>
-      <input type="text" name="conductor_ai_model" required maxlength="200" value="<%= escapeHtml(values.conductor_ai_model || '') %>" placeholder="e.g., Claude Opus 4.6, GPT-5, Gemini 3 Pro">
-      <label class="checkbox-inline">
-        <input type="checkbox" name="conductor_ai_model_private" <%= values.conductor_ai_model_private ? 'checked' : '' %>>
+    <div class="field">
+      <label for="conductor_ai_model"><span class="label-text">AI model <span class="req">*</span></span></label>
+      <input id="conductor_ai_model" type="text" name="conductor_ai_model" required maxlength="200" value="<%= escapeHtml(values.conductor_ai_model || '') %>" placeholder="e.g., Claude Opus 4.6, GPT-5, Gemini 3 Pro">
+      <label class="checkbox-inline" for="conductor_ai_model_private">
+        <input id="conductor_ai_model_private" type="checkbox" name="conductor_ai_model_private" <%= values.conductor_ai_model_private ? 'checked' : '' %>>
         <span>Keep this private. Public viewers will see <em>(undisclosed)</em>; you and admins still see the value. Useful when the model's TOS or your context makes naming risky.</span>
       </label>
-    </label>
+    </div>
 
     <div class="ctype-section ctype-human-ai" id="ctype-human-ai" style="<%= values.conductor_type === 'ai-agent' ? 'display:none' : '' %>">
-      <label>
-        <span class="label-text">Human conductor <span class="req">*</span></span>
-        <input type="text" name="conductor_human" maxlength="200" value="<%= escapeHtml(values.conductor_human || '') %>" placeholder="full name — usually you">
-        <label class="checkbox-inline">
-          <input type="checkbox" name="conductor_human_private" <%= values.conductor_human_private ? 'checked' : '' %>>
+      <div class="field">
+        <label for="conductor_human"><span class="label-text">Human conductor <span class="req">*</span></span></label>
+        <input id="conductor_human" type="text" name="conductor_human" maxlength="200" value="<%= escapeHtml(values.conductor_human || '') %>" placeholder="full name — usually you">
+        <label class="checkbox-inline" for="conductor_human_private">
+          <input id="conductor_human_private" type="checkbox" name="conductor_human_private" <%= values.conductor_human_private ? 'checked' : '' %>>
           <span>Keep this private. Useful if your institution might react to public AI co-conduct or if there's a legal sensitivity. Public viewers see <em>(undisclosed)</em>.</span>
         </label>
-      </label>
+      </div>
       <label>
         <span class="label-text">Conductor role <span class="req">*</span></span>
         <select name="conductor_role">
@@ -175,6 +175,14 @@
         <textarea name="auditor_statement" minlength="20" maxlength="3000" rows="5" placeholder="A few sentences. What did the auditor verify? What did they NOT verify? Are there caveats?"><%= escapeHtml(values.auditor_statement || '') %></textarea>
         <span class="hint">Quote the auditor's own words if possible. The auditor accepts professional reputational responsibility for what they assert here.</span>
       </label>
+      <label>
+        <span class="label-text">Auditor ORCID <span class="muted">(optional, unverified)</span></span>
+        <input type="text" name="auditor_orcid" maxlength="19"
+               pattern="\d{4}-\d{4}-\d{4}-\d{3}[\dX]"
+               value="<%= escapeHtml(values.auditor_orcid || '') %>"
+               placeholder="0000-0002-1825-0097">
+        <span class="hint">Format: <code>XXXX-XXXX-XXXX-XXXX</code>. Displayed as a self-claim — PreXiv does <strong>not</strong> verify ORCID iDs yet.</span>
+      </label>
     </div>
 
     <div class="no-auditor-block" id="no-auditor-block" style="<%= values.has_auditor ? 'display:none' : '' %>">
@@ -189,11 +197,23 @@
     </div>
   </section>
 
+  <% if (isEditing) { %>
+  <section class="form-section">
+    <h2>4 — What changed? <span class="muted">(optional)</span></h2>
+    <p class="muted small">A brief note about this revision. Shows up on the version-history page so readers can scan changes without diffing the abstract by hand.</p>
+    <label>
+      <span class="label-text">Change summary</span>
+      <textarea name="diff_summary" maxlength="500" rows="3" placeholder="e.g. 'Tightened the bound in Section 3 after a referee comment.'"></textarea>
+      <span class="hint">≤ 500 characters. Shown verbatim on <a href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>/versions" target="_blank" rel="noopener">/m/<%= m.arxiv_like_id %>/versions</a>.</span>
+    </label>
+  </section>
+  <% } %>
+
   <div class="form-submit">
     <button type="submit" class="btn-primary big"><%= isEditing ? 'Save changes' : 'Post manuscript' %></button>
     <% if (isEditing) { %>
       <a class="btn-secondary" href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>">Cancel</a>
-      <span class="muted small">The id, DOI, and original submission timestamp stay the same.</span>
+      <span class="muted small">The id, DOI, and original submission timestamp stay the same. A version snapshot is saved before each edit.</span>
     <% } else { %>
       <span class="muted small">By submitting you confirm the work was conducted by you (and the AI you named).</span>
     <% } %>
@@ -210,8 +230,14 @@
     const agSec  = document.getElementById('ctype-ai-agent');
 
     function syncAuditor() {
+      const t = document.querySelector('input[name="conductor_type"]:checked');
+      const isAgent = t && t.value === 'ai-agent';
       af.style.display = cb.checked ? '' : 'none';
-      nb.style.display = cb.checked ? 'none' : '';
+      nb.style.display = (cb.checked || isAgent) ? 'none' : '';
+      const noAuditorCheckbox = nb.querySelector('input[name="no_auditor_ack"]');
+      if (noAuditorCheckbox) noAuditorCheckbox.required = !isAgent && !cb.checked;
+      af.querySelectorAll('input[name="auditor_name"], select[name="auditor_role"], textarea[name="auditor_statement"]')
+        .forEach((el) => { el.required = cb.checked; });
     }
     function syncCType() {
       const t = document.querySelector('input[name="conductor_type"]:checked');
@@ -221,6 +247,7 @@
       // The "submitter not responsible for correctness" ack is only meaningful
       // when there's a human conductor; the AI-agent path has its own ack.
       const noAuditorCheckbox = nb.querySelector('input[name="no_auditor_ack"]');
+      const aiAgentCheckbox = agSec.querySelector('input[name="ai_agent_ack"]');
       if (isAgent) {
         nb.style.display = 'none';
       } else if (!cb.checked) {
@@ -231,6 +258,9 @@
       const cr = document.querySelector('select[name="conductor_role"]');
       if (ch) ch.required = !isAgent;
       if (cr) cr.required = !isAgent;
+      if (noAuditorCheckbox) noAuditorCheckbox.required = !isAgent && !cb.checked;
+      if (aiAgentCheckbox) aiAgentCheckbox.required = isAgent;
+      syncAuditor();
     }
     cb.addEventListener('change', syncAuditor);
     for (const r of radios) r.addEventListener('change', syncCType);

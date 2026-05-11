@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const { runMigrations } = require('./lib/migrations');
 
 const DB_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
@@ -55,6 +56,9 @@ CREATE TABLE IF NOT EXISTS users (
   email_verify_expires   INTEGER,
   password_reset_token   TEXT,
   password_reset_expires INTEGER,
+  totp_secret            TEXT,
+  totp_enabled           INTEGER NOT NULL DEFAULT 0,
+  orcid                  TEXT,
   created_at             DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -87,6 +91,7 @@ CREATE TABLE IF NOT EXISTS manuscripts (
   auditor_affiliation TEXT,
   auditor_role       TEXT,
   auditor_statement  TEXT,
+  auditor_orcid      TEXT,
 
   view_count         INTEGER DEFAULT 0,
   score              INTEGER DEFAULT 0,
@@ -160,129 +165,106 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   expires_at    DATETIME
 );
 CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+
+CREATE TABLE IF NOT EXISTS manuscript_versions (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  manuscript_id INTEGER NOT NULL REFERENCES manuscripts(id) ON DELETE CASCADE,
+  version       INTEGER NOT NULL,
+  title         TEXT NOT NULL,
+  abstract      TEXT NOT NULL,
+  authors       TEXT NOT NULL,
+  category      TEXT,
+  pdf_path      TEXT,
+  external_url  TEXT,
+  conductor_type     TEXT,
+  conductor_ai_model TEXT,
+  conductor_human    TEXT,
+  conductor_role     TEXT,
+  conductor_notes    TEXT,
+  agent_framework    TEXT,
+  has_auditor        INTEGER,
+  auditor_name       TEXT,
+  auditor_affiliation TEXT,
+  auditor_role       TEXT,
+  auditor_statement  TEXT,
+  diff_summary  TEXT,
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(manuscript_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_versions_manuscript ON manuscript_versions(manuscript_id, version DESC);
+
+-- ─── audit log (moderator/admin actions) ───────────────────────────────────
+CREATE TABLE IF NOT EXISTS audit_log (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_user_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  action          TEXT NOT NULL,
+  target_type     TEXT,
+  target_id       INTEGER,
+  detail          TEXT,
+  ip              TEXT,
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor   ON audit_log(actor_user_id);
+
+-- ─── notifications (in-app, no email) ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind          TEXT NOT NULL,
+  actor_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  manuscript_id INTEGER REFERENCES manuscripts(id) ON DELETE CASCADE,
+  comment_id    INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+  seen          INTEGER NOT NULL DEFAULT 0,
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, seen, created_at DESC);
+
+-- ─── follows (user → user) ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS follows (
+  follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  followee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (follower_id, followee_id),
+  CHECK (follower_id != followee_id)
+);
+CREATE INDEX IF NOT EXISTS idx_follows_followee ON follows(followee_id);
+
+-- ─── webhooks (per-user agent subscriptions) ───────────────────────────────
+-- The dispatcher in lib/webhooks.js POSTs the JSON envelope
+--   { event, ts, payload }
+-- to the configured url whenever an event the user subscribed to fires,
+-- signed with HMAC-SHA256(secret, body) sent in the X-PreXiv-Signature
+-- header. After 5 consecutive failures the dispatcher sets active = 0.
+CREATE TABLE IF NOT EXISTS webhooks (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  url              TEXT NOT NULL,
+  secret           TEXT NOT NULL,
+  events           TEXT NOT NULL,
+  active           INTEGER NOT NULL DEFAULT 1,
+  description      TEXT,
+  failure_count    INTEGER NOT NULL DEFAULT 0,
+  last_attempt_at  DATETIME,
+  last_status      INTEGER,
+  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_webhooks_user ON webhooks(user_id);
 `);
 
-// ─── lightweight migrations for databases created on earlier schemas ────────
-function safeAlter(stmt) {
+// Tiny in-place ALTER for legacy DBs that pre-date the `description` column
+// on `webhooks`. Idempotent — silently swallows the "duplicate column" error
+// that better-sqlite3 raises if the column already exists.
+function _safeAlterWebhooks(stmt) {
   try { db.exec(stmt); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
 }
-safeAlter(`ALTER TABLE users ADD COLUMN email_verified         INTEGER NOT NULL DEFAULT 0`);
-safeAlter(`ALTER TABLE users ADD COLUMN email_verify_token     TEXT`);
-safeAlter(`ALTER TABLE users ADD COLUMN email_verify_expires   INTEGER`);
-safeAlter(`ALTER TABLE users ADD COLUMN password_reset_token   TEXT`);
-safeAlter(`ALTER TABLE users ADD COLUMN password_reset_expires INTEGER`);
-safeAlter(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN doi              TEXT`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN pdf_text         TEXT`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn        INTEGER NOT NULL DEFAULT 0`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn_reason TEXT`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN withdrawn_at     DATETIME`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN conductor_type            TEXT NOT NULL DEFAULT 'human-ai'`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN agent_framework           TEXT`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN conductor_ai_model_public INTEGER NOT NULL DEFAULT 1`);
-safeAlter(`ALTER TABLE manuscripts ADD COLUMN conductor_human_public    INTEGER NOT NULL DEFAULT 1`);
-
-// ─── relax NOT NULL on conductor_human / conductor_role ──────────────────────
-// Old schema had both as NOT NULL. AI-agent manuscripts have neither, so we
-// rebuild the table without those constraints (idempotent — only fires when
-// the running DB still has the legacy NOT NULL).
-function relaxConductorNotNullIfNeeded() {
-  const cols = db.prepare(`PRAGMA table_info(manuscripts)`).all();
-  const ch = cols.find(c => c.name === 'conductor_human');
-  const cr = cols.find(c => c.name === 'conductor_role');
-  if (!ch || !cr) return;
-  if (ch.notnull !== 1 && cr.notnull !== 1) return; // already relaxed
-
-  console.log('[migrate] rebuilding manuscripts table to allow AI-agent (no human conductor) submissions…');
-
-  const colNames = cols.map(c => c.name);
-  const selectList = colNames.join(', ');
-
-  db.exec(`
-    PRAGMA foreign_keys = OFF;
-    BEGIN;
-    DROP TRIGGER IF EXISTS manuscripts_ai;
-    DROP TRIGGER IF EXISTS manuscripts_ad;
-    DROP TRIGGER IF EXISTS manuscripts_au;
-
-    CREATE TABLE manuscripts_new (
-      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-      arxiv_like_id      TEXT UNIQUE,
-      doi                TEXT UNIQUE,
-      submitter_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      title              TEXT NOT NULL,
-      abstract           TEXT NOT NULL,
-      authors            TEXT NOT NULL,
-      category           TEXT NOT NULL,
-      pdf_path           TEXT,
-      pdf_text           TEXT,
-      external_url       TEXT,
-      conductor_type     TEXT NOT NULL DEFAULT 'human-ai'
-                         CHECK (conductor_type IN ('human-ai', 'ai-agent')),
-      conductor_ai_model TEXT NOT NULL,
-      conductor_human    TEXT,
-      conductor_role     TEXT,
-      conductor_notes    TEXT,
-      agent_framework    TEXT,
-      has_auditor        INTEGER NOT NULL DEFAULT 0,
-      auditor_name       TEXT,
-      auditor_affiliation TEXT,
-      auditor_role       TEXT,
-      auditor_statement  TEXT,
-      view_count         INTEGER DEFAULT 0,
-      score              INTEGER DEFAULT 0,
-      comment_count      INTEGER DEFAULT 0,
-      withdrawn          INTEGER NOT NULL DEFAULT 0,
-      withdrawn_reason   TEXT,
-      withdrawn_at       DATETIME,
-      created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    INSERT INTO manuscripts_new (${selectList})
-    SELECT ${selectList} FROM manuscripts;
-
-    DROP TABLE manuscripts;
-    ALTER TABLE manuscripts_new RENAME TO manuscripts;
-
-    CREATE INDEX IF NOT EXISTS idx_manuscripts_created ON manuscripts(created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_manuscripts_score   ON manuscripts(score DESC);
-    CREATE INDEX IF NOT EXISTS idx_manuscripts_cat     ON manuscripts(category);
-
-    CREATE TRIGGER IF NOT EXISTS manuscripts_ai AFTER INSERT ON manuscripts BEGIN
-      INSERT INTO manuscripts_fts(rowid, title, abstract, authors, pdf_text)
-      VALUES (new.id, new.title, new.abstract, new.authors, COALESCE(new.pdf_text, ''));
-    END;
-    CREATE TRIGGER IF NOT EXISTS manuscripts_ad AFTER DELETE ON manuscripts BEGIN
-      INSERT INTO manuscripts_fts(manuscripts_fts, rowid, title, abstract, authors, pdf_text)
-      VALUES ('delete', old.id, old.title, old.abstract, old.authors, COALESCE(old.pdf_text, ''));
-    END;
-    CREATE TRIGGER IF NOT EXISTS manuscripts_au AFTER UPDATE ON manuscripts BEGIN
-      INSERT INTO manuscripts_fts(manuscripts_fts, rowid, title, abstract, authors, pdf_text)
-      VALUES ('delete', old.id, old.title, old.abstract, old.authors, COALESCE(old.pdf_text, ''));
-      INSERT INTO manuscripts_fts(rowid, title, abstract, authors, pdf_text)
-      VALUES (new.id, new.title, new.abstract, new.authors, COALESCE(new.pdf_text, ''));
-    END;
-
-    COMMIT;
-    PRAGMA foreign_keys = ON;
-  `);
-
-  // FTS now points at the new manuscripts table by row content; rebuild to be safe.
-  db.exec(`INSERT INTO manuscripts_fts(manuscripts_fts) VALUES ('rebuild');`);
-}
-relaxConductorNotNullIfNeeded();
-
-// ─── promote configured admins ──────────────────────────────────────────────
-const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || '')
-  .split(',').map(s => s.trim()).filter(Boolean);
-if (ADMIN_USERNAMES.length) {
-  for (const u of ADMIN_USERNAMES) {
-    db.prepare('UPDATE users SET is_admin = 1 WHERE username = ?').run(u);
-  }
-}
+_safeAlterWebhooks(`ALTER TABLE webhooks ADD COLUMN description TEXT`);
 
 // ─── FTS5 over manuscripts (title + abstract + authors + pdf body) ──────────
+// Created up-front so any later table-rebuild migration has the FTS table to
+// rebuild against. Triggers are idempotent (CREATE TRIGGER IF NOT EXISTS) and
+// re-installed below after migrations in case migration 2 dropped them as
+// part of the manuscripts-table rebuild.
 db.exec(`
 CREATE VIRTUAL TABLE IF NOT EXISTS manuscripts_fts USING fts5(
   title, abstract, authors, pdf_text,
@@ -305,39 +287,54 @@ CREATE TRIGGER IF NOT EXISTS manuscripts_au AFTER UPDATE ON manuscripts BEGIN
 END;
 `);
 
-// Backfill synthetic DOIs for legacy rows that were created before the DOI
-// column existed. Safe to run repeatedly — only fills NULLs.
+// ─── numbered migrations ───────────────────────────────────────────────────
+// All schema upgrades for legacy DBs (column adds, NOT-NULL relaxation on
+// conductor_human/role, DOI backfill, prefix renames, 2FA columns, audit_log,
+// ORCID columns) live in lib/migrations.js and are tracked in a tiny
+// schema_version table. The runner detects a legacy DB whose schema is
+// already at HEAD (e.g. the existing victoria DB, brought there by the
+// historical safeAlter() blocks) and stamps it without re-running anything.
+const migrationResult = runMigrations(db);
+if (migrationResult.applied.length) {
+  console.log(`[migrate] applied migrations ${migrationResult.applied.join(', ')} (schema_version=${migrationResult.stampedAt})`);
+} else if (migrationResult.skippedReason === 'schema-already-current') {
+  console.log(`[migrate] legacy DB already at current schema — stamped schema_version=${migrationResult.stampedAt} without re-running migrations`);
+}
+
+// Re-create FTS triggers idempotently in case migration 2 rebuilt the
+// manuscripts table (which drops triggers as a side-effect).
 db.exec(`
-  UPDATE manuscripts
-  SET    doi = '10.99999/' || UPPER(arxiv_like_id)
-  WHERE  doi IS NULL AND arxiv_like_id IS NOT NULL;
+CREATE TRIGGER IF NOT EXISTS manuscripts_ai AFTER INSERT ON manuscripts BEGIN
+  INSERT INTO manuscripts_fts(rowid, title, abstract, authors, pdf_text)
+  VALUES (new.id, new.title, new.abstract, new.authors, COALESCE(new.pdf_text, ''));
+END;
+CREATE TRIGGER IF NOT EXISTS manuscripts_ad AFTER DELETE ON manuscripts BEGIN
+  INSERT INTO manuscripts_fts(manuscripts_fts, rowid, title, abstract, authors, pdf_text)
+  VALUES ('delete', old.id, old.title, old.abstract, old.authors, COALESCE(old.pdf_text, ''));
+END;
+CREATE TRIGGER IF NOT EXISTS manuscripts_au AFTER UPDATE ON manuscripts BEGIN
+  INSERT INTO manuscripts_fts(manuscripts_fts, rowid, title, abstract, authors, pdf_text)
+  VALUES ('delete', old.id, old.title, old.abstract, old.authors, COALESCE(old.pdf_text, ''));
+  INSERT INTO manuscripts_fts(rowid, title, abstract, authors, pdf_text)
+  VALUES (new.id, new.title, new.abstract, new.authors, COALESCE(new.pdf_text, ''));
+END;
 `);
 
-// Rename legacy 'pa.' id prefix to 'prexiv.' to match the brand, then to
-// 'prexiv:' (arxiv-style colon separator). Idempotent — each migration only
-// matches rows that still have the older prefix.
-db.exec(`
-  UPDATE manuscripts
-  SET arxiv_like_id = 'prexiv.' || SUBSTR(arxiv_like_id, 4)
-  WHERE arxiv_like_id LIKE 'pa.%';
-  UPDATE manuscripts
-  SET doi = '10.99999/PREXIV.' || SUBSTR(doi, LENGTH('10.99999/PA.') + 1)
-  WHERE doi LIKE '10.99999/PA.%';
-  -- prexiv. → prexiv:  (and PREXIV. → PREXIV: in DOIs)
-  UPDATE manuscripts
-  SET arxiv_like_id = 'prexiv:' || SUBSTR(arxiv_like_id, LENGTH('prexiv.') + 1)
-  WHERE arxiv_like_id LIKE 'prexiv.%';
-  UPDATE manuscripts
-  SET doi = '10.99999/PREXIV:' || SUBSTR(doi, LENGTH('10.99999/PREXIV.') + 1)
-  WHERE doi LIKE '10.99999/PREXIV.%';
-`);
+// ─── promote configured admins ──────────────────────────────────────────────
+const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+if (ADMIN_USERNAMES.length) {
+  for (const u of ADMIN_USERNAMES) {
+    db.prepare('UPDATE users SET is_admin = 1 WHERE username = ?').run(u);
+  }
+}
 
-// Backfill FTS for any manuscripts that pre-date the FTS table. We use
-// FTS5's built-in 'rebuild' command so the doclist matches the live row
-// values exactly — a manual delete-all + reinsert can leave the index in a
-// state where subsequent UPDATE triggers fail with "database disk image is
-// malformed" because the OLD values referenced by the 'delete' command
-// don't match what the index thinks is there.
+// Backfill FTS for any manuscripts whose row count drifts from the FTS index.
+// We use FTS5's built-in 'rebuild' command so the doclist matches the live
+// row values exactly — a manual delete-all + reinsert can leave the index in
+// a state where later UPDATE triggers fail with "database disk image is
+// malformed" because the OLD values the 'delete' command references don't
+// match what the index thinks is there.
 const ftsCount = db.prepare('SELECT COUNT(*) AS n FROM manuscripts_fts').get().n;
 const msCount  = db.prepare('SELECT COUNT(*) AS n FROM manuscripts').get().n;
 if (ftsCount !== msCount) {

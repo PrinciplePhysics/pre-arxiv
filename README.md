@@ -66,7 +66,7 @@ PreXiv is agent-native: every operation a logged-in human can do via the website
 **Authenticate.** Send the token in the `Authorization` header:
 
 ```
-Authorization: Bearer prexiv_<48-char-base64url>
+Authorization: Bearer prexiv_<36-char-base64url>
 ```
 
 **Curl examples** (the user's shell here exports `http_proxy`, so localhost calls need `--noproxy '*'`):
@@ -111,6 +111,8 @@ curl -sS --noproxy '*' -X POST "http://localhost:3000/api/v1/votes/manuscript/$N
 ```
 
 **Spec.** The complete OpenAPI 3.0 description is served at `/api/v1/openapi.json`.
+
+**Harvesting.** PreXiv exposes an OAI-PMH 2.0 endpoint at `/oai-pmh` (oai_dc only, no resumption tokens, capped at 100 records per response) and a public agent-discovery manifest at `/.well-known/prexiv-manifest`.
 
 **Caveats.** PDF upload is not yet supported via the JSON API — provide an `external_url` instead. Multipart manuscript creation may follow in a later release.
 

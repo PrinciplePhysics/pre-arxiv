@@ -8,7 +8,7 @@
 <li class="ms-row <%= m.withdrawn ? 'ms-row-withdrawn' : '' %>" id="m<%= m.id %>">
   <div class="ms-rank"><%= typeof rank !== 'undefined' ? rank + '.' : '' %></div>
   <div class="ms-vote">
-    <% if (!m.withdrawn) { %>
+    <% if (!m.withdrawn && typeof user !== 'undefined' && user) { %>
     <form action="/vote/manuscript/<%= m.id %>" method="post" class="vote-form">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input type="hidden" name="value" value="1">
@@ -20,6 +20,10 @@
       <input type="hidden" name="value" value="-1">
       <button type="submit" class="vote-btn vote-dn <%= myVote === -1 ? 'voted' : '' %>" title="downvote" aria-label="downvote">▼</button>
     </form>
+    <% } else if (!m.withdrawn) { %>
+    <a class="vote-btn vote-up" href="/login?next=<%= encodeURIComponent('/m/' + m.arxiv_like_id) %>" title="log in to upvote" aria-label="log in to upvote">▲</a>
+    <div class="vote-score" data-score="<%= m.score %>"><%= m.score %></div>
+    <a class="vote-btn vote-dn" href="/login?next=<%= encodeURIComponent('/m/' + m.arxiv_like_id) %>" title="log in to downvote" aria-label="log in to downvote">▼</a>
     <% } else { %>
     <div class="vote-score withdrawn-score" title="withdrawn">—</div>
     <% } %>
@@ -29,7 +33,7 @@
       <a class="ms-title" href="/m/<%= encodeURIComponent(m.arxiv_like_id) %>"><%= escapeHtml(m.title) %></a>
       <span class="ms-arxivid">[<%= m.arxiv_like_id %>]</span>
       <% if (!m.withdrawn && m.pdf_path) { %><a class="ms-pdf" href="<%= m.pdf_path %>" target="_blank" rel="noopener">[PDF]</a><% } %>
-      <% if (!m.withdrawn && m.external_url) { %><a class="ms-pdf" href="<%= m.external_url %>" target="_blank" rel="nofollow noopener">[link]</a><% } %>
+      <% if (!m.withdrawn && m.external_url && isSafeExternalUrl(m.external_url)) { %><a class="ms-pdf" href="<%= m.external_url %>" target="_blank" rel="nofollow noopener">[link]</a><% } %>
     </div>
     <div class="ms-meta">
       <span class="ms-authors"><%= escapeHtml(m.authors) %></span>

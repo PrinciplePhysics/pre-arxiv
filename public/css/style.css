@@ -33,6 +33,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   font-family: var(--sans);
   font-size: 14.5px;
@@ -141,21 +142,30 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   gap: 2px;
   margin-left: 8px;
   flex-wrap: nowrap;
-  min-width: 0;
+  /* Don't allow topnav to shrink below its content — that lets the nav links
+     overflow visually and land *under* the search box. Let the searchbox
+     shrink first instead. */
+  flex-shrink: 0;
+  align-items: center;
 }
 .topnav a {
   color: #fde4d2;
   font-size: 13px;
-  padding: 4px 8px;
+  line-height: 1;
+  min-height: 26px;
+  padding: 0 7px;
   border-radius: 3px;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .topnav a:hover { background: rgba(255,255,255,0.12); color: #fff; text-decoration: none; }
 .topnav a.on   { background: rgba(0,0,0,0.18); color: #fff; }
 .topnav a.submit-link { background: rgba(255,255,255,0.2); color: #fff; font-weight: 600; }
 .topnav a.submit-link.on { background: rgba(0,0,0,0.25); }
 
-.searchbox { margin-left: auto; flex-shrink: 1; min-width: 0; }
+.searchbox { margin-left: auto; flex-shrink: 1; min-width: 80px; }
 .searchbox input {
   width: 200px;
   max-width: 100%;
@@ -187,13 +197,28 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 }
 .userbox .logout-form button:hover { color: #fff; text-decoration: underline; }
 
-@media (max-width: 1100px) {
+@media (max-width: 1320px) {
+  /* The tagline ("preprint of preprints") is the cheapest thing to drop —
+     buys ~110px without hurting wayfinding. */
   .brand-tagline { display: none; }
-  .searchbox input { width: 160px; }
+  .searchbox input { width: 170px; }
+  .userbox { gap: 5px; font-size: 12px; }
+}
+@media (max-width: 1180px) {
+  /* Drop "edit profile" / "API tokens" text links from the userbox (still
+     reachable from /u/<me> and the bell-menu). Keep the most-used controls. */
+  .userbox .userbox-secondary { display: none; }
+  .searchbox input { width: 150px; }
+}
+@media (max-width: 1040px) {
+  /* Tighten nav padding so the link strip itself compresses. */
+  .topnav a { padding: 0 6px; font-size: 12.5px; }
+  .searchbox input { width: 130px; }
 }
 @media (max-width: 900px) {
   .topbar-inner { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px; }
-  .topnav { width: 100%; order: 99; flex-wrap: wrap; }
+  .topnav { width: 100%; order: 99; flex-wrap: wrap; gap: 4px; margin-left: 0; flex-shrink: 1; }
+  .topnav a { min-height: 24px; padding: 0 7px; font-size: 12.5px; }
   .searchbox { margin-left: 0; flex: 1; }
   .searchbox input { width: 100%; }
 }
@@ -255,8 +280,10 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   background: none; border: none; cursor: pointer;
   font-size: 13px; padding: 0; line-height: 1;
   color: #b9b3a3;
+  display: inline-block;
+  text-decoration: none;
 }
-.vote-btn:hover { color: var(--brand); }
+.vote-btn:hover { color: var(--brand); text-decoration: none; }
 .vote-btn.voted { color: var(--brand); font-weight: 700; }
 .vote-score {
   font-size: 11px; color: var(--muted);
@@ -666,7 +693,8 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 }
 .form-section p { margin: 4px 0 12px; }
 
-.submit-form label {
+.submit-form label,
+.submit-form .field {
   display: block;
   margin: 12px 0;
 }
@@ -707,7 +735,8 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   display: flex; gap: 14px;
 }
 .row-fields .grow { flex: 1; }
-.row-fields label { margin: 12px 0; }
+.row-fields label,
+.row-fields .field { margin: 12px 0; }
 @media (max-width: 720px) {
   .row-fields { flex-direction: column; gap: 0; }
 }
@@ -819,6 +848,19 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
   border: 1px solid var(--rule-strong); border-radius: 3px;
   font-family: var(--sans);
 }
+
+.empty-state {
+  margin: 24px 0;
+  padding: 18px 20px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--brand);
+  border-radius: 4px;
+}
+.empty-state p { margin: 4px 0; }
+.empty-state p:first-child { margin-top: 0; }
+.empty-state p:last-child  { margin-bottom: 0; }
+.empty-state a { color: var(--brand); }
 
 /* ─── user profile ───────────────────────────────────────────────────────── */
 
@@ -996,6 +1038,44 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 .cite-actions { margin: 0 0 8px; }
 .mono { font-family: var(--mono); }
 
+.token-display {
+  width: 100%;
+  max-width: 100%;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 7px 9px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+}
+
+.op-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.op-table th,
+.op-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px dotted var(--rule);
+}
+
+@media (max-width: 700px) {
+  .prose {
+    padding: 18px 16px;
+  }
+  .prose .kv,
+  .op-table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .prose .kv th {
+    white-space: normal;
+  }
+}
+
 /* ─── redacted / private fields ──────────────────────────────────────────── */
 
 .redacted {
@@ -1106,6 +1186,20 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 .btn-secondary.danger { color: #a03030; border-color: #d8a4a4; }
 .btn-secondary.danger:hover { background: #f8eaea; }
 
+@media (max-width: 520px) {
+  .mod-action { width: 100%; }
+  .mod-action summary {
+    width: 100%;
+    text-align: left;
+  }
+  .mod-action[open] > .mod-form {
+    position: static;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 .admin-link { background: rgba(0,0,0,0.18); color: #ffe0c8 !important; }
 
 /* ─── flag queue ─────────────────────────────────────────────────────────── */
@@ -1195,3 +1289,531 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 
 ::selection { background: var(--brand-bg); color: var(--brand); }
 .katex-display { overflow-x: auto; overflow-y: hidden; }
+
+/* ─── cookie consent banner ──────────────────────────────────────────────── */
+
+.cookie-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: var(--bg-card);
+  border-top: 1px solid var(--rule-strong);
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.cookie-banner-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.cookie-banner-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.cookie-banner-link { color: var(--link); }
+.cookie-banner-ok {
+  background: var(--brand);
+  color: #fff;
+  border: 1px solid var(--brand);
+  padding: 5px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.cookie-banner-ok:hover { background: #94360a; border-color: #94360a; }
+
+/* Reserve a little extra space at the bottom of the page when the banner
+   is visible so the footer text is never hidden behind it. */
+body:has(#prexiv-cookie-banner) .sitefooter { margin-bottom: 56px; }
+
+@media (max-width: 700px) {
+  .cookie-banner-inner { font-size: 12px; }
+}
+
+.method { padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+.method-get    { background: #e6efe9; color: #2c6d3e; }
+.method-post   { background: var(--brand-bg); color: var(--brand); }
+.method-delete { background: #f8eaea; color: #a03030; }
+.method-patch  { background: #ecedfb; color: #494ec1; }
+button.small { padding: 3px 8px; font-size: 12px; }
+.btn-secondary.small { padding: 3px 8px; font-size: 12px; }
+
+/* ─── accessibility: skip-link + visually-hidden ─────────────────────────── */
+
+.visually-hidden,
+.visually-hidden:not(:focus):not(:active) {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 6px;
+  z-index: 10000;
+  background: var(--bg-card);
+  color: var(--brand);
+  border: 2px solid var(--brand);
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s;
+}
+.skip-link:focus {
+  top: 6px;
+  outline: none;
+}
+
+/* ─── notification bell + badge in topbar ────────────────────────────────── */
+
+.userbox .bell {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.userbox .bell:hover { background: rgba(255,255,255,0.12); text-decoration: none; }
+.userbox .bell.has-unread { color: #fff; font-weight: 600; }
+.userbox .bell-badge {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #fde4d2;
+}
+.userbox .bell.has-unread .bell-badge { color: #fff; }
+
+/* ─── theme toggle in topbar ─────────────────────────────────────────────── */
+
+.theme-form { margin: 0; display: inline-flex; }
+.theme-toggle {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.25);
+  color: #fde4d2;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+.theme-toggle:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.theme-toggle-label { text-transform: lowercase; letter-spacing: 0.3px; }
+
+/* ─── notifications page ─────────────────────────────────────────────────── */
+
+.notif-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+.notif-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+}
+.notif-row.unseen {
+  background: var(--brand-bg);
+  border-color: #e6c8a6;
+}
+.notif-row.seen { opacity: 0.85; }
+.notif-body { flex: 1; min-width: 0; }
+.notif-link { font-weight: 600; }
+.notif-row.seen .notif-link { font-weight: 500; }
+.notif-meta { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.notif-mark-all-form { margin-bottom: 12px; }
+
+/* ─── user profile: header + actions + bio ───────────────────────────────── */
+
+.user-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.user-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.user-card-actions .inline-form { margin: 0; }
+.user-bio {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+.user-bio p:first-child { margin-top: 0; }
+.user-bio p:last-child  { margin-bottom: 0; }
+
+/* ─── search filters ─────────────────────────────────────────────────────── */
+
+.search-filters {
+  margin: 10px 0 0;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--bg-card);
+}
+.search-filters > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  user-select: none;
+}
+.search-filters > summary::-webkit-details-marker { display: none; }
+.search-filters[open] > summary { border-bottom: 1px solid var(--rule); }
+.search-filters .filter-form { padding: 12px; }
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.filter-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.filter-grid select,
+.filter-grid input {
+  width: 100%;
+  padding: 6px 8px;
+  font-family: var(--sans);
+  font-size: 13px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--bg-card);
+  color: var(--ink);
+}
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+/* ─── orcid badge ────────────────────────────────────────────────────────── */
+
+.user-orcid { margin-top: 4px; font-size: 12.5px; }
+.orcid-badge {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--rule);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+/* ─── mobile-first refinements (≤ 500 / ≤ 360) ───────────────────────────── */
+
+@media (max-width: 600px) {
+  body { font-size: 15px; }
+  .container { padding: 0 10px; margin: 12px auto 48px; }
+  .manuscript { padding: 16px; }
+  .ms-id-row { font-size: 11.5px; }
+  .ms-h1 { font-size: 22px; }
+
+  /* Make all action-bar buttons hit ≥ 44px tall on touch. */
+  .btn-primary, .btn-secondary, .vote-pill, .mod-action summary,
+  .theme-toggle, .filter-actions button {
+    min-height: 44px;
+    line-height: 1.4;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .btn-primary, .btn-secondary { padding-left: 14px; padding-right: 14px; }
+  .ms-actions-bar { gap: 8px; }
+  .ms-actions-left, .ms-actions-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Stack the rank/vote column above the body for narrow widths. */
+  .ms-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .ms-rank {
+    text-align: left;
+    width: auto;
+    min-width: 32px;
+  }
+  .ms-vote {
+    flex-direction: row;
+    width: auto;
+    gap: 6px;
+    align-items: center;
+  }
+  .ms-vote .vote-btn {
+    font-size: 18px;
+    padding: 4px 8px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+  .ms-body { flex: 1 0 100%; }
+
+  /* Manuscript conductor table: stack each row as a card. */
+  .kv, .kv tbody, .kv tr, .kv th, .kv td {
+    display: block;
+    width: 100%;
+  }
+  .kv tr {
+    padding: 6px 0;
+    border-bottom: 1px dotted var(--rule);
+  }
+  .kv th {
+    width: auto;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 2px;
+    padding: 0;
+    border: none;
+  }
+  .kv td {
+    padding: 0;
+    border: none;
+  }
+
+  /* Search-filter grid collapses to a single column. */
+  .filter-grid { grid-template-columns: 1fr; }
+
+  /* Submit form: full-width inputs on phone. */
+  .submit-form input,
+  .submit-form select,
+  .submit-form textarea { font-size: 16px; }  /* avoid iOS zoom-on-focus */
+
+  /* Notifications: stack meta below body. */
+  .notif-row { flex-direction: column; align-items: stretch; }
+  .notif-meta { justify-content: space-between; }
+
+  /* User profile head: stack action under the name. */
+  .user-card-head { flex-direction: column; }
+
+  /* Topbar tighter. */
+  .topbar-inner { padding: 6px 10px; gap: 6px; }
+  .userbox { font-size: 12px; gap: 4px; flex-wrap: wrap; }
+  .userbox .sep { display: none; }
+}
+
+@media (max-width: 360px) {
+  .container { padding: 0 8px; }
+  .ms-h1 { font-size: 19px; }
+  .manuscript { padding: 12px; }
+}
+
+/* ─── dark mode ──────────────────────────────────────────────────────────── */
+/* Two activation paths:
+   1. Explicit user choice via [data-theme="dark"] on <html>.
+   2. System preference (prefers-color-scheme: dark) when the user has not
+      overridden, i.e. [data-theme="auto"] (default) or [data-theme="dark"].
+   The block below redefines only the CSS custom properties — no other
+   selectors are touched, so the rest of the stylesheet picks up the new
+   palette automatically. */
+
+:root[data-theme="dark"],
+:root[data-theme="dark"] .topbar-inner {
+  /* explicit dark — applied via cookie */
+}
+
+/* Shared dark palette block (used by both explicit dark and auto+system-dark). */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --bg:           #14130f;
+    --bg-card:      #1d1c17;
+    --bg-card-alt:  #211f1a;
+    --ink:          #ece8de;
+    --ink-soft:     #c8c2b1;
+    --muted:        #8a8576;
+    --rule:         #2d2a23;
+    --rule-strong:  #423d33;
+    --brand:        #d96b2e;
+    --brand-soft:   #e57e3f;
+    --brand-bg:     #3a2017;
+    --link:         #e57e3f;
+    --link-hover:   #f0986b;
+    --accent-blue:  #6da7d6;
+    --warn:         #d97a3c;
+    --warn-bg:      #2c1d12;
+    --warn-rule:    #5a3a20;
+    --ok:           #6dbf7e;
+    --ok-bg:        #15291b;
+    --ok-rule:      #2a4a32;
+    --code-bg:      #2a261e;
+  }
+}
+
+/* Explicit dark: same palette, but unconditional. */
+:root[data-theme="dark"] {
+  --bg:           #14130f;
+  --bg-card:      #1d1c17;
+  --bg-card-alt:  #211f1a;
+  --ink:          #ece8de;
+  --ink-soft:     #c8c2b1;
+  --muted:        #8a8576;
+  --rule:         #2d2a23;
+  --rule-strong:  #423d33;
+  --brand:        #d96b2e;
+  --brand-soft:   #e57e3f;
+  --brand-bg:     #3a2017;
+  --link:         #e57e3f;
+  --link-hover:   #f0986b;
+  --accent-blue:  #6da7d6;
+  --warn:         #d97a3c;
+  --warn-bg:      #2c1d12;
+  --warn-rule:    #5a3a20;
+  --ok:           #6dbf7e;
+  --ok-bg:        #15291b;
+  --ok-rule:      #2a4a32;
+  --code-bg:      #2a261e;
+}
+
+/* Dark-mode adjustments for the few palette elements that aren't pure
+   variables (the agent-banner / badge-agent uses literal hex). Apply both
+   for [data-theme="dark"] AND for auto+system-dark. */
+:root[data-theme="dark"] .agent-banner,
+:root[data-theme="dark"] .badge-agent {
+  background: #1d2530;
+  border-color: #2c3e58;
+  color: #b9d3ee;
+}
+:root[data-theme="dark"] .ctype-card:has(input:checked) { background: #2b1d12; }
+:root[data-theme="dark"] .submit-form input,
+:root[data-theme="dark"] .submit-form select,
+:root[data-theme="dark"] .submit-form textarea,
+:root[data-theme="dark"] .auth-card input,
+:root[data-theme="dark"] .filter-grid input,
+:root[data-theme="dark"] .filter-grid select,
+:root[data-theme="dark"] .searchbox input,
+:root[data-theme="dark"] .token-display { background: #14130f; color: var(--ink); }
+:root[data-theme="dark"] .tombstone-banner { background: #25221b; border-color: var(--rule-strong); color: var(--ink-soft); }
+:root[data-theme="dark"] .notif-row.unseen { background: #2c1d12; border-color: #5a3a20; }
+:root[data-theme="dark"] .badge-withdrawn { background: #2a2620; color: var(--muted); border-color: var(--rule-strong); }
+:root[data-theme="dark"] .ms-row-withdrawn .ms-title { color: var(--muted); }
+:root[data-theme="dark"] .auditor-statement { color: #d4ead7; }
+:root[data-theme="dark"] .no-auditor { color: #f3c896; }
+:root[data-theme="dark"] .warn-banner { color: #f3c896; }
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] .agent-banner,
+  :root[data-theme="auto"] .badge-agent {
+    background: #1d2530;
+    border-color: #2c3e58;
+    color: #b9d3ee;
+  }
+  :root[data-theme="auto"] .ctype-card:has(input:checked) { background: #2b1d12; }
+  :root[data-theme="auto"] .submit-form input,
+  :root[data-theme="auto"] .submit-form select,
+  :root[data-theme="auto"] .submit-form textarea,
+  :root[data-theme="auto"] .auth-card input,
+  :root[data-theme="auto"] .filter-grid input,
+  :root[data-theme="auto"] .filter-grid select,
+  :root[data-theme="auto"] .searchbox input,
+  :root[data-theme="auto"] .token-display { background: #14130f; color: var(--ink); }
+  :root[data-theme="auto"] .tombstone-banner { background: #25221b; border-color: var(--rule-strong); color: var(--ink-soft); }
+  :root[data-theme="auto"] .notif-row.unseen { background: #2c1d12; border-color: #5a3a20; }
+  :root[data-theme="auto"] .badge-withdrawn { background: #2a2620; color: var(--muted); border-color: var(--rule-strong); }
+  :root[data-theme="auto"] .ms-row-withdrawn .ms-title { color: var(--muted); }
+  :root[data-theme="auto"] .auditor-statement { color: #d4ead7; }
+  :root[data-theme="auto"] .no-auditor { color: #f3c896; }
+  :root[data-theme="auto"] .warn-banner { color: #f3c896; }
+}
+
+/* ─── print stylesheet ───────────────────────────────────────────────────── */
+
+@media print {
+  /* Plain page. */
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  * { box-shadow: none !important; }
+
+  /* Hide UI chrome. */
+  .topbar,
+  .sitefooter,
+  .ms-actions-bar,
+  .comment-form,
+  .vote-pill, .vote-btn,
+  .ms-vote,
+  .userbox,
+  .topnav,
+  .searchbox,
+  .skip-link,
+  .cookie-banner,
+  .mod-action,
+  .login-cta,
+  .reply-toggle,
+  .reply-form,
+  .theme-form,
+  .bell,
+  .flash,
+  .pagination,
+  .search-filters {
+    display: none !important;
+  }
+
+  /* Manuscript article fills the page. */
+  .container { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+  .manuscript { border: none !important; padding: 0 !important; background: #fff !important; }
+
+  /* H1 prints as a regular heading; large but not huge. */
+  .ms-h1 {
+    font-size: 22pt !important;
+    color: #000 !important;
+    margin: 0 0 8pt;
+  }
+  .ms-section-h { color: #000 !important; }
+  .ms-abstract  { color: #000 !important; }
+
+  /* Print the URL after each link. */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    color: #555;
+  }
+  /* Don't do that for in-page anchors / mailto / pure CSS hooks. */
+  a[href^="#"]::after,
+  a[href^="javascript:"]::after { content: ""; }
+
+  /* Avoid breaking section heads from the first paragraph. */
+  h1, h2, h3 { page-break-after: avoid; }
+  .ms-section { page-break-inside: avoid; }
+  .comment    { page-break-inside: avoid; }
+
+  /* Banners stay readable in monochrome. */
+  .warn-banner, .audit-banner, .agent-banner, .tombstone-banner {
+    background: #fff !important;
+    border: 1px solid #000 !important;
+    color: #000 !important;
+  }
+}

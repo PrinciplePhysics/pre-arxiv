@@ -43,6 +43,9 @@ for (const [un, em, pw, dn, aff, bio, k] of sampleUsers) {
   const r = insertUser.run(un, em, hashPassword(pw), dn, aff, bio, k);
   userIds[un] = r.lastInsertRowid;
 }
+// First seeded user (eulerine) is the demo admin so the test suites and any
+// hands-on poking via the demo login can exercise the admin surface.
+db.prepare('UPDATE users SET is_admin = 1 WHERE username = ?').run('eulerine');
 
 const insertManuscript = db.prepare(`
   INSERT INTO manuscripts (
