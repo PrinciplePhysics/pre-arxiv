@@ -10,6 +10,7 @@ use tower_sessions::{Expiry, SessionManagerLayer};
 use tower_sessions_sqlx_store::SqliteStore;
 use tracing_subscriber::EnvFilter;
 
+mod api_auth;
 mod auth;
 mod db;
 mod error;

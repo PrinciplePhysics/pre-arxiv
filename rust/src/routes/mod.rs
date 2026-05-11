@@ -3,6 +3,7 @@ use axum::Router;
 
 use crate::state::AppState;
 
+pub mod api;
 pub mod auth;
 pub mod cite;
 pub mod comments;
@@ -10,6 +11,7 @@ pub mod home;
 pub mod listings;
 pub mod manuscript;
 pub mod me;
+pub mod me_tokens;
 pub mod pages;
 pub mod profile;
 pub mod search;
@@ -47,10 +49,14 @@ pub fn router() -> Router<AppState> {
         .route("/submit", get(submit::show_submit).post(submit::do_submit))
         .route("/vote", post(votes::vote))
 
-        // /me/* (stubs require login; redirect to /login otherwise)
+        // /me/tokens (real impl) and other /me/* (stubs for now)
+        .route("/me/tokens", get(me_tokens::show).post(me_tokens::create))
+        .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
         .route("/me/edit", get(me::me_edit))
-        .route("/me/tokens", get(me::me_tokens))
         .route("/feed", get(me::feed))
+
+        // Agent-native JSON API
+        .nest("/api/v1", api::router())
 
         // Static content pages
         .route("/about", get(pages::about))
