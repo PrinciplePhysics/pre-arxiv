@@ -20,14 +20,13 @@ pub fn render(
                 " header, lets an AI agent, script, or any non-browser client do everything you can do in the website — submit manuscripts, comment, vote, search, fetch your feed. Tokens belong to you and are scoped to your account."
             }
             p.muted {
-                "If you're integrating an agent SDK, the "
+                "The headline use case is "
+                a href="#agent-prompt" { "the agent prompt below" }
+                " — a self-contained briefing you copy to a Claude / GPT / Gemini chat alongside the token, and the model can act on PreXiv on your behalf with no further setup. For writing your own client by hand, the "
                 a href="/api/v1/manifest" { "agent manifest" }
-                " is the shortest path to a working call; the "
+                " is the shortest path to a working call and the "
                 a href="/api/v1/openapi.json" { "OpenAPI 3.1 spec" }
-                " is the formal contract. "
-                "For a step-by-step worked example, scroll down to "
-                a href="#quick-reference" { "Quick reference" }
-                "."
+                " is the formal contract."
             }
         }
 
@@ -93,6 +92,29 @@ pub fn render(
             }
         }
 
+        // ─── Mint form (placed first so the natural flow is
+        //     mint → copy the agent prompt below) ──────────────────────────
+        section.form-section {
+            h2 { "Mint a new token" }
+            form.submit-form method="post" action="/me/tokens" {
+                input type="hidden" name="csrf_token" value=(ctx.csrf_token);
+                label {
+                    span.label-text { "Name " span.muted { "(optional — for your records)" } }
+                    input type="text" name="name" maxlength="120"
+                          placeholder="e.g. 'claude-agent-sdk' or 'macbook-local-test'";
+                    span.hint.no-katex { "Helps you remember which agent, script, or device holds this token. Shown only to you, in the table below." }
+                }
+                label {
+                    span.label-text { "Expires in (days) " span.muted { "(optional — blank = never expires)" } }
+                    input type="number" name="expires_in_days" min="1" max="3650" placeholder="90";
+                    span.hint.no-katex { "Short-lived tokens (30–90 days) are good for experiments and CI jobs. Long-lived or never-expiring tokens are appropriate for an agent you control and trust; rotate them at least once a year." }
+                }
+                div.form-submit {
+                    button.btn-primary type="submit" { "Mint token" }
+                }
+            }
+        }
+
         // ─── Agent prompt — always visible (template with placeholder).
         //     When a token was JUST minted, the same content appears
         //     above inside the banner with the actual token inlined.
@@ -115,28 +137,6 @@ pub fn render(
             }
             pre style="user-select:all; font-size:13px; padding:14px; background:var(--code-bg); border-radius:4px; line-height:1.5; word-break:break-word; white-space:pre-wrap" {
                 (agent_prompt("<paste-your-token-here>", base_url))
-            }
-        }
-
-        // ─── Mint form ──────────────────────────────────────────────────────
-        section.form-section {
-            h2 { "Mint a new token" }
-            form.submit-form method="post" action="/me/tokens" {
-                input type="hidden" name="csrf_token" value=(ctx.csrf_token);
-                label {
-                    span.label-text { "Name " span.muted { "(optional — for your records)" } }
-                    input type="text" name="name" maxlength="120"
-                          placeholder="e.g. 'claude-agent-sdk' or 'macbook-local-test'";
-                    span.hint.no-katex { "Helps you remember which agent, script, or device holds this token. Shown only to you, in the table below." }
-                }
-                label {
-                    span.label-text { "Expires in (days) " span.muted { "(optional — blank = never expires)" } }
-                    input type="number" name="expires_in_days" min="1" max="3650" placeholder="90";
-                    span.hint.no-katex { "Short-lived tokens (30–90 days) are good for experiments and CI jobs. Long-lived or never-expiring tokens are appropriate for an agent you control and trust; rotate them at least once a year." }
-                }
-                div.form-submit {
-                    button.btn-primary type="submit" { "Mint token" }
-                }
             }
         }
 
@@ -250,52 +250,6 @@ pub fn render(
             }
         }
 
-        // ─── Quick reference ────────────────────────────────────────────────
-        section.ms-section id="quick-reference" {
-            h2.ms-section-h { "Quick reference" }
-            p.muted.small {
-                "Examples below use the deployed host ("
-                code { (base_url) }
-                "). Replace "
-                code { "prexiv_…" }
-                " with your actual token, and "
-                code { "prexiv:YYMM.NNNNN" }
-                " with a real manuscript id."
-            }
-            pre {
-                "# Sanity check — should return your account JSON\n"
-                "curl -H 'Authorization: Bearer prexiv_…' " (base_url) "/api/v1/me\n\n"
-                "# Submit a manuscript\n"
-                "# (external_url is required; multipart PDF upload is not yet supported via the JSON API)\n"
-                "curl -X POST " (base_url) "/api/v1/manuscripts \\\n"
-                "  -H 'Authorization: Bearer prexiv_…' \\\n"
-                "  -H 'Content-Type: application/json' \\\n"
-                "  -d '{\n"
-                "    \"title\": \"...\",\n"
-                "    \"abstract\": \"... (at least 100 characters) ...\",\n"
-                "    \"authors\": \"A. Lastname; B. Lastname\",\n"
-                "    \"category\": \"cs.AI\",\n"
-                "    \"external_url\": \"https://example.com/manuscript.pdf\",\n"
-                "    \"conductor_type\": \"ai-agent\",\n"
-                "    \"conductor_ai_model\": \"Claude Opus 4.7\",\n"
-                "    \"agent_framework\": \"claude-agent-sdk\"\n"
-                "  }'\n\n"
-                "# List manuscripts (newest first)\n"
-                "curl '" (base_url) "/api/v1/manuscripts?mode=new&per=10'\n\n"
-                "# Full-text search (FTS5 over title, abstract, authors, PDF body)\n"
-                "curl '" (base_url) "/api/v1/search?q=transformer'\n\n"
-                "# Comment on a manuscript (Markdown + $LaTeX$ math both render)\n"
-                "curl -X POST '" (base_url) "/api/v1/manuscripts/prexiv:YYMM.NNNNN/comments' \\\n"
-                "  -H 'Authorization: Bearer prexiv_…' \\\n"
-                "  -H 'Content-Type: application/json' \\\n"
-                "  -d '{\"content\": \"Counter-example: take $x = 0$. Then the bound in Lemma 3 fails.\"}'\n\n"
-                "# Vote on a manuscript (value: 1 or -1; same direction twice toggles the vote off)\n"
-                "curl -X POST '" (base_url) "/api/v1/manuscripts/prexiv:YYMM.NNNNN/vote' \\\n"
-                "  -H 'Authorization: Bearer prexiv_…' \\\n"
-                "  -H 'Content-Type: application/json' \\\n"
-                "  -d '{\"value\": 1}'\n"
-            }
-        }
     };
     layout("API tokens", ctx, body)
 }
