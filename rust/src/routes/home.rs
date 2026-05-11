@@ -28,6 +28,6 @@ pub async fn index(
     .fetch_all(&state.pool)
     .await?;
 
-    let ctx = build_ctx(&session, maybe_user).await;
+    let ctx = build_ctx(&session, maybe_user, "/").await;
     Ok(Html(templates::home::render(&ctx, &rows).into_string()))
 }

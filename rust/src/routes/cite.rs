@@ -5,12 +5,11 @@ use tower_sessions::Session;
 use crate::auth::MaybeUser;
 use crate::error::{AppError, AppResult};
 use crate::helpers::build_ctx;
-use crate::models::comment::CommentWithAuthor;
 use crate::models::Manuscript;
 use crate::state::AppState;
 use crate::templates;
 
-pub async fn view(
+pub async fn cite(
     State(state): State<AppState>,
     session: Session,
     maybe_user: MaybeUser,
@@ -37,30 +36,7 @@ pub async fn view(
     .bind(&id)
     .fetch_optional(&state.pool)
     .await?;
-
     let m = m.ok_or(AppError::NotFound)?;
-
-    let comments: Vec<CommentWithAuthor> = sqlx::query_as::<_, CommentWithAuthor>(
-        r#"
-        SELECT c.id, c.manuscript_id, c.author_id,
-               u.username AS author_username,
-               c.parent_id, c.content, c.score, c.created_at
-        FROM comments c
-        JOIN users u ON u.id = c.author_id
-        WHERE c.manuscript_id = ?
-        ORDER BY c.created_at ASC
-        "#,
-    )
-    .bind(m.id)
-    .fetch_all(&state.pool)
-    .await?;
-
-    sqlx::query("UPDATE manuscripts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")
-        .bind(m.id)
-        .execute(&state.pool)
-        .await
-        .ok();
-
     let ctx = build_ctx(&session, maybe_user, "/m").await;
-    Ok(Html(templates::manuscript::render(&ctx, &m, &comments).into_string()))
+    Ok(Html(templates::cite::render(&ctx, &m).into_string()))
 }

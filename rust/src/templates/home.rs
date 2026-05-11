@@ -2,39 +2,118 @@ use maud::{html, Markup};
 
 use crate::models::ManuscriptListItem;
 
-use super::layout::{layout, PageCtx};
+use super::layout::{layout, time_ago, PageCtx};
 
 pub fn render(ctx: &PageCtx, manuscripts: &[ManuscriptListItem]) -> Markup {
+    let logged_in = ctx.user.is_some();
     let body = html! {
-        h1 { "Recent manuscripts" }
         @if manuscripts.is_empty() {
-            p.empty { "No manuscripts yet." }
+            div.empty {
+                p { "No manuscripts here yet." }
+                p { a.btn-primary href="/submit" { "Be the first to submit one →" } }
+            }
         } @else {
-            ul.manuscript-list {
-                @for m in manuscripts {
-                    li.manuscript-row.withdrawn[m.is_withdrawn()] {
-                        a.manuscript-title href={ "/m/" (m.arxiv_like_id.as_deref().unwrap_or("")) } {
-                            (m.title)
-                        }
-                        @if m.is_withdrawn() {
-                            span.badge.withdrawn { "withdrawn" }
-                        }
-                        div.manuscript-meta {
-                            span.authors { (m.authors) }
-                            " · "
-                            span.category { (m.category) }
-                            " · "
-                            span.conductor { (m.conductor_label()) }
-                            " · "
-                            span.score {
-                                (m.score.unwrap_or(0)) " pts · "
-                                (m.comment_count.unwrap_or(0)) " comments"
-                            }
-                        }
-                    }
+            ol.ms-list {
+                @for (i, m) in manuscripts.iter().enumerate() {
+                    (manuscript_row(ctx, m, i + 1, logged_in))
                 }
             }
         }
     };
-    layout("Home", ctx, body)
+    layout("Ranked", ctx, body)
+}
+
+pub fn manuscript_row(ctx: &PageCtx, m: &ManuscriptListItem, rank: usize, logged_in: bool) -> Markup {
+    let id_url = m.arxiv_like_id.as_deref().unwrap_or("");
+    let withdrawn = m.is_withdrawn();
+    html! {
+        li.ms-row.ms-row-withdrawn[withdrawn] id={ "m" (m.id) } {
+            div.ms-rank { (rank) "." }
+            div.ms-vote {
+                @if !withdrawn && logged_in {
+                    form.vote-form action="/vote" method="post" {
+                        input type="hidden" name="csrf_token" value=(ctx.csrf_token);
+                        input type="hidden" name="target_type" value="manuscript";
+                        input type="hidden" name="target_id" value=(m.id);
+                        input type="hidden" name="value" value="1";
+                        button.vote-btn.vote-up type="submit" title="upvote" aria-label="upvote" { "▲" }
+                    }
+                    div.vote-score data-score=(m.score.unwrap_or(0)) { (m.score.unwrap_or(0)) }
+                    form.vote-form action="/vote" method="post" {
+                        input type="hidden" name="csrf_token" value=(ctx.csrf_token);
+                        input type="hidden" name="target_type" value="manuscript";
+                        input type="hidden" name="target_id" value=(m.id);
+                        input type="hidden" name="value" value="-1";
+                        button.vote-btn.vote-dn type="submit" title="downvote" aria-label="downvote" { "▼" }
+                    }
+                } @else if !withdrawn {
+                    a.vote-btn.vote-up href={ "/login?next=/m/" (id_url) } title="log in to upvote" { "▲" }
+                    div.vote-score data-score=(m.score.unwrap_or(0)) { (m.score.unwrap_or(0)) }
+                    a.vote-btn.vote-dn href={ "/login?next=/m/" (id_url) } title="log in to downvote" { "▼" }
+                } @else {
+                    div.vote-score.withdrawn-score title="withdrawn" { "—" }
+                }
+            }
+            div.ms-body {
+                div.ms-title-line {
+                    a.ms-title href={ "/m/" (id_url) } { (m.title) }
+                    " "
+                    span.ms-arxivid { "[" (id_url) "]" }
+                }
+                div.ms-meta {
+                    span.ms-authors { (m.authors) }
+                    " " span.dot { "·" } " "
+                    a.ms-cat href={ "/browse/" (m.category) } { (m.category) }
+                    " "
+                    @if withdrawn {
+                        span.badge.badge-withdrawn title="The submitter (or an admin) withdrew this manuscript" { "⊘ withdrawn" }
+                    } @else {
+                        @if m.conductor_type == "ai-agent" {
+                            span.badge.badge-agent title="Produced autonomously by an AI agent" { "⚙ AI-agent" }
+                        }
+                    }
+                }
+                div.ms-sub {
+                    span.muted { "submitted " }
+                    @if let Some(ts) = &m.created_at {
+                        span.muted { (time_ago(ts)) }
+                    }
+                    " " span.dot { "·" } " "
+                    @if m.conductor_type == "ai-agent" {
+                        span.muted { "produced by" }
+                        " "
+                        span.conductor-pair {
+                            em {
+                                @if m.conductor_ai_model_public != 0 { (m.conductor_ai_model) }
+                                @else { "(undisclosed)" }
+                            }
+                            " "
+                            span.muted.small { "(autonomous)" }
+                        }
+                    } @else {
+                        span.muted { "conducted by" }
+                        " "
+                        span.conductor-pair {
+                            strong {
+                                @if m.conductor_human_public != 0 {
+                                    (m.conductor_human.as_deref().unwrap_or("(undisclosed)"))
+                                } @else { "(undisclosed)" }
+                            }
+                            " + "
+                            em {
+                                @if m.conductor_ai_model_public != 0 { (m.conductor_ai_model) }
+                                @else { "(undisclosed)" }
+                            }
+                        }
+                    }
+                    " " span.dot { "·" } " "
+                    a href={ "/m/" (id_url) "#comments" } {
+                        (m.comment_count.unwrap_or(0))
+                        " comment"
+                        @if m.comment_count.unwrap_or(0) != 1 { "s" }
+                    }
+                }
+            }
+        }
+    }
 }

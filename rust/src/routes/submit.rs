@@ -20,7 +20,7 @@ pub async fn show_submit(
     maybe_user: MaybeUser,
     RequireUser(_user): RequireUser,
 ) -> AppResult<Html<String>> {
-    let mut ctx = build_ctx(&session, maybe_user).await;
+    let mut ctx = build_ctx(&session, maybe_user, "/submit").await;
     ctx.no_index = true;
     Ok(Html(templates::submit::render(&ctx, None).into_string()))
 }
@@ -190,7 +190,7 @@ fn make_prexiv_id() -> String {
 }
 
 async fn err_page(session: &Session, maybe_user: MaybeUser, msg: &str) -> Response {
-    let mut ctx = build_ctx(session, maybe_user).await;
+    let mut ctx = build_ctx(session, maybe_user, "/submit").await;
     ctx.no_index = true;
     Html(templates::submit::render(&ctx, Some(msg)).into_string()).into_response()
 }

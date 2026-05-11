@@ -27,7 +27,7 @@ pub async fn show_login(
     if maybe_user.0.is_some() {
         return Ok(Html(redirect_html("/")));
     }
-    let mut ctx = build_ctx(&session, maybe_user).await;
+    let mut ctx = build_ctx(&session, maybe_user, "/login").await;
     ctx.no_index = true;
     let markup = templates::auth::render_login(&ctx, None, q.next.as_deref());
     Ok(Html(markup.into_string()))
@@ -76,7 +76,7 @@ async fn error_response(
     msg: &str,
     next: Option<&str>,
 ) -> Response {
-    let mut ctx = build_ctx(session, maybe_user).await;
+    let mut ctx = build_ctx(session, maybe_user, "/login").await;
     ctx.no_index = true;
     let markup = templates::auth::render_login(&ctx, Some(msg), next);
     Html(markup.into_string()).into_response()
@@ -89,7 +89,7 @@ pub async fn show_register(
     if maybe_user.0.is_some() {
         return Ok(Html(redirect_html("/")));
     }
-    let mut ctx = build_ctx(&session, maybe_user).await;
+    let mut ctx = build_ctx(&session, maybe_user, "/register").await;
     ctx.no_index = true;
     let markup = templates::auth::render_register(&ctx, None, &RegisterForm::default());
     Ok(Html(markup.into_string()))
@@ -112,7 +112,7 @@ pub async fn do_register(
     Form(form): Form<RegisterPost>,
 ) -> AppResult<Response> {
     let mk_err = async |msg: &str, form: &RegisterPost, maybe_user: MaybeUser| -> Response {
-        let mut ctx = build_ctx(&session, maybe_user).await;
+        let mut ctx = build_ctx(&session, maybe_user, "/register").await;
         ctx.no_index = true;
         let form_state = RegisterForm {
             username: form.username.clone(),

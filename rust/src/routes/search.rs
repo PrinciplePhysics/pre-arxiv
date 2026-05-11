@@ -23,7 +23,7 @@ pub async fn search(
     Query(params): Query<SearchParams>,
 ) -> AppResult<Html<String>> {
     let q = params.q.trim();
-    let ctx = build_ctx(&session, maybe_user).await;
+    let ctx = build_ctx(&session, maybe_user, "/search").await;
     if q.is_empty() {
         return Ok(Html(templates::search::render(&ctx, q, &[]).into_string()));
     }

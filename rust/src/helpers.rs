@@ -20,8 +20,18 @@ pub async fn set_flash(session: &Session, msg: impl Into<String>) {
     let _ = session.insert(SESSION_FLASH_KEY, msg.into()).await;
 }
 
-pub async fn build_ctx(session: &Session, MaybeUser(user): MaybeUser) -> PageCtx {
+pub async fn build_ctx(
+    session: &Session,
+    MaybeUser(user): MaybeUser,
+    current_path: impl Into<String>,
+) -> PageCtx {
     let csrf_token = csrf_token(session).await;
     let flash = take_flash(session).await;
-    PageCtx { user, csrf_token, no_index: false, flash }
+    PageCtx {
+        user,
+        csrf_token,
+        no_index: false,
+        flash,
+        current_path: current_path.into(),
+    }
 }
