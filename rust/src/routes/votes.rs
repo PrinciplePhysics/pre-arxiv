@@ -90,13 +90,23 @@ pub async fn vote(
     .await?;
     let score = score.map(|(s,)| s).unwrap_or(0);
 
-    let table = if form.target_type == "manuscript" { "manuscripts" } else { "comments" };
-    let sql = format!("UPDATE {table} SET score = ? WHERE id = ?");
-    sqlx::query(&sql)
-        .bind(score)
-        .bind(form.target_id)
-        .execute(&mut *tx)
-        .await?;
+    // Defence in depth: enumerate the two valid target types as exact
+    // string literals rather than interpolating `form.target_type` into
+    // SQL — even though the input is already validated to be one of two
+    // values, never let a future refactor turn this into an injection.
+    match form.target_type.as_str() {
+        "manuscript" => {
+            sqlx::query("UPDATE manuscripts SET score = ? WHERE id = ?")
+                .bind(score).bind(form.target_id)
+                .execute(&mut *tx).await?;
+        }
+        "comment" => {
+            sqlx::query("UPDATE comments SET score = ? WHERE id = ?")
+                .bind(score).bind(form.target_id)
+                .execute(&mut *tx).await?;
+        }
+        _ => unreachable!("target_type validated above"),
+    }
 
     tx.commit().await?;
     Ok(Redirect::to(&back).into_response())

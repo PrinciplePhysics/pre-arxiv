@@ -6,6 +6,7 @@ use time::Duration;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
+use tower_sessions::cookie::SameSite;
 use tower_sessions::{Expiry, SessionManagerLayer};
 use tower_sessions_sqlx_store::SqliteStore;
 use tracing_subscriber::EnvFilter;
@@ -60,6 +61,8 @@ async fn main() -> anyhow::Result<()> {
     let secure_cookies = std::env::var("NODE_ENV").as_deref() == Ok("production");
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(secure_cookies)
+        .with_http_only(true)
+        .with_same_site(SameSite::Lax)
         .with_name("prexiv_session")
         .with_expiry(Expiry::OnInactivity(Duration::days(30)));
 

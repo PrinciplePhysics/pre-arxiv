@@ -1,71 +1,93 @@
 #!/usr/bin/env bash
-# PreXiv backup — bundle the SQLite DB plus the upload tree into a single
-# timestamped tar.gz under backups/, and keep the most-recent 14 archives.
+# Atomic snapshot of PreXiv's Tier-1 data (SQLite DB + uploads dir).
 #
-# Idempotent: safe to run more than once a day. Each invocation creates a
-# new tarball with its own timestamp; the rotation step just deletes
-# everything older than the 14-th newest archive in backups/.
+# Usage: backup.sh [TIER] [REASON]
+#   TIER     pre-deploy | hourly | daily | weekly | manual  (default: manual)
+#   REASON   free-form annotation embedded in the filename
 #
-# Usage: scripts/backup.sh
+# Output: $BACKUP_ROOT/$TIER/<ISO-timestamp>[__<reason>].tar.gz
+#
+# Why .backup instead of cp: a WAL-mode SQLite database is consistent only
+# when the WAL is checkpointed at the byte the read happens. `cp` can copy
+# a torn read. `sqlite3 ... '.backup ...'` is the supported online-backup
+# API, atomic w.r.t. concurrent writers.
+#
+# Why tar around the .backup output: we want the uploads directory captured
+# in the same archive so a restore returns the system to a consistent
+# (DB + files) state.
+
 set -euo pipefail
 
-# Resolve repo root from this script's location (works regardless of cwd).
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$HERE/.." && pwd)"
+TIER="${1:-manual}"
+REASON="${2:-}"
 
-DATA_DIR="${DATA_DIR:-$ROOT/data}"
-UPLOAD_DIR="${UPLOAD_DIR:-$ROOT/public/uploads}"
-BACKUP_DIR="${BACKUP_DIR:-$ROOT/backups}"
-KEEP="${KEEP:-14}"
-
-mkdir -p "$BACKUP_DIR"
-
+DATA_DIR="${DATA_DIR:-/var/lib/prexiv/current}"
+BACKUP_ROOT="${BACKUP_ROOT:-/var/lib/prexiv/backups}"
 DB_PATH="$DATA_DIR/prearxiv.db"
-if [ ! -f "$DB_PATH" ]; then
-  echo "backup: DB file not found at $DB_PATH" >&2
-  exit 1
+UPLOAD_DIR="$DATA_DIR/uploads"
+
+case "$TIER" in
+  pre-deploy|hourly|daily|weekly|manual) ;;
+  *) echo "backup: unknown tier '$TIER'; valid: pre-deploy|hourly|daily|weekly|manual" >&2; exit 2 ;;
+esac
+
+case "$TIER" in
+  pre-deploy) KEEP=30 ;;
+  hourly)     KEEP=48 ;;
+  daily)      KEEP=30 ;;
+  weekly)     KEEP=12 ;;
+  manual)     KEEP=20 ;;
+esac
+
+command -v sqlite3 >/dev/null 2>&1 || { echo "backup: sqlite3 not in PATH" >&2; exit 1; }
+[ -f "$DB_PATH" ] || { echo "backup: DB not found at $DB_PATH" >&2; exit 1; }
+
+DEST_DIR="$BACKUP_ROOT/$TIER"
+mkdir -p "$DEST_DIR"
+
+TS="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+SUFFIX=""
+if [ -n "$REASON" ]; then
+  CLEAN_REASON="$(printf '%s' "$REASON" | tr -c '[:alnum:]_-' '_' | cut -c1-40)"
+  SUFFIX="__${CLEAN_REASON}"
 fi
-if ! command -v sqlite3 >/dev/null 2>&1; then
-  echo "backup: sqlite3 binary not found in PATH" >&2
-  exit 1
+NAME="${TS}${SUFFIX}"
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+# 1. Atomic SQLite snapshot.
+sqlite3 "$DB_PATH" ".backup '$TMP_DIR/prearxiv.db'"
+
+# 2. Integrity-check the snapshot — anything other than 'ok' means we
+#    just captured a corrupt DB. Refuse to keep it; exit non-zero so
+#    deploy.sh ABORTs the deploy.
+INTEG="$(sqlite3 "$TMP_DIR/prearxiv.db" 'PRAGMA integrity_check;' | head -1)"
+if [ "$INTEG" != "ok" ]; then
+  echo "backup: integrity_check FAILED on snapshot ($INTEG); refusing to keep" >&2
+  exit 3
 fi
 
-STAMP="$(date +%Y%m%d-%H%M%S)"
-ARCHIVE="$BACKUP_DIR/prexiv-$STAMP.tar.gz"
+# 3. Optionally snapshot the sessions DB (Tier-2). Cheap; lets a restore
+#    keep users logged-in across the restore boundary.
+if [ -f "$DATA_DIR/sessions.db" ]; then
+  sqlite3 "$DATA_DIR/sessions.db" ".backup '$TMP_DIR/sessions.db'" || true
+fi
 
-# Stage everything in a per-run tmpdir, so an interrupted run leaves no
-# half-built artefacts behind.
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-# Consistent hot-snapshot of the live DB. Using sqlite3's .backup is required
-# because better-sqlite3 may have an open WAL — `cp` could capture an
-# inconsistent point-in-time view of the main file vs the WAL.
-sqlite3 "$DB_PATH" ".backup '$TMP/prearxiv.db'"
-
-# Stage the uploads alongside (may not exist on a brand-new install).
+# 4. Hard-link the uploads dir into the staging dir (cheap on the same fs;
+#    avoids reading every PDF byte just to tar it back up).
 if [ -d "$UPLOAD_DIR" ]; then
-  mkdir -p "$TMP/uploads"
-  # cp -a preserves perms/timestamps. Trailing /. copies contents only.
-  if [ -n "$(ls -A "$UPLOAD_DIR" 2>/dev/null)" ]; then
-    cp -a "$UPLOAD_DIR"/. "$TMP/uploads/"
-  fi
-else
-  mkdir -p "$TMP/uploads"
+  cp -al "$UPLOAD_DIR" "$TMP_DIR/uploads" 2>/dev/null || cp -r "$UPLOAD_DIR" "$TMP_DIR/uploads"
 fi
 
-# Build the tarball atomically: write to a .partial first, rename when done.
-tar -C "$TMP" -czf "$ARCHIVE.partial" prearxiv.db uploads
-mv "$ARCHIVE.partial" "$ARCHIVE"
+# 5. Tar the staging dir into the final archive.
+ARCHIVE="$DEST_DIR/${NAME}.tar.gz"
+tar -C "$TMP_DIR" -czf "$ARCHIVE" .
+SIZE="$(du -h "$ARCHIVE" | awk '{print $1}')"
 
-echo "backup: wrote $ARCHIVE"
-
-# Rotate: keep only the newest $KEEP archives matching prexiv-*.tar.gz.
-# `ls -1t` orders by mtime descending; tail -n +N skips the first N-1.
-cd "$BACKUP_DIR"
-ls -1t prexiv-*.tar.gz 2>/dev/null | tail -n +"$((KEEP + 1))" | while read -r old; do
+# 6. Rotation: keep the $KEEP newest .tar.gz files in this tier; delete the rest.
+cd "$DEST_DIR"
+ls -t *.tar.gz 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r old; do
   rm -f -- "$old"
-  echo "backup: pruned $old"
 done
 
-exit 0
+echo "backup: wrote $ARCHIVE ($SIZE), tier=$TIER, kept=$KEEP newest"

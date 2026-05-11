@@ -66,8 +66,8 @@ pub async fn do_login(
         return Ok(error_response(&session, maybe_user, "Wrong password.", form.next.as_deref()).await);
     }
     login_session(&session, user_id).await.map_err(crate::error::AppError::Other)?;
-    let dest = form.next.as_deref().filter(|s| s.starts_with('/')).unwrap_or("/");
-    Ok(Redirect::to(dest).into_response())
+    let dest = sanitize_next(form.next.as_deref());
+    Ok(Redirect::to(&dest).into_response())
 }
 
 async fn error_response(
@@ -201,6 +201,26 @@ pub async fn do_logout(
 
 fn redirect_html(to: &str) -> String {
     format!(r#"<!doctype html><meta http-equiv="refresh" content="0;url={to}">"#)
+}
+
+/// Open-redirect defence for `?next=…`. Only same-origin paths beginning
+/// with a single `/` (not `//`, which browsers interpret as a
+/// protocol-relative cross-origin URL) and not `/\` (Windows-style
+/// alternate). Falls back to the home page on anything suspicious.
+fn sanitize_next(next: Option<&str>) -> String {
+    match next {
+        Some(s)
+            if s.starts_with('/')
+                && !s.starts_with("//")
+                && !s.starts_with("/\\")
+                && !s.contains('\n')
+                && !s.contains('\r')
+                && s.len() <= 512 =>
+        {
+            s.to_string()
+        }
+        _ => "/".to_string(),
+    }
 }
 
 #[allow(dead_code)]

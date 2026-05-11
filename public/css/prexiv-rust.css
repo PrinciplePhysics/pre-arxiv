@@ -214,6 +214,14 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
 }
 .audit-self-callout strong { color: var(--warn); }
 
+/* Withdrawn manuscripts: the JS app's style.css strikes through the title.
+   Per user feedback that the strikethrough is visually noisy, we just gray
+   the title and let the "⊘ withdrawn" badge carry the signal. */
+.ms-row-withdrawn .ms-title,
+.ms-row-withdrawn .manuscript-title {
+  text-decoration: none !important;
+}
+
 /* ─── mobile / tablet responsive tuning for bx-* additions ───────────────
    The shared style.css already collapses the topbar (≤900px), row-fields
    (≤720px), and the conductor-type radio cards (intrinsic flex-wrap).
