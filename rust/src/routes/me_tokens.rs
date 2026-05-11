@@ -47,7 +47,8 @@ pub async fn show(
         .await
         .ok()
         .flatten();
-    Ok(Html(templates::me_tokens::render(&ctx, &rows, just_minted.as_ref()).into_string()))
+    let base = state.app_url.as_deref().unwrap_or("http://localhost:3001");
+    Ok(Html(templates::me_tokens::render(&ctx, &rows, just_minted.as_ref(), base).into_string()))
 }
 
 #[derive(Deserialize)]
