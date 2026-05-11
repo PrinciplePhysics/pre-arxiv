@@ -59,7 +59,8 @@ DATA_DIR="$DATA_DIR" BACKUP_ROOT="$BACKUP_ROOT" \
 #    The newest archive may be either .tar.gz or .tar.gz.age depending
 #    on whether age encryption is enabled (recipient pub-key present).
 echo "[2/7] verifying snapshot integrity…"
-LATEST="$(ls -t "$BACKUP_ROOT/pre-deploy/"*.tar.gz.age "$BACKUP_ROOT/pre-deploy/"*.tar.gz 2>/dev/null | head -1)"
+LATEST="$(find "$BACKUP_ROOT/pre-deploy/" -maxdepth 1 -type f \( -name '*.tar.gz.age' -o -name '*.tar.gz' \) -printf '%T@ %p\n' \
+  | sort -rn | head -1 | awk '{print $2}')"
 [ -n "$LATEST" ] || abort "could not locate the snapshot just written"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
