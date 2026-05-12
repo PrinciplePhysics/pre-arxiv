@@ -990,3 +990,442 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   .profile-actions .btn-secondary,
   .profile-actions button { width: 100%; text-align: center; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   POLISH LAYER · 20260512f
+   Loaded last; overrides earlier rules selectively. Aim: the "looks
+   effortless" feel of well-built native software — layered subtle
+   shadows, hairline rules, restrained palette, generous whitespace.
+   ───────────────────────────────────────────────────────────────── */
+
+/* ── A. Foundation tokens (additive — leave style.css alone) ─────── */
+:root {
+  /* Layered shadow scale. Each step combines a tight 1px inset-ish
+     hairline with a soft drop, the way native macOS surfaces do. */
+  --shadow-xs: 0 0 0 1px rgba(20, 16, 8, 0.04);
+  --shadow-sm: 0 1px 2px rgba(20, 16, 8, 0.06), 0 0 0 1px rgba(20, 16, 8, 0.045);
+  --shadow-md: 0 4px 14px rgba(20, 16, 8, 0.08), 0 1px 3px rgba(20, 16, 8, 0.045);
+  --shadow-lg: 0 12px 40px rgba(20, 16, 8, 0.14), 0 4px 12px rgba(20, 16, 8, 0.05);
+  --shadow-xl: 0 28px 80px rgba(20, 16, 8, 0.20), 0 12px 30px rgba(20, 16, 8, 0.08);
+
+  /* Radius scale: small inline pills / chips / buttons / cards / modals.
+     Existing rules sit on top of this without breaking. */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+
+  /* Easing curves. */
+  --ease-out: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── B. Selection, focus, scrollbars — global delight ────────────── */
+::selection {
+  background: rgba(184, 67, 10, 0.22);
+  color: var(--ink);
+}
+
+/* One coherent focus ring. Box-shadow form so it doesn't shift layout
+   the way `outline` does on certain widgets, AND we layer it under
+   any element-specific shadow so they don't fight. */
+*:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(184, 67, 10, 0.25), 0 0 0 1px var(--brand);
+  border-radius: var(--r-sm);
+  transition: box-shadow 0.12s var(--ease-out);
+}
+/* Buttons + links keep their own border-radius — don't square them off. */
+a:focus-visible,
+button:focus-visible,
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible { border-radius: inherit; }
+/* Inputs already have a border — bring the ring just outside it. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(184, 67, 10, 0.18);
+}
+
+/* WebKit scrollbars — tight, recede when idle. */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(20, 16, 8, 0.18);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(20, 16, 8, 0.32); background-clip: content-box; }
+
+/* ── C. Topbar — softer presence, cleaner active state ───────────── */
+.topbar {
+  background: linear-gradient(180deg, #c75017 0%, #b8430a 55%, #a3380a 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset,
+              0 2px 8px rgba(20, 16, 8, 0.08);
+}
+.brand-mark {
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12) inset,
+              0 0 0 1px rgba(255, 255, 255, 0.35),
+              0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.18s var(--ease-out);
+}
+.brand:hover .brand-mark { transform: scale(1.04); }
+.brand-name .bx {
+  text-shadow: none;            /* the old shadow read as muddy on the new gradient */
+}
+
+.topnav a {
+  position: relative;
+  height: 28px;
+  min-height: 28px;
+  border-radius: var(--r-sm);
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  transition: background-color 0.12s var(--ease-out), color 0.12s var(--ease-out);
+}
+.topnav a:hover { background: rgba(255, 255, 255, 0.14); }
+/* Replace the old muddy dark-bg active state with a crisp 2px white
+   under-indicator. Reads instantly as "you are here" on the orange
+   bar without darkening it. */
+.topnav a.on {
+  background: transparent;
+  color: #fff;
+}
+.topnav a.on::after {
+  content: "";
+  position: absolute;
+  left: 7px; right: 7px; bottom: -3px;
+  height: 2px;
+  background: #fff;
+  border-radius: 2px;
+}
+.topnav a.submit-link {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.topnav a.submit-link:hover { background: rgba(255, 255, 255, 0.26); }
+.topnav a.submit-link.on { background: rgba(255, 255, 255, 0.32); }
+.topnav a.submit-link.on::after { display: none; }
+
+/* Search input — pill, focusable, native-feeling */
+.searchbox input {
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  background: rgba(255, 253, 248, 0.96);
+  border-radius: 18px;
+  padding: 5px 12px;
+  height: 28px;
+  font-size: 13px;
+  transition: background 0.12s var(--ease-out), box-shadow 0.12s var(--ease-out);
+}
+.searchbox input::placeholder { color: rgba(20, 16, 8, 0.42); }
+.searchbox input:focus,
+.searchbox input:focus-visible {
+  background: #fffdf8;
+  border-color: rgba(0, 0, 0, 0.26);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4),
+              0 1px 3px rgba(0, 0, 0, 0.15) inset;
+  outline: none;
+}
+
+/* Userbox — quieter dot separators */
+.userbox .sep { color: rgba(255, 228, 206, 0.55); }
+.userbox .karma { color: rgba(255, 255, 255, 0.78); }
+
+/* ── D. Manuscript row — clearer hierarchy ───────────────────────── */
+.ms-row {
+  padding: 14px 0 13px;
+  gap: 10px;
+  border-bottom-color: var(--rule);
+}
+.ms-row:first-child { padding-top: 8px; }
+.ms-rank {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--rule-strong);
+}
+.ms-vote { gap: 1px; }
+.vote-btn {
+  width: 22px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  color: #bcb6a6;
+  transition: background-color 0.12s var(--ease-out), color 0.12s var(--ease-out);
+}
+.vote-btn:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.vote-btn.voted { background: var(--brand-bg); }
+.vote-score {
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.ms-title {
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.ms-arxivid {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.ms-meta {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.ms-meta .dot { color: var(--rule-strong); }
+.ms-sub {
+  margin-top: 2px;
+  font-size: 12px;
+}
+.ms-row-withdrawn .ms-title {
+  color: var(--muted);
+  text-decoration: none !important;
+}
+
+/* Badges — refined baseline + breathing room */
+.badge {
+  display: inline-block;
+  padding: 1px 8px 2px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  font-family: var(--sans);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+/* ── E. Buttons — hover lift + crisp press ───────────────────────── */
+.btn-primary, .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  transition:
+    transform 0.06s var(--ease-out),
+    background-color 0.12s var(--ease-out),
+    color 0.12s var(--ease-out),
+    border-color 0.12s var(--ease-out),
+    box-shadow 0.12s var(--ease-out);
+  will-change: transform;
+}
+.btn-primary {
+  background: var(--brand);
+  border: 1px solid #9c3808;
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05),
+              0 1px 2px rgba(184, 67, 10, 0.15);
+}
+.btn-primary:hover {
+  background: #c14a0e;
+  border-color: #872f06;
+  box-shadow: 0 3px 10px rgba(184, 67, 10, 0.28),
+              0 1px 2px rgba(184, 67, 10, 0.12);
+  transform: translateY(-1px);
+  color: #fff;
+  text-decoration: none;
+}
+.btn-primary:active {
+  transform: translateY(0);
+  background: #a83c08;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06) inset;
+}
+.btn-secondary {
+  background: var(--bg-card);
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+}
+.btn-secondary:hover {
+  background: #fff;
+  border-color: #aea487;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.btn-secondary:active {
+  transform: translateY(0);
+  background: var(--bg-card-alt);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04) inset;
+}
+
+/* ── F. Card surfaces — shared shadow rhythm ─────────────────────── */
+.profile-card,
+.account-info-panel,
+.bx-sidebar-block,
+.form-errors {
+  box-shadow: var(--shadow-sm);
+  border-radius: var(--r-md);
+}
+.welcome-box {
+  box-shadow: var(--shadow-xl);
+  border-radius: var(--r-lg);
+}
+.welcome-backdrop {
+  background: rgba(20, 16, 8, 0.42);
+  backdrop-filter: saturate(0.7) blur(2px);
+  -webkit-backdrop-filter: saturate(0.7) blur(2px);
+}
+
+/* ── G. Page header — tighter rhythm ─────────────────────────────── */
+.page-header { margin: 10px 0 18px; }
+.page-header h1 {
+  font-size: 26px;
+  letter-spacing: -0.015em;
+  font-weight: 700;
+  line-height: 1.18;
+}
+.page-header p.muted {
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+/* ── H. Forms — focus / spacing micro-polish ─────────────────────── */
+.submit-form input[type="text"],
+.submit-form input[type="email"],
+.submit-form input[type="password"],
+.submit-form input[type="url"],
+.submit-form select,
+.submit-form textarea {
+  border-radius: var(--r-sm);
+  border-color: var(--rule-strong);
+  background: #fff;
+  transition: border-color 0.12s var(--ease-out), box-shadow 0.12s var(--ease-out);
+}
+.submit-form input[type="text"]:hover:not(:focus),
+.submit-form input[type="email"]:hover:not(:focus),
+.submit-form input[type="password"]:hover:not(:focus),
+.submit-form input[type="url"]:hover:not(:focus),
+.submit-form select:hover:not(:focus),
+.submit-form textarea:hover:not(:focus) {
+  border-color: #aea487;
+}
+.submit-form .label-text {
+  letter-spacing: 0.005em;
+}
+.form-section h2 {
+  font-family: var(--sans);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+}
+.form-section h2 .muted, .form-section h2 .req {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── I. Footer — quiet, dignified ────────────────────────────────── */
+.sitefooter {
+  margin-top: 72px;
+  padding: 32px 0 28px;
+  border-top: 1px solid var(--rule);
+  background: rgba(20, 16, 8, 0.018);
+  color: var(--muted);
+  font-size: 13px;
+}
+.sitefooter a {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.sitefooter a:hover { color: var(--brand); text-decoration: none; }
+.footer-brand { font-size: 18px; }
+.foot-cols { gap: 32px !important; }
+
+/* ── J. Misc — flash, code, small-but-noticed details ────────────── */
+.flash {
+  background: var(--bg-card);
+  border: 1px solid var(--rule-strong);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  font-weight: 500;
+}
+code, pre {
+  font-feature-settings: "calt" 0;  /* turn off contextual alternates for monospace */
+}
+.role-tag {
+  display: inline-block;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 7px 2px;
+  border-radius: 10px;
+  background: var(--code-bg);
+  color: var(--ink-soft);
+  border: 1px solid var(--rule);
+  line-height: 1.5;
+  vertical-align: 1px;
+}
+
+/* Smooth out maud-driven anchor jumps */
+a[href^="#"], a[href*="#comment-"] { scroll-margin-top: 64px; }
+
+/* Image-style render of the brand wordmark — keep the playful italic
+   X but lose the heavy text-shadow that was clashing on the new
+   gradient topbar. */
+.brand-name .bx { font-style: italic; text-shadow: none; }
+
+/* Empty states — tiny but a give-up sign of bad apps */
+.empty {
+  text-align: center;
+  padding: 56px 16px 64px;
+  color: var(--muted);
+}
+.empty p { margin: 6px 0; }
+.empty p:first-child { font-size: 16px; color: var(--ink-soft); }
+
+/* Dark-mode auto: when the OS prefers dark, the gradient topbar still
+   needs to look right. We already darken via the linear-gradient, but
+   ensure the brand-mark white square doesn't pop too hard. */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] .topbar {
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset,
+                0 2px 12px rgba(0, 0, 0, 0.4);
+  }
+  :root[data-theme="auto"] .brand-mark {
+    background: #fbe9d9;
+  }
+  :root[data-theme="auto"] .sitefooter {
+    background: rgba(255, 255, 255, 0.02);
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Reduce-motion users: turn off transforms and shadows-on-hover so
+   nothing wiggles. Still keep colour transitions for legibility. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .btn-primary:hover, .btn-secondary:hover { transform: none; }
+}
