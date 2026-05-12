@@ -15,34 +15,61 @@ pub fn render(
     let logged_in = ctx.user.is_some();
     let viewer_is_self = ctx.user.as_ref().map(|v| v.id == u.id).unwrap_or(false);
 
+    // The real name (display_name) is the headline; the @username is
+    // demoted to a small monospace handle below it. When display_name
+    // is empty we fall back to the username as the headline so we
+    // never render an anonymous-looking blank.
+    let real_name: &str = u.display_name.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or(&u.username);
+    let has_display_name = u.display_name.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false);
     let body = html! {
-        div.page-header {
-            h1 { "@" (u.username) }
-            @if let Some(d) = &u.display_name {
-                p.muted { (d) }
+        header.profile-card {
+            div.profile-card-id {
+                h1.profile-name { (real_name) }
+                @if has_display_name {
+                    p.profile-handle { "@" (u.username) }
+                }
             }
-            p.muted {
-                "karma " (u.karma.unwrap_or(0))
-                " · " (rows.len()) " manuscripts"
-                " · " (stats.follower_count) " "
-                @if stats.follower_count == 1 { "follower" } @else { "followers" }
-                " · following " (stats.following_count)
-                @if u.is_admin() { " · " span.role-tag { "admin" } }
+            p.profile-stats {
+                span.profile-stat { strong { (u.karma.unwrap_or(0)) } " karma" }
+                span.profile-sep { "·" }
+                span.profile-stat { strong { (rows.len()) } " manuscript" @if rows.len() != 1 { "s" } }
+                span.profile-sep { "·" }
+                span.profile-stat {
+                    strong { (stats.follower_count) }
+                    " "
+                    @if stats.follower_count == 1 { "follower" } @else { "followers" }
+                }
+                span.profile-sep { "·" }
+                span.profile-stat { "following " strong { (stats.following_count) } }
+                @if u.is_admin() {
+                    span.profile-sep { "·" }
+                    span.role-tag { "admin" }
+                }
             }
-            @if let Some(b) = &u.bio { p { (b) } }
-            @if let Some(a) = &u.affiliation { p.muted { "Affiliation: " (a) } }
-
-            div style="display:flex;gap:8px;margin-top:8px" {
+            @if let Some(b) = &u.bio {
+                @if !b.trim().is_empty() {
+                    p.profile-bio { (b) }
+                }
+            }
+            @if let Some(a) = &u.affiliation {
+                @if !a.trim().is_empty() {
+                    p.profile-affiliation {
+                        span.profile-affiliation-label { "Affiliation" }
+                        " · " (a)
+                    }
+                }
+            }
+            div.profile-actions {
                 @if viewer_is_self {
                     a.btn-secondary href="/me/edit" { "Edit profile" }
                 } @else if logged_in {
                     @if stats.viewer_follows {
-                        form action={"/u/" (u.username) "/unfollow"} method="post" style="display:inline" {
+                        form action={"/u/" (u.username) "/unfollow"} method="post" {
                             input type="hidden" name="csrf_token" value=(ctx.csrf_token);
                             button.btn-secondary type="submit" { "✓ Following — unfollow" }
                         }
                     } @else {
-                        form action={"/u/" (u.username) "/follow"} method="post" style="display:inline" {
+                        form action={"/u/" (u.username) "/follow"} method="post" {
                             input type="hidden" name="csrf_token" value=(ctx.csrf_token);
                             button.btn-primary type="submit" { "+ Follow" }
                         }
@@ -52,7 +79,7 @@ pub fn render(
                 }
             }
         }
-        h2 { "Submitted manuscripts" }
+        h2.profile-section-h { "Submitted manuscripts" }
         @if rows.is_empty() {
             p.muted { "No manuscripts yet." }
         } @else {

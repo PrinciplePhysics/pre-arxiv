@@ -886,3 +886,107 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   }
   .account-info-link:last-child { border-bottom: none; }
 }
+
+/* ─── /u/{username} profile header card ──────────────────────────────
+   Real name (display_name) is the headline — serif, large, ink-black.
+   The @username handle drops to a small monospace muted subtitle so
+   readers see the person first and the slug second. The whole header
+   sits in a thin-bordered card to give it shape distinct from the
+   manuscript list that follows. */
+.profile-card {
+  background: var(--bg-card);
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  padding: 22px 26px 18px;
+  margin: 18px 0 26px;
+  box-shadow: var(--shadow);
+}
+.profile-card-id {
+  margin-bottom: 12px;
+}
+.profile-name {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0;
+}
+.profile-handle {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+  margin: 4px 0 0;
+  letter-spacing: 0;
+}
+.profile-stats {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dotted var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 0;
+}
+.profile-stats strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.profile-stats .role-tag {
+  margin-left: 2px;
+}
+.profile-stat { white-space: nowrap; }
+.profile-sep {
+  color: var(--rule-strong);
+  margin: 0 8px;
+  user-select: none;
+}
+.profile-bio {
+  margin: 0 0 8px;
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.profile-affiliation {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--muted);
+  font-family: var(--sans);
+}
+.profile-affiliation-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.profile-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.profile-actions form { margin: 0; display: inline; }
+
+.profile-section-h {
+  margin-top: 10px;
+  font-family: var(--serif);
+  font-size: 20px;
+  letter-spacing: -0.005em;
+}
+
+@media (max-width: 560px) {
+  .profile-card { padding: 18px 18px 14px; }
+  .profile-name { font-size: 24px; }
+  .profile-stats { font-size: 12px; }
+  .profile-sep { margin: 0 6px; }
+  .profile-actions { flex-direction: column; }
+  .profile-actions .btn-primary,
+  .profile-actions .btn-secondary,
+  .profile-actions button { width: 100%; text-align: center; }
+}
