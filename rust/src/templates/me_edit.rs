@@ -64,6 +64,10 @@ pub fn render(
                 a.account-info-link href="/me/2fa"      { "Two-factor auth" }
                 span.account-info-sep { "|" }
                 a.account-info-link href="/me/tokens"   { "API tokens" }
+                span.account-info-sep { "|" }
+                a.account-info-link href="/me/export"   { "Export data" }
+                span.account-info-sep { "|" }
+                a.account-info-link.account-info-danger href="/me/delete-account" { "Delete account" }
             }
         }
 

@@ -41,6 +41,12 @@ pub fn render_list(ctx: &PageCtx, m: &Manuscript, versions: &[ManuscriptVersion]
                             span.version-row-time { (time_ago(&t)) " \u{2013} " (t.format("%Y-%m-%d")) }
                         }
                         span.version-row-spacer {}
+                        @if v.version_number > 1 {
+                            a.btn-secondary.btn-small href={ "/m/" (slug) "/diff/" (v.version_number - 1) "/" (v.version_number) }
+                              title={ "Diff v" (v.version_number - 1) " → v" (v.version_number) } {
+                                "Diff vs v" (v.version_number - 1)
+                            }
+                        }
                         @if v.version_number == m.current_version {
                             a.btn-secondary.btn-small href={ "/m/" (slug) } { "View latest" }
                         } @else {

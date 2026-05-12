@@ -1,9 +1,13 @@
 use std::net::SocketAddr;
 
+use std::sync::Arc;
+
 use anyhow::Context;
 use axum::http::{header, HeaderValue};
 use axum::Router;
 use time::Duration;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::GovernorLayer;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -128,8 +132,40 @@ async fn main() -> anyhow::Result<()> {
             HeaderValue::from_static("interest-cohort=()"),
         ));
 
+    // Per-IP rate limiting via tower_governor. Default key extractor
+    // uses the source IP (taking it from the socket; behind Tailscale
+    // Funnel this is the inbound Funnel-relay IP, which still gives us
+    // a usable token-bucket because a single client's requests share
+    // the same source). Two buckets:
+    //
+    //   * `auth_governor` — applied to /login, /register, /forgot-password
+    //     and the /login/2fa second-step. 5 attempts per minute with a
+    //     burst of 5. Defends against credential-stuffing.
+    //
+    //   * `write_governor` — applied to /submit, /vote, comment posts,
+    //     and the API write paths. 30 requests per minute, burst 30.
+    //     Defends against vote-brigading and submission spam.
+    let auth_governor = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(12) // 5/min average
+            .burst_size(5)
+            .finish()
+            .expect("auth GovernorConfig"),
+    );
+    let write_governor = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(2)  // 30/min average
+            .burst_size(30)
+            .finish()
+            .expect("write GovernorConfig"),
+    );
+    let auth_layer  = GovernorLayer::new(auth_governor);
+    let write_layer = GovernorLayer::new(write_governor);
+
     let app = Router::new()
         .merge(routes::router())
+        .merge(routes::auth_post_router().layer(auth_layer))
+        .merge(routes::write_post_router().layer(write_layer))
         // The more-specific upload mount goes FIRST so axum picks it up
         // before the generic /static fallback.
         .nest_service("/static/uploads", ServeDir::new(upload_dir))

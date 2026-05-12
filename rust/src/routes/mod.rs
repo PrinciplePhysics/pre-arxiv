@@ -32,9 +32,11 @@ pub mod listings;
 pub mod manuscript;
 pub mod manuscript_versions;
 pub mod revise;
+pub mod versions_diff;
 pub mod me;
 pub mod me_edit;
 pub mod me_email;
+pub mod me_account;
 pub mod me_password;
 pub mod me_tokens;
 pub mod notifications;
@@ -61,12 +63,13 @@ pub fn router() -> Router<AppState> {
 
         // Manuscript
         .route("/m/{id}", get(manuscript::view))
-        .route("/m/{id}/comment", post(comments::post_comment))
+        // /m/{id}/comment POST is in write_post_router() (rate-limited)
         .route("/m/{id}/cite", get(cite::cite))
         .route("/m/{id}/withdraw", post(withdraw::withdraw))
         .route("/m/{id}/revise", get(revise::show).post(revise::submit))
         .route("/m/{id}/versions", get(manuscript_versions::list_versions))
         .route("/m/{id}/v/{n}", get(manuscript_versions::show_version))
+        .route("/m/{id}/diff/{a}/{b}", get(versions_diff::show))
 
         // Profile + follow
         .route("/u/{username}", get(profile::show))
@@ -76,15 +79,14 @@ pub fn router() -> Router<AppState> {
         // Search
         .route("/search", get(search::search))
 
-        // Auth
-        .route("/login", get(auth::show_login).post(auth::do_login))
-        .route("/login/2fa", get(two_factor::show_login_2fa).post(two_factor::submit_login_2fa))
-        .route("/register", get(auth::show_register).post(auth::do_register))
+        // Auth — POSTs live in auth_post_router() (rate-limited)
+        .route("/login", get(auth::show_login))
+        .route("/login/2fa", get(two_factor::show_login_2fa))
+        .route("/register", get(auth::show_register))
         .route("/logout", post(auth::do_logout))
 
-        // Submit + write actions
-        .route("/submit", get(submit::show_submit).post(submit::do_submit))
-        .route("/vote", post(votes::vote))
+        // Submit GET only (POST is in write_post_router())
+        .route("/submit", get(submit::show_submit))
 
         // /me/tokens (real impl) and other /me/* (stubs for now)
         .route("/me/tokens", get(me_tokens::show).post(me_tokens::create))
@@ -97,16 +99,18 @@ pub fn router() -> Router<AppState> {
         .route("/me/2fa", get(two_factor::show).post(two_factor::start_enroll))
         .route("/me/2fa/confirm", post(two_factor::confirm))
         .route("/me/2fa/disable", post(two_factor::disable))
+        .route("/me/delete-account", get(me_account::show_delete).post(me_account::submit_delete))
+        .route("/me/export", get(me_account::export))
         .route("/me/email", get(me_email::show).post(me_email::submit))
         .route("/me/email/cancel", post(me_email::cancel))
         .route("/me/resend-verification", post(verify::resend))
         .route("/verify/{token}", get(verify::show))
         .route("/confirm-email-change/{token}", get(me_email::confirm))
 
-        // Forgot / reset password (anonymous flow)
-        .route("/forgot-password", get(forgot::show_forgot).post(forgot::submit_forgot))
+        // Forgot / reset password — GETs only; POSTs in auth_post_router().
+        .route("/forgot-password", get(forgot::show_forgot))
         .route("/forgot-password/sent", get(forgot::show_sent))
-        .route("/reset-password/{token}", get(forgot::show_reset).post(forgot::submit_reset))
+        .route("/reset-password/{token}", get(forgot::show_reset))
 
         .route("/feed", get(feed::show))
 
@@ -134,4 +138,25 @@ pub fn router() -> Router<AppState> {
 
         // OAI-PMH metadata-harvest endpoint (Dublin Core).
         .route("/oai", get(oai::oai))
+}
+
+/// POST endpoints subject to the strict auth-attempt rate limit
+/// (5 attempts / min per IP). Layered with auth_layer in main.rs.
+pub fn auth_post_router() -> Router<AppState> {
+    Router::new()
+        .route("/login", post(auth::do_login))
+        .route("/login/2fa", post(two_factor::submit_login_2fa))
+        .route("/register", post(auth::do_register))
+        .route("/forgot-password", post(forgot::submit_forgot))
+        .route("/reset-password/{token}", post(forgot::submit_reset))
+}
+
+/// POST endpoints subject to the standard write-throttle rate limit
+/// (30 req / min per IP). Submission, voting, commenting. Layered
+/// with write_layer in main.rs.
+pub fn write_post_router() -> Router<AppState> {
+    Router::new()
+        .route("/submit", post(submit::do_submit))
+        .route("/vote", post(votes::vote))
+        .route("/m/{id}/comment", post(comments::post_comment))
 }
