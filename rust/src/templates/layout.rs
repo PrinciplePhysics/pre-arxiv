@@ -230,10 +230,6 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                             span.footer-sep aria-hidden="true" { "·" }
                             a href="/submit"     { "Submit" }
                             span.footer-sep aria-hidden="true" { "·" }
-                            a href="/sitemap.xml" rel="sitemap" { "Sitemap" }
-                            span.footer-sep aria-hidden="true" { "·" }
-                            a href="/feed.rss"   rel="alternate" type="application/rss+xml" { "RSS" }
-                            span.footer-sep aria-hidden="true" { "·" }
                             a href="/api/v1/openapi.json" { "API" }
                             span.footer-spacer aria-hidden="true" {}
                             a href="/tos"        { "ToS" }
