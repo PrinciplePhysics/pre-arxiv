@@ -2294,12 +2294,33 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   /* keep the native focus ring drivable */
   border: 0;
   padding: 0;
+  margin: 0;
+  /* squash any UA-rendered text so nothing peeks through opacity transitions */
+  font-size: 0;
+  color: transparent;
 }
 .submit-form .upload-dropzone .upload-input {
   /* override the generic .submit-form input[type="file"] styling so the
-     transparent input doesn't paint a brand button under our label */
+     transparent input doesn't paint a brand button under our label.
+     The earlier rule sets `display: flex` + `background: #fff` + a
+     branded ::file-selector-button; we have to undo all of that here. */
+  display: block;
   background: transparent;
   min-height: 0;
+}
+/* Belt-and-suspenders: a few browser builds keep painting the native
+   file-picker button even when the parent input is opacity:0. Collapse
+   it to 0×0 and hide it explicitly so nothing leaks through. */
+.upload-dropzone .upload-input::file-selector-button,
+.upload-dropzone .upload-input::-webkit-file-upload-button {
+  visibility: hidden;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
 }
 .upload-target {
   display: flex;
@@ -2440,23 +2461,41 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 
 /* Dark mode — keep the warmth but darken the tray surface so it reads
-   as "still a drop zone" rather than a flat panel. */
-:root[data-theme="dark"] .upload-target,
-:root[data-theme="auto"] .upload-target {
+   as "still a drop zone" rather than a flat panel. Two selectors:
+     * `[data-theme="dark"]`  — explicit, fires always
+     * `[data-theme="auto"]`  — only when the OS preference is dark
+   The `auto` variant MUST sit inside a prefers-color-scheme media query
+   so light-mode users on the auto theme keep the warm cream backdrop
+   (without the media query, the dark rules clobber light mode). */
+:root[data-theme="dark"] .upload-target {
   background: #2d2017;
   border-color: rgba(217, 107, 46, 0.40);
 }
-:root[data-theme="dark"] .upload-dropzone:hover .upload-target,
-:root[data-theme="auto"] .upload-dropzone:hover .upload-target {
+:root[data-theme="dark"] .upload-dropzone:hover .upload-target {
   background: #3a2418;
 }
-:root[data-theme="dark"] .upload-icon,
-:root[data-theme="auto"] .upload-icon {
+:root[data-theme="dark"] .upload-icon {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(217, 107, 46, 0.28);
 }
-:root[data-theme="dark"] .upload-button,
-:root[data-theme="auto"] .upload-button {
+:root[data-theme="dark"] .upload-button {
   background: rgba(255, 255, 255, 0.03);
   border-color: rgba(217, 107, 46, 0.40);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] .upload-target {
+    background: #2d2017;
+    border-color: rgba(217, 107, 46, 0.40);
+  }
+  :root[data-theme="auto"] .upload-dropzone:hover .upload-target {
+    background: #3a2418;
+  }
+  :root[data-theme="auto"] .upload-icon {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(217, 107, 46, 0.28);
+  }
+  :root[data-theme="auto"] .upload-button {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(217, 107, 46, 0.40);
+  }
 }
