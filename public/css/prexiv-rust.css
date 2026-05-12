@@ -436,3 +436,149 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   /* Comments — author name + timestamp shouldn't crowd the body. */
   .comment-meta { font-size: 0.92em; }
 }
+
+/* ─── Welcome modal ─────────────────────────────────────────────────
+   First-visit-only popup. Rendered into / markup with hidden=true;
+   welcome-modal.js reveals it on first load and stores dismissal in
+   localStorage. Uses position:fixed so DOM position is irrelevant.
+   ────────────────────────────────────────────────────────────────── */
+.welcome-modal[hidden] { display: none; }
+.welcome-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.welcome-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(31, 31, 31, 0.55);
+  cursor: pointer;
+  animation: welcome-fadein 180ms ease-out;
+}
+.welcome-box {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-card);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  padding: 28px 32px 22px;
+  max-width: 560px;
+  width: 100%;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.55;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  animation: welcome-slidein 220ms cubic-bezier(0.2, 0.7, 0.3, 1.0);
+  outline: none;
+}
+.welcome-box:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.welcome-title {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  margin: 0 0 6px;
+  color: var(--ink);
+}
+.welcome-lede {
+  font-style: italic;
+  font-weight: 600;
+  color: var(--brand);
+  font-size: 18px;
+  margin: 0 0 14px;
+}
+.welcome-body p { margin: 0 0 12px; }
+.welcome-body strong { color: var(--ink); font-weight: 700; }
+.welcome-body code {
+  background: var(--code-bg);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+  font-family: var(--mono);
+}
+.welcome-coda {
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+  margin-top: 14px !important;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+.welcome-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 28px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.welcome-close:hover { background: var(--bg-card-alt); color: var(--ink); }
+.welcome-close:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+.welcome-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+@keyframes welcome-fadein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes welcome-slidein {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)   scale(1.000); }
+}
+
+/* Phones — fill more of the screen, stack buttons full width. */
+@media (max-width: 520px) {
+  .welcome-modal { padding: 16px 12px; }
+  .welcome-box {
+    padding: 22px 20px 18px;
+    max-height: calc(100vh - 32px);
+  }
+  .welcome-title { font-size: 22px; }
+  .welcome-lede  { font-size: 16px; }
+  .welcome-body  { font-size: 15px; }
+  .welcome-coda  { font-size: 14px; }
+  .welcome-actions { flex-direction: column-reverse; gap: 8px; }
+  .welcome-actions .btn-primary,
+  .welcome-actions .btn-secondary {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* Dark theme — only when the user has selected data-theme=dark or has it
+   on auto with a dark OS preference (matches the rest of the stylesheet's
+   pattern; light remains the default).                                   */
+:root[data-theme="dark"] .welcome-box,
+:root[data-theme="dark"] .welcome-body strong,
+:root[data-theme="dark"] .welcome-title { color: #e8dfd1; }
+:root[data-theme="dark"] .welcome-box   { background: #1f1c18; border-color: #4a3f30; }
+:root[data-theme="dark"] .welcome-coda  { color: #b8aa90; border-top-color: #4a3f30; }
+:root[data-theme="dark"] .welcome-body code { background: #2a251f; }
+:root[data-theme="dark"] .welcome-backdrop  { background: rgba(0, 0, 0, 0.75); }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] .welcome-box,
+  :root[data-theme="auto"] .welcome-body strong,
+  :root[data-theme="auto"] .welcome-title { color: #e8dfd1; }
+  :root[data-theme="auto"] .welcome-box   { background: #1f1c18; border-color: #4a3f30; }
+  :root[data-theme="auto"] .welcome-coda  { color: #b8aa90; border-top-color: #4a3f30; }
+  :root[data-theme="auto"] .welcome-body code { background: #2a251f; }
+  :root[data-theme="auto"] .welcome-backdrop  { background: rgba(0, 0, 0, 0.75); }
+}

@@ -9,6 +9,7 @@ use super::layout::{layout, time_ago, PageCtx};
 pub fn render(ctx: &PageCtx, manuscripts: &[ManuscriptListItem]) -> Markup {
     let logged_in = ctx.user.is_some();
     let body = html! {
+        (welcome_modal())
         @if manuscripts.is_empty() {
             div.empty {
                 p { "No manuscripts here yet." }
@@ -23,6 +24,53 @@ pub fn render(ctx: &PageCtx, manuscripts: &[ManuscriptListItem]) -> Markup {
         }
     };
     layout("Ranked", ctx, body)
+}
+
+/// First-visit welcome explainer. Rendered into the homepage markup but
+/// kept `hidden` server-side; `/static/js/welcome-modal.js` reveals it on
+/// the first visit and remembers the dismissal in localStorage. Wording
+/// is deliberate: it acknowledges that AI-authored science is happening
+/// anyway, claims transparency (named conductor + AI model + auditor) as
+/// the price of entry, and frames PreXiv as a historical record rather
+/// than a peer-reviewed venue — three positions that each pre-empt a
+/// likely objection from first-time visitors.
+fn welcome_modal() -> Markup {
+    html! {
+        div.welcome-modal #welcome-modal hidden role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-body" aria-hidden="true" {
+            div.welcome-backdrop data-welcome-dismiss="1" {}
+            div.welcome-box tabindex="-1" {
+                button.welcome-close type="button" data-welcome-dismiss="1" aria-label="Close welcome message" { "×" }
+                h2 #welcome-title.welcome-title { "Welcome to PreXiv" }
+                div #welcome-body.welcome-body {
+                    p.welcome-lede { "A preprint archive for the AGI age." }
+                    p {
+                        "AI is already writing science. Most venues won't yet publish it; PreXiv will — provided every submission carries its provenance in the open."
+                    }
+                    p {
+                        "Each manuscript names its "
+                        strong { "conductor" }
+                        " (the human or agent who produced it), the "
+                        strong { "AI model" }
+                        " that drafted it, and — when one exists — a named "
+                        strong { "auditor" }
+                        " who has read the work and signed off on correctness. No auditor, no green check. Readers see at a glance who staked their name on what."
+                    }
+                    p {
+                        "The same API is open to humans and CLI agents. Mint a token at "
+                        code { "/me/tokens" }
+                        " and your agent can submit, search, vote, and cite through the same endpoints you do."
+                    }
+                    p.welcome-coda {
+                        "Not peer review. Not a publication of record. An honest log of who said what, on whose authority — in the years AI takes over scientific writing."
+                    }
+                }
+                div.welcome-actions {
+                    a.btn-secondary href="/guidelines" { "Read the guidelines" }
+                    button.btn-primary type="button" data-welcome-dismiss="1" { "Got it" }
+                }
+            }
+        }
+    }
 }
 
 fn truncate_name(s: &str) -> String {

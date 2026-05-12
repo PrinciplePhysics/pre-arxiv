@@ -55,6 +55,7 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                 script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" {}
                 script defer src="/static/js/katex-init.js" {}
                 script defer src="/static/js/copy-button.js" {}
+                script defer src="/static/js/welcome-modal.js" {}
             }
             body {
                 a.skip-link href="#main-content" { "Skip to main content" }
