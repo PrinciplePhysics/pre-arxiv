@@ -42,7 +42,7 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260512d";
+const ASSET_VER: &str = "20260512e";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target { "on" } else { "" }
@@ -115,8 +115,6 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                             @if let Some(u) = &ctx.user {
                                 a.me href={ "/u/" (u.username) } { (u.username) }
                                 span.karma title="karma" { "(" (u.karma.unwrap_or(0)) ")" }
-                                span.sep { "·" }
-                                a href="/me/edit" title="edit your profile" { "edit profile" }
                                 span.sep { "·" }
                                 a href="/me/tokens" title="manage your API tokens" { "API tokens" }
                                 span.sep { "·" }
