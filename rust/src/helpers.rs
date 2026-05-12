@@ -27,11 +27,22 @@ pub async fn build_ctx(
 ) -> PageCtx {
     let csrf_token = csrf_token(session).await;
     let flash = take_flash(session).await;
+    // Persistent across requests until the user verifies. We *don't*
+    // remove it here (unlike `flash`) — we want the inline link to
+    // remain available if the user reloads or navigates between
+    // unverified pages. Cleared by the /verify/{token} handler on
+    // successful redeem.
+    let pending_verify_token: Option<String> = session
+        .get::<String>("pending_verify_token")
+        .await
+        .ok()
+        .flatten();
     PageCtx {
         user,
         csrf_token,
         no_index: false,
         flash,
         current_path: current_path.into(),
+        pending_verify_token,
     }
 }

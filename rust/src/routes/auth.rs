@@ -188,29 +188,36 @@ pub async fn do_register(
 
     let user_id = result.last_insert_rowid();
 
-    // Fire-and-forget verification email. We deliberately await the
-    // result rather than spawning, so transient SMTP issues are visible
-    // in logs at registration time — but `mint_and_send` itself never
-    // bubbles a send failure up: registration should succeed and the
-    // user can use `Resend verification` later.
-    let pool = state.pool.clone();
-    let email_clone = email.clone();
-    let username_clone = username.to_string();
-    let app_url = state.app_url.clone();
-    tokio::spawn(async move {
-        let _ = verify::mint_and_send(
-            &pool, user_id, &email_clone, &username_clone, app_url.as_deref(),
-        ).await;
-    });
+    // Mint a verification token and fire the email send in the
+    // background. `mint_and_send` returns the plaintext token, which we
+    // stash in the session so /me/edit can render an inline
+    // "Verify my email →" button — this is the fallback path that
+    // keeps PreXiv usable while the upstream mail provider's
+    // anti-abuse activation is pending. Once outbound mail starts
+    // working, the same token also arrives by email; whichever the
+    // user clicks works.
+    let pending_token = verify::mint_and_send(
+        &state.pool, user_id, &email, username, state.app_url.as_deref(),
+    )
+    .await
+    .ok();
 
     login_session(&session, user_id)
         .await
         .map_err(crate::error::AppError::Other)?;
+
+    if let Some(t) = pending_token {
+        let _ = session.insert("pending_verify_token", t).await;
+    }
+
     set_flash(
         &session,
-        "Welcome! Check your inbox — we've sent a verification link. You can browse and comment now, but submitting a manuscript requires email verification."
+        "Welcome! Click the green button below to verify your email — submission is gated on verification. (We've also queued a verification email; delivery may take a moment.)"
     ).await;
-    Ok(Redirect::to("/").into_response())
+    // Redirect to /me/edit so the verify banner is the first thing the
+    // user sees post-register. They can browse and comment from here
+    // (the topnav still works), but submit and tokens are gated.
+    Ok(Redirect::to("/me/edit").into_response())
 }
 
 #[derive(Deserialize)]

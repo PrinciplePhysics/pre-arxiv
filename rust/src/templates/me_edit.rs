@@ -16,7 +16,7 @@ pub fn render(ctx: &PageCtx, v: &EditValues, errors: &[String]) -> Markup {
         }
 
         @if unverified {
-            (verify_banner(&ctx.csrf_token, email))
+            (verify_banner(&ctx.csrf_token, email, ctx.pending_verify_token.as_deref()))
         }
 
         @if !errors.is_empty() {
@@ -78,21 +78,48 @@ pub fn render(ctx: &PageCtx, v: &EditValues, errors: &[String]) -> Markup {
 }
 
 /// Banner shown at the top of /me/edit (and /submit) when the current
-/// user's email isn't verified. Carries a small inline form so the
-/// "Resend verification" button is one click away.
-pub fn verify_banner(csrf_token: &str, email: &str) -> Markup {
+/// user's email isn't verified.
+///
+/// When the session carries a `pending_verify_token` (set by
+/// /register and /me/resend-verification), the banner promotes that
+/// token to a one-click "Verify my email →" button — same /verify/{token}
+/// endpoint the email link would target, no inbox round-trip needed.
+/// This is the fallback that keeps PreXiv usable while the upstream
+/// mail provider's anti-abuse activation is pending.
+///
+/// Without a session token, the banner falls back to the original
+/// "check your inbox / resend" affordance.
+pub fn verify_banner(csrf_token: &str, email: &str, pending_token: Option<&str>) -> Markup {
     html! {
         div.verify-banner role="status" {
-            div.verify-banner-text {
-                strong { "Email not verified yet." }
-                " "
-                "We sent a verification link to "
-                strong { (email) }
-                " when you registered. Click the link in that email to enable manuscript submission. If you didn't get it, resend it now:"
-            }
-            form.verify-banner-resend method="post" action="/me/resend-verification" {
-                input type="hidden" name="csrf_token" value=(csrf_token);
-                button.btn-secondary type="submit" { "Resend verification" }
+            @if let Some(token) = pending_token {
+                div.verify-banner-text {
+                    strong { "Email not verified yet." }
+                    " "
+                    "Click the button to verify your email and unlock manuscript submission. "
+                    "A copy is also queued for delivery to "
+                    strong { (email) }
+                    " (email delivery is in setup; the in-browser link is the fast path)."
+                }
+                div.verify-banner-actions {
+                    a.btn-primary href={ "/verify/" (token) } { "Verify my email →" }
+                    form.verify-banner-resend method="post" action="/me/resend-verification" {
+                        input type="hidden" name="csrf_token" value=(csrf_token);
+                        button.btn-secondary type="submit" { "New link" }
+                    }
+                }
+            } @else {
+                div.verify-banner-text {
+                    strong { "Email not verified yet." }
+                    " "
+                    "We sent a verification link to "
+                    strong { (email) }
+                    " when you registered. Click the link in that email to enable manuscript submission. If you didn't get it, resend it now:"
+                }
+                form.verify-banner-resend method="post" action="/me/resend-verification" {
+                    input type="hidden" name="csrf_token" value=(csrf_token);
+                    button.btn-secondary type="submit" { "Resend verification" }
+                }
             }
         }
     }

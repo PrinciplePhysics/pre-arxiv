@@ -31,11 +31,18 @@ pub async fn show(
     let (ok, headline, message) = match verify::resolve_token(&state.pool, &token).await {
         Ok(Some((token_id, user_id))) => {
             match verify::consume(&state.pool, token_id, user_id).await {
-                Ok(()) => (
-                    true,
-                    "Email verified",
-                    "Thanks — your email is verified. You can now submit manuscripts and mint API tokens.".to_string(),
-                ),
+                Ok(()) => {
+                    // Clear the session's pending verify token — it now
+                    // points at a deleted row, and the verify banner
+                    // shouldn't render on subsequent unverified-page
+                    // visits (the user is now verified anyway).
+                    let _ = session.remove::<String>("pending_verify_token").await;
+                    (
+                        true,
+                        "Email verified",
+                        "Thanks — your email is verified. You can now submit manuscripts and mint API tokens.".to_string(),
+                    )
+                }
                 Err(e) => {
                     tracing::error!(target: "prexiv::verify", error = %e, "consume failed");
                     (
@@ -100,18 +107,25 @@ pub async fn resend(
         tracing::error!(target: "prexiv::verify", error = %e, user_id = user.id, "invalidate failed");
     }
 
-    let pool = state.pool.clone();
-    let email = user.email.clone();
-    let username = user.username.clone();
-    let app_url = state.app_url.clone();
-    let user_id = user.id;
-    tokio::spawn(async move {
-        let _ = verify::mint_and_send(&pool, user_id, &email, &username, app_url.as_deref()).await;
-    });
+    // Mint a fresh token (also fires the email in the background). The
+    // returned plaintext goes into the session so the /me/edit banner
+    // can render the inline "Verify my email →" button while outbound
+    // mail provider activation is still pending.
+    let pending_token = verify::mint_and_send(
+        &state.pool, user.id, &user.email, &user.username, state.app_url.as_deref(),
+    )
+    .await
+    .ok();
+    if let Some(t) = pending_token {
+        let _ = session.insert("pending_verify_token", t).await;
+    }
 
     set_flash(
         &session,
-        format!("Verification email re-sent to {}. Check your inbox.", user.email),
+        format!(
+            "Fresh verification link generated for {}. Click the green button below to verify, or watch your inbox for the email copy.",
+            user.email
+        ),
     ).await;
     Ok(Redirect::to("/me/edit").into_response())
 }

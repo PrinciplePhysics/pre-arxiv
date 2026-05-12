@@ -705,7 +705,23 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
 .verify-banner-resend { margin: 0; flex: 0 0 auto; }
 .verify-banner-resend .btn-secondary { white-space: nowrap; }
 
+/* When the banner is in inline-fallback mode it has two controls — the
+   primary "Verify my email →" link and a smaller "New link" form. */
+.verify-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.verify-banner-actions .btn-primary,
+.verify-banner-actions .btn-secondary { white-space: nowrap; }
+.verify-banner-actions form { margin: 0; }
+
 @media (max-width: 520px) {
   .verify-banner { flex-direction: column; align-items: stretch; }
   .verify-banner-resend .btn-secondary { width: 100%; text-align: center; }
+  .verify-banner-actions { flex-direction: column; align-items: stretch; }
+  .verify-banner-actions .btn-primary,
+  .verify-banner-actions .btn-secondary { width: 100%; text-align: center; }
 }

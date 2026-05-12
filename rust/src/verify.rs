@@ -65,33 +65,46 @@ pub async fn invalidate_for_user(pool: &SqlitePool, user_id: i64) -> Result<()> 
     Ok(())
 }
 
-/// Mint a token, build the verify URL, and (best-effort) send the email.
-/// Returns Ok even if the SMTP send fails — registration shouldn't be
-/// undone by a transient SMTP hiccup. Failure is logged.
+/// Mint a token, build the verify URL, fire the outbound email in the
+/// background, and return the plaintext token so the caller can stash it
+/// in the session for an inline-verify-link fallback.
+///
+/// We deliberately don't await the SMTP/HTTP send: it can take seconds
+/// (or minutes, if a provider's API is slow), and the registration
+/// response must complete promptly. The send is spawned with its own
+/// 12-second wall-clock cap so it can't pile up forever; failures are
+/// logged but otherwise invisible.
 pub async fn mint_and_send(
     pool: &SqlitePool,
     user_id: i64,
     email: &str,
     username: &str,
     app_url: Option<&str>,
-) -> Result<()> {
+) -> Result<String> {
     let token = mint_token(pool, user_id).await?;
     let base = app_url.unwrap_or("http://localhost:3001");
     let link = format!("{}/verify/{}", base.trim_end_matches('/'), token);
 
-    // Send with a wall-clock cap so a stuck SMTP connection can never
-    // pin a request. lettre's default TLS handshake timeout is generous.
-    let send_fut = crate::email::send_verification_email(email, username, &link);
-    match tokio::time::timeout(StdDuration::from_secs(12), send_fut).await {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => {
-            tracing::error!(target: "prexiv::verify", error = %e, %email, %username, "SMTP send failed");
+    // Send in the background. We move owned copies of every &str so
+    // the spawn outlives the calling request.
+    let to = email.to_string();
+    let username_owned = username.to_string();
+    let link_for_send = link.clone();
+    tokio::spawn(async move {
+        let send_fut =
+            crate::email::send_verification_email(&to, &username_owned, &link_for_send);
+        match tokio::time::timeout(StdDuration::from_secs(12), send_fut).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                tracing::error!(target: "prexiv::verify", error = %e, email = %to, username = %username_owned, "verification email send failed");
+            }
+            Err(_) => {
+                tracing::error!(target: "prexiv::verify", email = %to, username = %username_owned, "verification email send timed out after 12s");
+            }
         }
-        Err(_) => {
-            tracing::error!(target: "prexiv::verify", %email, %username, "SMTP send timed out after 12s");
-        }
-    }
-    Ok(())
+    });
+
+    Ok(token)
 }
 
 /// Resolve a plaintext token to the user it verifies. Returns Some(user_id)

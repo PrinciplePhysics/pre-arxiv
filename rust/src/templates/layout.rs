@@ -13,6 +13,14 @@ pub struct PageCtx {
     pub flash: Option<String>,
     /// Used to highlight the current section in the topnav (e.g. "/", "/submit").
     pub current_path: String,
+    /// Plaintext email-verification token, stashed in the session by the
+    /// register and resend-verification handlers. Lets the verify-banner
+    /// render a direct "Verify my email →" button without waiting for a
+    /// delivered email — used as a fallback when the outbound mail
+    /// provider can't yet send (e.g., Brevo activation pending).
+    /// Persists until the user successfully verifies (the /verify/{token}
+    /// handler clears it on success).
+    pub pending_verify_token: Option<String>,
 }
 
 impl PageCtx {

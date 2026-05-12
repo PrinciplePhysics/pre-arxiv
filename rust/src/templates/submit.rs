@@ -77,7 +77,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
         }
 
         @if unverified {
-            (crate::templates::me_edit::verify_banner(&ctx.csrf_token, email))
+            (crate::templates::me_edit::verify_banner(&ctx.csrf_token, email, ctx.pending_verify_token.as_deref()))
         }
 
         @if let Some(e) = error {
