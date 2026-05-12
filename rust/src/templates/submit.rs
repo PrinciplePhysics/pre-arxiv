@@ -149,17 +149,80 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     }
                 }
 
-                div.row-fields {
-                    div.grow.field {
-                        label for="pdf_upload" { span.label-text { "Upload PDF" } }
-                        input id="pdf_upload" type="file" name="pdf" accept="application/pdf";
-                        span.hint.no-katex { "Either this or an external URL. PDF only, up to 30 MB." }
+                section.source-choice-section {
+                    p.label-text { "Source format " span.req { "*" } }
+                    p.muted.small.no-katex { "arXiv-style: upload your LaTeX source and we compile it. Or upload a finished PDF directly. Or link a hosted-elsewhere copy." }
+
+                    div.conductor-type-choice.source-type-choice {
+                        label.ctype-card {
+                            input type="radio" name="source_type" value="tex" checked;
+                            div.ctype-body {
+                                strong { "LaTeX source " span.muted.small { "(recommended)" } }
+                                span.muted.small.no-katex {
+                                    "We compile the PDF server-side with "
+                                    code { "pdflatex" }
+                                    " (no shell-escape; 60-second timeout). Upload a single "
+                                    code { ".tex" }
+                                    " file, or a "
+                                    code { ".zip" }
+                                    " / "
+                                    code { ".tar.gz" }
+                                    " containing the .tex plus figures and "
+                                    code { ".bib" }
+                                    "."
+                                }
+                            }
+                        }
+                        label.ctype-card {
+                            input type="radio" name="source_type" value="pdf";
+                            div.ctype-body {
+                                strong { "PDF directly" }
+                                span.muted.small.no-katex { "Skip compilation: upload an already-finished PDF. Use this if you don't have the .tex source handy." }
+                            }
+                        }
+                        label.ctype-card {
+                            input type="radio" name="source_type" value="url";
+                            div.ctype-body {
+                                strong { "External URL only" }
+                                span.muted.small.no-katex { "No file upload. Link to a hosted copy (arXiv, GitHub, journal site, your homepage)." }
+                            }
+                        }
                     }
-                    label.grow {
-                        span.label-text { "External URL" }
+
+                    // LaTeX source upload — visible when source_type=tex.
+                    div.source-block.source-tex-block {
+                        label for="source_upload" { span.label-text { "Upload LaTeX source " span.req { "*" } } }
+                        input id="source_upload" type="file" name="source"
+                              accept=".tex,.zip,.tar.gz,.tgz,application/x-tex,application/zip,application/gzip,application/x-gzip";
+                        span.hint.no-katex {
+                            "Single "
+                            code { ".tex" }
+                            " (for math papers with no figures), "
+                            code { ".zip" }
+                            ", or "
+                            code { ".tar.gz" }
+                            ". Up to 30 MB. The archive root or a subdirectory must contain a "
+                            code { ".tex" }
+                            " with "
+                            code { "\\documentclass" }
+                            "."
+                        }
+                    }
+
+                    // PDF upload — visible when source_type=pdf.
+                    div.source-block.source-pdf-block {
+                        label for="pdf_upload" { span.label-text { "Upload PDF " span.req { "*" } } }
+                        input id="pdf_upload" type="file" name="pdf" accept="application/pdf";
+                        span.hint.no-katex { "PDF only, up to 30 MB." }
+                    }
+
+                    // External URL — visible always (an addition to the
+                    // tex/pdf upload, or the only field on source_type=url).
+                    label.source-external-url {
+                        span.label-text { "External URL " span.muted.small { "(optional unless 'External URL only')" } }
                         input type="url" name="external_url" maxlength="500"
-                              placeholder="https://… (e.g., GitHub repo or hosted PDF)";
-                        span.hint.no-katex { "Either this or a PDF upload. Use for hosted-elsewhere copies (arXiv, GitHub, journal site)." }
+                              placeholder="https://… (e.g., arXiv abstract, GitHub repo, journal page)";
+                        span.hint.no-katex { "A canonical link to the same work elsewhere. Always shown to readers." }
                     }
                 }
             }

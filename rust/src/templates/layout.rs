@@ -71,7 +71,7 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260512l";
+const ASSET_VER: &str = "20260512m";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target { "on" } else { "" }
@@ -229,8 +229,6 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                             a href="/guidelines" { "Guidelines" }
                             span.footer-sep aria-hidden="true" { "·" }
                             a href="/submit"     { "Submit" }
-                            span.footer-sep aria-hidden="true" { "·" }
-                            a href="/api/v1/openapi.json" { "API" }
                             span.footer-spacer aria-hidden="true" {}
                             a href="/tos"        { "ToS" }
                             span.footer-sep aria-hidden="true" { "·" }

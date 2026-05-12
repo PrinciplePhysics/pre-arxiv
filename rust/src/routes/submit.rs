@@ -33,15 +33,14 @@ pub async fn do_submit(
     mut multipart: Multipart,
 ) -> AppResult<Response> {
     let mut fields: SubmitFields = SubmitFields::default();
-    // Buffer the PDF in memory first; only write it to disk AFTER CSRF and
-    // field validation pass. This closes two issues:
-    //   (1) A forged CSRF request would previously leave the uploaded PDF
-    //       on disk even though the manuscript row was never created — an
-    //       attacker could fill the upload directory by repeatedly posting
-    //       multipart forms with bad CSRF tokens.
-    //   (2) It also lets us reject obviously-non-PDF uploads up front via
-    //       a magic-bytes check.
-    let mut pdf_buf: Option<(String, axum::body::Bytes)> = None;
+    // Buffer either the PDF OR the LaTeX-source upload in memory first;
+    // only write to disk AFTER CSRF + field validation pass, so a forged
+    // multipart POST can't fill the upload directory. The pdf buffer
+    // also gets a magic-byte sanity check; the source buffer is left
+    // raw because zip / tar.gz / single-.tex have wildly different
+    // signatures (compile module re-detects).
+    let mut pdf_buf:    Option<(String, axum::body::Bytes)> = None;
+    let mut source_buf: Option<(String, axum::body::Bytes)> = None;
 
     while let Some(field) = multipart
         .next_field()
@@ -65,15 +64,26 @@ pub async fn do_submit(
             if data.len() > 30 * 1024 * 1024 {
                 return Ok(err_page(&session, maybe_user, "PDF exceeds 30 MB.").await);
             }
-            // Magic-bytes check: the file must actually be a PDF, not just
-            // named .pdf. Defends against an attacker uploading HTML/JS
-            // disguised as a PDF (browsers would still render it as
-            // application/pdf via mime_guess, but defense in depth — and
-            // it also prevents accidental corruption from being persisted).
             if !data.starts_with(b"%PDF-") {
                 return Ok(err_page(&session, maybe_user, "Uploaded file is not a valid PDF (missing %PDF header).").await);
             }
             pdf_buf = Some((safe, data));
+        } else if name == "source" {
+            // LaTeX-source upload (.tex / .zip / .tar.gz). We don't
+            // magic-byte-check here — the compile module re-detects.
+            let file_name = field.file_name().unwrap_or("source.tex").to_string();
+            let safe = sanitize_filename(&file_name);
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("multipart: {e}")))?;
+            if data.is_empty() {
+                continue;
+            }
+            if data.len() > 30 * 1024 * 1024 {
+                return Ok(err_page(&session, maybe_user, "Source upload exceeds 30 MB.").await);
+            }
+            source_buf = Some((safe, data));
         } else {
             let value = field
                 .text()
@@ -171,34 +181,98 @@ pub async fn do_submit(
     let arxiv_like_id = make_prexiv_id();
     let synthetic_doi = format!("10.99999/{}", arxiv_like_id);
 
-    // All validation passed → now (and only now) persist the PDF.
-    let pdf_path: Option<String> = if let Some((safe, data)) = pdf_buf {
-        let upload_dir = upload_dir();
-        fs::create_dir_all(&upload_dir)
-            .await
-            .map_err(|e| crate::error::AppError::Other(e.into()))?;
-        let stored = format!(
-            "{}-{}-{}",
-            chrono::Utc::now().timestamp_millis(),
-            rand::thread_rng().gen_range(100_000..1_000_000),
-            safe
-        );
+    // Source-type gate. The form has three branches; enforce the
+    // required artefact for each.
+    let source_type = if fields.source_type.is_empty() { "tex".to_string() } else { fields.source_type.clone() };
+    match source_type.as_str() {
+        "tex" => {
+            if source_buf.is_none() {
+                return Ok(err_page(&session, maybe_user,
+                    "LaTeX source upload is required. Choose 'PDF directly' or 'External URL only' if you don't have the .tex.").await);
+            }
+        }
+        "pdf" => {
+            if pdf_buf.is_none() {
+                return Ok(err_page(&session, maybe_user,
+                    "PDF upload is required for the 'PDF directly' option.").await);
+            }
+        }
+        "url" => {
+            if fields.external_url.trim().is_empty() {
+                return Ok(err_page(&session, maybe_user,
+                    "External URL is required for the 'External URL only' option.").await);
+            }
+        }
+        other => {
+            return Ok(err_page(&session, maybe_user,
+                &format!("Unknown source_type '{other}'.")).await);
+        }
+    }
+
+    // All validation passed → now (and only now) persist files and (for
+    // tex) run the compiler.
+    let upload_dir = upload_dir();
+    fs::create_dir_all(&upload_dir).await
+        .map_err(|e| crate::error::AppError::Other(e.into()))?;
+    let stamp = chrono::Utc::now().timestamp_millis();
+    let rnd: u32 = rand::thread_rng().gen_range(100_000..1_000_000);
+
+    let mut pdf_path: Option<String> = None;
+    let mut source_path: Option<String> = None;
+
+    if let Some((safe, data)) = &pdf_buf {
+        // Direct-PDF path: no compilation.
+        let stored = format!("{stamp}-{rnd}-{safe}");
         let full = upload_dir.join(&stored);
-        let mut f = fs::File::create(&full)
-            .await
+        let mut f = fs::File::create(&full).await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
-        f.write_all(&data)
-            .await
+        f.write_all(data).await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
-        Some(stored)
-    } else {
-        None
-    };
+        pdf_path = Some(stored);
+    }
+
+    if let Some((safe, data)) = &source_buf {
+        // Persist the source archive.
+        let stored_src = format!("{stamp}-{rnd}-src-{safe}");
+        let full_src = upload_dir.join(&stored_src);
+        let mut f = fs::File::create(&full_src).await
+            .map_err(|e| crate::error::AppError::Other(e.into()))?;
+        f.write_all(data).await
+            .map_err(|e| crate::error::AppError::Other(e.into()))?;
+        source_path = Some(stored_src);
+
+        // Compile.
+        match crate::compile::compile(safe, data).await {
+            Ok(compiled) => {
+                let pdf_name = format!("{stamp}-{rnd}-compiled.pdf");
+                let pdf_full = upload_dir.join(&pdf_name);
+                let mut pf = fs::File::create(&pdf_full).await
+                    .map_err(|e| crate::error::AppError::Other(e.into()))?;
+                pf.write_all(&compiled.pdf).await
+                    .map_err(|e| crate::error::AppError::Other(e.into()))?;
+                pdf_path = Some(pdf_name);
+            }
+            Err(e) => {
+                // Compile failed. Surface the error + the LaTeX log tail
+                // to the user; drop the source we just wrote (no manuscript
+                // row gets created).
+                let _ = fs::remove_file(upload_dir.join(source_path.as_deref().unwrap_or(""))).await;
+                let log_excerpt = e.log().map(|s| s.to_string());
+                let msg = match log_excerpt {
+                    Some(log) => format!(
+                        "LaTeX compile failed: {e}\n\nLast lines of the compile log:\n\n{log}"
+                    ),
+                    None => format!("LaTeX compile failed: {e}"),
+                };
+                return Ok(err_page(&session, maybe_user, &msg).await);
+            }
+        }
+    }
 
     let result = sqlx::query(
         r#"INSERT INTO manuscripts (
             arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
-            pdf_path, external_url,
+            pdf_path, external_url, source_path,
             conductor_type, conductor_ai_model, conductor_ai_model_public,
             conductor_human, conductor_human_public, conductor_role, conductor_notes,
             agent_framework,
@@ -207,7 +281,7 @@ pub async fn do_submit(
             license, ai_training
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?,
-            ?, ?,
+            ?, ?, ?,
             ?, ?, ?,
             ?, ?, ?, ?,
             ?,
@@ -225,6 +299,7 @@ pub async fn do_submit(
     .bind(fields.category.trim())
     .bind(pdf_path.as_deref())
     .bind(opt(&fields.external_url))
+    .bind(source_path.as_deref())
     .bind(&fields.conductor_type)
     .bind(fields.conductor_ai_model.trim())
     .bind(if fields.conductor_ai_model_public { 1i64 } else { 0 })
@@ -332,6 +407,8 @@ struct SubmitFields {
     auditor_orcid: String,
     license: String,
     ai_training: String,
+    /// "tex" / "pdf" / "url"
+    source_type: String,
 }
 
 impl SubmitFields {
@@ -343,6 +420,7 @@ impl SubmitFields {
             "authors" => self.authors = v,
             "category" => self.category = v,
             "external_url" => self.external_url = v,
+            "source_type" => self.source_type = v,
             "conductor_type" => self.conductor_type = v,
             "conductor_ai_model" => self.conductor_ai_model = v,
             "conductor_ai_model_public" => self.conductor_ai_model_public = is_truthy(&v),

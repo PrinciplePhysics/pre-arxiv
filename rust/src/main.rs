@@ -20,6 +20,7 @@ use tracing_subscriber::EnvFilter;
 mod api_auth;
 mod auth;
 mod categories;
+mod compile;
 mod db;
 mod email;
 mod error;

@@ -58,6 +58,13 @@ similar = "2"
 # Per-IP rate limiting for unauthenticated write endpoints.
 tower_governor = "0.8"
 
+# Server-side LaTeX → PDF compilation. zip + tar.gz extraction for
+# multi-file uploads; tempfile for isolated per-submission compile dirs.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tar = "0.4"
+flate2 = "1"
+tempfile = "3"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

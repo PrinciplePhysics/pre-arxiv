@@ -2257,3 +2257,16 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .diff-block .diff-context { color: var(--muted); }
 .diff-added-inline   { background: rgba(46, 154, 71, 0.18); padding: 0 4px; border-radius: 3px; color: #1f6633; font-weight: 600; }
 .diff-removed-inline { background: rgba(186, 85, 26, 0.18); padding: 0 4px; border-radius: 3px; color: #8b3308; font-weight: 600; }
+
+/* ─── /submit: source-type radio choice (CSS-only show/hide) ──────── */
+.source-choice-section { margin: 14px 0; }
+.source-type-choice {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+.source-block { display: none; margin-top: 8px; }
+.source-choice-section:has(input[name="source_type"][value="tex"]:checked) .source-tex-block { display: block; }
+.source-choice-section:has(input[name="source_type"][value="pdf"]:checked) .source-pdf-block { display: block; }
+.source-external-url { display: block; margin-top: 10px; }

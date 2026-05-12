@@ -237,6 +237,11 @@ pub fn render(
                             "↓ Download PDF"
                         }
                     }
+                    @if let Some(src) = &m.source_path {
+                        a.bx-sidebar-btn.secondary href={ "/static/uploads/" (src) } target="_blank" rel="noopener" title="Compiled from this LaTeX source" {
+                            "↓ LaTeX source"
+                        }
+                    }
                     @if let Some(url) = &m.external_url {
                         (sidebar_external(url))
                     }
