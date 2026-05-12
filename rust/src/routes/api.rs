@@ -29,6 +29,8 @@ pub fn router() -> Router<AppState> {
         .route("/manuscripts/{id}",                  get(get_manuscript))
         .route("/manuscripts/{id}/comments",         get(list_comments).post(post_comment))
         .route("/manuscripts/{id}/vote",             post(vote_manuscript))
+        .route("/manuscripts/{id}/versions",         get(list_manuscript_versions).post(post_manuscript_version))
+        .route("/manuscripts/{id}/versions/{n}",     get(get_manuscript_version))
         .route("/search",                            get(search))
         .route("/openapi.json",                      get(openapi))
         .route("/manifest",                          get(manifest))
@@ -332,6 +334,32 @@ async fn post_manuscript(
         .bind(new_id)
         .execute(&mut *tx)
         .await;
+
+    // Initial v1 in manuscript_versions, inside the same transaction.
+    let title_t = v.title.trim();
+    let abstract_t = v.r#abstract.trim();
+    let authors_t = v.authors.trim();
+    let category_t = v.category.trim();
+    let ext_url = v.external_url.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let cond_notes = v.conductor_notes.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let _ = crate::versions::insert_initial(
+        &mut *tx,
+        new_id,
+        &crate::versions::VersionInput {
+            title: title_t,
+            r#abstract: abstract_t,
+            authors: authors_t,
+            category: category_t,
+            pdf_path: None,
+            external_url: ext_url,
+            conductor_notes: cond_notes,
+            license: "CC-BY-4.0",
+            ai_training: "allow",
+            revision_note: None,
+        },
+    )
+    .await;
+
     tx.commit().await?;
 
     // Fetch and return the freshly-created row.
@@ -345,7 +373,8 @@ async fn post_manuscript(
                   auditor_statement, auditor_orcid,
                   view_count, score, comment_count,
                   withdrawn, withdrawn_reason, withdrawn_at,
-                  created_at, updated_at
+                  created_at, updated_at,
+                  license, ai_training, current_version
            FROM manuscripts WHERE id = ?"#,
     )
     .bind(new_id)
@@ -463,6 +492,171 @@ async fn vote_manuscript(
         .execute(&mut *tx).await?;
     tx.commit().await?;
     Ok((StatusCode::OK, Json(json!({"ok": true, "score": score}))))
+}
+
+// ─── /manuscripts/{id}/versions ───────────────────────────────────────────
+
+async fn list_manuscript_versions(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> AppResult<Json<Value>> {
+    let m: Option<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT id, current_version FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
+    )
+    .bind(&id).bind(&id)
+    .fetch_optional(&state.pool).await?;
+    let (manuscript_id, current_version) = m.ok_or(crate::error::AppError::NotFound)?;
+    let vs = crate::versions::list_versions(&state.pool, manuscript_id)
+        .await
+        .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("{e}")))?;
+    let items: Vec<Value> = vs.iter().map(|v| json!({
+        "version_number": v.version_number,
+        "revision_note":  v.revision_note,
+        "revised_at":     v.revised_at,
+        "title":          v.title,
+        "authors":        v.authors,
+        "category":       v.category,
+        "pdf_path":       v.pdf_path,
+        "external_url":   v.external_url,
+        "license":        v.license,
+        "ai_training":    v.ai_training,
+        "is_current":     v.version_number == current_version,
+    })).collect();
+    Ok(Json(json!({
+        "items": items,
+        "current_version": current_version,
+    })))
+}
+
+async fn get_manuscript_version(
+    State(state): State<AppState>,
+    Path((id, n)): Path<(String, i64)>,
+) -> AppResult<Json<Value>> {
+    let m: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
+        "SELECT id FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
+    )
+    .bind(&id).bind(&id)
+    .fetch_optional(&state.pool).await?;
+    let manuscript_id = m.ok_or(crate::error::AppError::NotFound)?.0;
+    let v = crate::versions::get_version(&state.pool, manuscript_id, n)
+        .await
+        .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("{e}")))?
+        .ok_or(crate::error::AppError::NotFound)?;
+    Ok(Json(json!({
+        "version_number": v.version_number,
+        "revision_note":  v.revision_note,
+        "revised_at":     v.revised_at,
+        "title":          v.title,
+        "abstract":       v.r#abstract,
+        "authors":        v.authors,
+        "category":       v.category,
+        "pdf_path":       v.pdf_path,
+        "external_url":   v.external_url,
+        "conductor_notes": v.conductor_notes,
+        "license":        v.license,
+        "ai_training":    v.ai_training,
+    })))
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+pub struct RevisionIn {
+    pub title: String,
+    pub r#abstract: String,
+    pub authors: String,
+    pub category: String,
+    pub external_url: Option<String>,
+    pub conductor_notes: Option<String>,
+    pub license: Option<String>,
+    pub ai_training: Option<String>,
+    /// Required; describes what changed.
+    pub revision_note: String,
+}
+
+async fn post_manuscript_version(
+    State(state): State<AppState>,
+    ApiVerifiedUser(user): ApiVerifiedUser,
+    Path(id): Path<String>,
+    Json(v): Json<RevisionIn>,
+) -> AppResult<(StatusCode, Json<Value>)> {
+    let m: Option<(i64, i64, i64, Option<String>, Option<String>, Option<String>)> =
+        sqlx::query_as(
+            "SELECT id, submitter_id, withdrawn, pdf_path, license, ai_training
+             FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
+        )
+        .bind(&id).bind(&id)
+        .fetch_optional(&state.pool).await?;
+    let (manuscript_id, submitter_id, withdrawn, pdf_path, existing_license, existing_ai) =
+        m.ok_or(crate::error::AppError::NotFound)?;
+
+    if submitter_id != user.id && !user.is_admin() {
+        return Ok((StatusCode::FORBIDDEN, Json(json!({
+            "error": "only the submitter or an admin may revise a manuscript"
+        }))));
+    }
+    if withdrawn != 0 {
+        return Ok((StatusCode::CONFLICT, Json(json!({
+            "error": "manuscript is withdrawn; revisions are disabled"
+        }))));
+    }
+
+    // Validation.
+    let mut errors: Vec<&str> = vec![];
+    if v.title.trim().is_empty() { errors.push("title is required"); }
+    if v.r#abstract.trim().len() < 100 { errors.push("abstract must be at least 100 chars"); }
+    if v.authors.trim().is_empty() { errors.push("authors is required"); }
+    if v.category.trim().is_empty() { errors.push("category is required"); }
+    if v.revision_note.trim().is_empty() {
+        errors.push("revision_note is required \u{2014} a short summary of what changed");
+    }
+    if !errors.is_empty() {
+        return Ok((StatusCode::UNPROCESSABLE_ENTITY, Json(json!({
+            "error": "validation failed",
+            "details": errors,
+        }))));
+    }
+
+    // The API can't accept a new PDF in JSON. Inherit the previous one.
+    let license_resolved = v.license.as_deref().map(str::trim).filter(|s| !s.is_empty())
+        .or(existing_license.as_deref())
+        .unwrap_or("CC-BY-4.0");
+    let ai_resolved = v.ai_training.as_deref().map(str::trim).filter(|s| !s.is_empty())
+        .or(existing_ai.as_deref())
+        .unwrap_or("allow");
+
+    let new_version = crate::versions::mint_revision(
+        &state.pool,
+        manuscript_id,
+        &crate::versions::VersionInput {
+            title: v.title.trim(),
+            r#abstract: v.r#abstract.trim(),
+            authors: v.authors.trim(),
+            category: v.category.trim(),
+            pdf_path: pdf_path.as_deref(),
+            external_url: v.external_url.as_deref().map(str::trim).filter(|s| !s.is_empty()),
+            conductor_notes: v.conductor_notes.as_deref().map(str::trim).filter(|s| !s.is_empty()),
+            license: license_resolved,
+            ai_training: ai_resolved,
+            revision_note: Some(v.revision_note.trim()),
+        },
+    )
+    .await
+    .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("{e}")))?;
+
+    let _ = sqlx::query(
+        "INSERT INTO audit_log (actor_user_id, action, target_type, target_id, detail) VALUES (?, 'manuscript_revise', 'manuscript', ?, ?)",
+    )
+    .bind(user.id)
+    .bind(manuscript_id)
+    .bind(format!("v{new_version}: {} (via API)", v.revision_note.trim()))
+    .execute(&state.pool)
+    .await;
+
+    Ok((StatusCode::CREATED, Json(json!({
+        "ok": true,
+        "version_number": new_version,
+        "manuscript_id": manuscript_id,
+    }))))
 }
 
 // ─── /search ───────────────────────────────────────────────────────────────

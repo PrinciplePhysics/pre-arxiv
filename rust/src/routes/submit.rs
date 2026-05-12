@@ -244,7 +244,23 @@ pub async fn do_submit(
     .execute(&state.pool)
     .await?;
 
-    let _ = result.last_insert_rowid();
+    let new_id = result.last_insert_rowid();
+    // Record v1 in manuscript_versions so the version log is complete
+    // from the moment of original submission.
+    let v1 = crate::versions::VersionInput {
+        title: fields.title.trim(),
+        r#abstract: fields.r#abstract.trim(),
+        authors: fields.authors.trim(),
+        category: fields.category.trim(),
+        pdf_path: pdf_path.as_deref(),
+        external_url: opt(&fields.external_url),
+        conductor_notes: opt(&fields.conductor_notes),
+        license,
+        ai_training,
+        revision_note: None,
+    };
+    let _ = crate::versions::insert_initial(&state.pool, new_id, &v1).await;
+
     set_flash(&session, format!("Manuscript submitted as {arxiv_like_id}.")).await;
     Ok(Redirect::to(&format!("/m/{arxiv_like_id}")).into_response())
 }

@@ -28,7 +28,7 @@ pub async fn view(
                view_count, score, comment_count,
                withdrawn, withdrawn_reason, withdrawn_at,
                created_at, updated_at,
-               license, ai_training
+               license, ai_training, current_version
         FROM manuscripts
         WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
         LIMIT 1

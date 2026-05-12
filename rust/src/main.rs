@@ -29,6 +29,7 @@ mod routes;
 mod state;
 mod templates;
 mod verify;
+mod versions;
 
 use crate::state::AppState;
 

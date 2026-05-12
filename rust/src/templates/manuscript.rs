@@ -40,8 +40,16 @@ pub fn render(
                 }
                 h1.ms-h1 { (md_inline(&m.title)) }
                 p.ms-authors-line { (m.authors) }
-                @if let Some(doi) = &m.doi {
-                    p.muted.small.mono { "doi: " (doi) }
+                p.muted.small.mono {
+                    @if let Some(doi) = &m.doi { "doi: " (doi) }
+                    @if m.current_version > 1 {
+                        " \u{00b7} version: v" (m.current_version)
+                        @if let Some(ts) = &m.updated_at {
+                            " (revised " (time_ago(ts)) ")"
+                        }
+                    } @else if m.current_version == 1 {
+                        " \u{00b7} version: v1"
+                    }
                 }
 
                 nav.bx-tabs aria-label="manuscript sections" {
@@ -255,6 +263,28 @@ pub fn render(
                         li { span.lbl { "Score" }    span.val { (m.score.unwrap_or(0)) } }
                         li { span.lbl { "Views" }    span.val { (m.view_count.unwrap_or(0)) } }
                         li { span.lbl { "Comments" } span.val { (m.comment_count.unwrap_or(0)) } }
+                        li { span.lbl { "Version" }  span.val { "v" (m.current_version) } }
+                    }
+                }
+
+                // Versions block: list link + revise CTA when allowed.
+                @let viewer_is_submitter = ctx.user.as_ref().map(|u| u.id == m.submitter_id).unwrap_or(false);
+                @let viewer_is_admin     = ctx.user.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+                @let can_revise = (viewer_is_submitter || viewer_is_admin) && !m.is_withdrawn();
+                div.bx-sidebar-block {
+                    h3 { "Versions" }
+                    @if m.current_version > 1 {
+                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/versions" } {
+                            "View all " (m.current_version) " versions"
+                        }
+                    } @else {
+                        p.muted.small style="margin:0 0 6px" { "Only v1 has been published." }
+                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/versions" } { "Version history" }
+                    }
+                    @if can_revise {
+                        a.bx-sidebar-btn href={ "/m/" (slug) "/revise" } style="margin-top:6px" {
+                            "\u{2728} Publish a new revision"
+                        }
                     }
                 }
 

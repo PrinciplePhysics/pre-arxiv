@@ -41,6 +41,34 @@ pub struct Manuscript {
     pub license: Option<String>,
     #[sqlx(default)]
     pub ai_training: Option<String>,
+    /// Latest version_number; selected only by routes that need to
+    /// render the version chrome (manuscript-detail, /versions list).
+    /// SELECTs that don't query the column get 0 here — they don't use
+    /// it anyway.
+    #[sqlx(default)]
+    pub current_version: i64,
+}
+
+/// One historical snapshot of a manuscript. Versions are immutable
+/// once written; revising a manuscript means inserting a new row here
+/// with version_number = current_version + 1 AND mirroring the new
+/// values onto the manuscripts row so the listings show the latest.
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct ManuscriptVersion {
+    pub id: i64,
+    pub manuscript_id: i64,
+    pub version_number: i64,
+    pub title: String,
+    pub r#abstract: String,
+    pub authors: String,
+    pub category: String,
+    pub pdf_path: Option<String>,
+    pub external_url: Option<String>,
+    pub conductor_notes: Option<String>,
+    pub license: Option<String>,
+    pub ai_training: Option<String>,
+    pub revision_note: Option<String>,
+    pub revised_at: Option<NaiveDateTime>,
 }
 
 /// Slim row used in listings (home, search results, profile pages).

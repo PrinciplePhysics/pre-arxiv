@@ -1841,3 +1841,92 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   .ms-h1 { font-size: 23px; }
   .bx-tabs a { padding: 8px 10px; font-size: 13px; }
 }
+
+/* ─── /m/{id}/versions list + historical-version banner ──────────── */
+.version-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.version-row {
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  box-shadow: var(--shadow-sm);
+}
+.version-row-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.version-row-tag {
+  display: inline-block;
+  background: var(--code-bg);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-sm);
+  padding: 1px 8px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.version-row-current {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border: 1px solid var(--ok-rule);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.version-row-time {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-family: var(--sans);
+}
+.version-row-spacer { flex: 1; }
+.version-row-note {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* "Historical version" banner — same shape as verify-banner, but
+   neutral palette so it doesn't read as alarm. */
+.historical-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--rule-strong);
+  border-left: 4px solid var(--accent-blue);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 14px;
+  line-height: 1.55;
+  box-shadow: var(--shadow-sm);
+}
+.historical-banner strong { color: var(--accent-blue); }
+.historical-banner .verify-banner-text { flex: 1 1 360px; min-width: 0; }
+.historical-banner .verify-banner-actions { flex: 0 0 auto; }
+
+/* Small button variant — used inside .version-row */
+.btn-secondary.btn-small,
+.btn-primary.btn-small {
+  padding: 4px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+}

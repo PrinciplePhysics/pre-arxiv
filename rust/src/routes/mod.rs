@@ -14,6 +14,8 @@ pub mod forgot;
 pub mod home;
 pub mod listings;
 pub mod manuscript;
+pub mod manuscript_versions;
+pub mod revise;
 pub mod me;
 pub mod me_edit;
 pub mod me_email;
@@ -43,6 +45,9 @@ pub fn router() -> Router<AppState> {
         .route("/m/{id}/comment", post(comments::post_comment))
         .route("/m/{id}/cite", get(cite::cite))
         .route("/m/{id}/withdraw", post(withdraw::withdraw))
+        .route("/m/{id}/revise", get(revise::show).post(revise::submit))
+        .route("/m/{id}/versions", get(manuscript_versions::list_versions))
+        .route("/m/{id}/v/{n}", get(manuscript_versions::show_version))
 
         // Profile + follow
         .route("/u/{username}", get(profile::show))
