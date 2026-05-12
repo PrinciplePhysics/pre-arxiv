@@ -46,6 +46,14 @@ ammonia = "4"
 # HIBP k-anonymity check
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
+# Email — outbound SMTP via lettre, talking to Gmail (smtp.gmail.com:587).
+# tokio1-rustls-tls so TLS verification uses webpki-roots (no openssl).
+lettre = { version = "0.11", default-features = false, features = [
+    "smtp-transport",
+    "tokio1-rustls-tls",
+    "builder",
+] }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

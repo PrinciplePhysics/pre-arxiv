@@ -5,12 +5,18 @@ use crate::routes::me_edit::EditValues;
 
 pub fn render(ctx: &PageCtx, v: &EditValues, errors: &[String]) -> Markup {
     let username = ctx.user.as_ref().map(|u| u.username.as_str()).unwrap_or("");
+    let unverified = ctx.user.as_ref().map(|u| !u.is_verified()).unwrap_or(false);
+    let email = ctx.user.as_ref().map(|u| u.email.as_str()).unwrap_or("");
     let body = html! {
         div.page-header {
             h1 { "Edit profile" }
             p.muted {
                 "Tweak your public-facing display fields. Changes here also apply to past and future submissions where you appear as the submitter."
             }
+        }
+
+        @if unverified {
+            (verify_banner(&ctx.csrf_token, email))
         }
 
         @if !errors.is_empty() {
@@ -69,4 +75,25 @@ pub fn render(ctx: &PageCtx, v: &EditValues, errors: &[String]) -> Markup {
         }
     };
     layout("Edit profile", ctx, body)
+}
+
+/// Banner shown at the top of /me/edit (and /submit) when the current
+/// user's email isn't verified. Carries a small inline form so the
+/// "Resend verification" button is one click away.
+pub fn verify_banner(csrf_token: &str, email: &str) -> Markup {
+    html! {
+        div.verify-banner role="status" {
+            div.verify-banner-text {
+                strong { "Email not verified yet." }
+                " "
+                "We sent a verification link to "
+                strong { (email) }
+                " when you registered. Click the link in that email to enable manuscript submission. If you didn't get it, resend it now:"
+            }
+            form.verify-banner-resend method="post" action="/me/resend-verification" {
+                input type="hidden" name="csrf_token" value=(csrf_token);
+                button.btn-secondary type="submit" { "Resend verification" }
+            }
+        }
+    }
 }

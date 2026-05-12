@@ -62,6 +62,8 @@ const ROLES: &[&str] = &[
 use crate::categories::{self as cats};
 
 pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
+    let unverified = ctx.user.as_ref().map(|u| !u.is_verified()).unwrap_or(false);
+    let email = ctx.user.as_ref().map(|u| u.email.as_str()).unwrap_or("");
     let body = html! {
         div.page-header {
             h1 { "Submit a manuscript" }
@@ -72,6 +74,10 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 strong { "auditor" }
                 " (optional) is a human expert who has verified its correctness."
             }
+        }
+
+        @if unverified {
+            (crate::templates::me_edit::verify_banner(&ctx.csrf_token, email))
         }
 
         @if let Some(e) = error {

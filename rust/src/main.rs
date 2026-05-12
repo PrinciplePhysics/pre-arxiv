@@ -17,6 +17,7 @@ mod api_auth;
 mod auth;
 mod categories;
 mod db;
+mod email;
 mod error;
 mod helpers;
 mod licenses;
@@ -25,6 +26,7 @@ mod models;
 mod routes;
 mod state;
 mod templates;
+mod verify;
 
 use crate::state::AppState;
 

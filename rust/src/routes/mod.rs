@@ -21,6 +21,7 @@ pub mod profile;
 pub mod search;
 pub mod static_routes;
 pub mod submit;
+pub mod verify;
 pub mod votes;
 pub mod withdraw;
 
@@ -61,6 +62,8 @@ pub fn router() -> Router<AppState> {
         .route("/me/tokens", get(me_tokens::show).post(me_tokens::create))
         .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
         .route("/me/edit", get(me_edit::show).post(me_edit::submit))
+        .route("/me/resend-verification", post(verify::resend))
+        .route("/verify/{token}", get(verify::show))
         .route("/feed", get(feed::show))
 
         // Admin

@@ -11,6 +11,7 @@ use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
 use crate::state::AppState;
 use crate::templates::{self, auth::RegisterForm};
+use crate::verify;
 
 #[derive(Deserialize)]
 pub struct NextParam {
@@ -186,10 +187,29 @@ pub async fn do_register(
     .await?;
 
     let user_id = result.last_insert_rowid();
+
+    // Fire-and-forget verification email. We deliberately await the
+    // result rather than spawning, so transient SMTP issues are visible
+    // in logs at registration time — but `mint_and_send` itself never
+    // bubbles a send failure up: registration should succeed and the
+    // user can use `Resend verification` later.
+    let pool = state.pool.clone();
+    let email_clone = email.clone();
+    let username_clone = username.to_string();
+    let app_url = state.app_url.clone();
+    tokio::spawn(async move {
+        let _ = verify::mint_and_send(
+            &pool, user_id, &email_clone, &username_clone, app_url.as_deref(),
+        ).await;
+    });
+
     login_session(&session, user_id)
         .await
         .map_err(crate::error::AppError::Other)?;
-    set_flash(&session, "Welcome! Your account was created.").await;
+    set_flash(
+        &session,
+        "Welcome! Check your inbox — we've sent a verification link. You can browse and comment now, but submitting a manuscript requires email verification."
+    ).await;
     Ok(Redirect::to("/").into_response())
 }
 

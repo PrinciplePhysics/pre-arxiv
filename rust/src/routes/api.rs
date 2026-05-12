@@ -14,7 +14,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::api_auth::{generate_token, hash_token, ApiUser};
+use crate::api_auth::{generate_token, hash_token, ApiUser, ApiVerifiedUser};
 use crate::error::AppResult;
 use crate::models::{Manuscript, ManuscriptListItem};
 use crate::state::AppState;
@@ -247,7 +247,7 @@ pub struct ManuscriptIn {
 
 async fn post_manuscript(
     State(state): State<AppState>,
-    ApiUser(user): ApiUser,
+    ApiVerifiedUser(user): ApiVerifiedUser,
     Json(v): Json<ManuscriptIn>,
 ) -> AppResult<(StatusCode, Json<Value>)> {
     let mut errors = vec![];

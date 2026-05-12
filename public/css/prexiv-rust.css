@@ -678,3 +678,34 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
 .submit-form .row-fields input[type="text"] {
   min-height: 38px;
 }
+
+/* ─── Email-verification banner ──────────────────────────────────────
+   Shown at the top of /me/edit and /submit when the current user's
+   email_verified flag is 0. Warm amber palette so it reads as "needs
+   attention" without being alarmist.
+   ──────────────────────────────────────────────────────────────── */
+.verify-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-rule);
+  border-left: 4px solid var(--warn);
+  border-radius: 5px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.verify-banner-text { flex: 1 1 320px; min-width: 0; }
+.verify-banner-text strong { color: var(--warn); }
+.verify-banner-resend { margin: 0; flex: 0 0 auto; }
+.verify-banner-resend .btn-secondary { white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .verify-banner { flex-direction: column; align-items: stretch; }
+  .verify-banner-resend .btn-secondary { width: 100%; text-align: center; }
+}
