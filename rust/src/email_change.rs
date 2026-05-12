@@ -142,10 +142,13 @@ pub async fn consume_and_apply(
 ) -> Result<bool> {
     let mut tx = pool.begin().await?;
 
+    let (hash_arr, enc) = crate::crypto::seal_email(new_email)
+        .context("sealing new email for change")?;
+    let new_hash = hash_arr.to_vec();
     let conflict: Option<(i64,)> = sqlx::query_as(
-        "SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1",
+        "SELECT id FROM users WHERE email_hash = ? AND id != ? LIMIT 1",
     )
-    .bind(new_email)
+    .bind(&new_hash)
     .bind(user_id)
     .fetch_optional(&mut *tx)
     .await
@@ -160,12 +163,18 @@ pub async fn consume_and_apply(
         return Ok(false);
     }
 
-    sqlx::query("UPDATE users SET email = ?, email_verified = 1 WHERE id = ?")
+    sqlx::query(
+        "UPDATE users
+           SET email = ?, email_hash = ?, email_enc = ?, email_verified = 1
+         WHERE id = ?",
+    )
         .bind(new_email)
+        .bind(&new_hash)
+        .bind(&enc)
         .bind(user_id)
         .execute(&mut *tx)
         .await
-        .context("updating users.email")?;
+        .context("updating users.email + crypto fields")?;
     sqlx::query("DELETE FROM pending_email_changes WHERE id = ?")
         .bind(token_id)
         .execute(&mut *tx)

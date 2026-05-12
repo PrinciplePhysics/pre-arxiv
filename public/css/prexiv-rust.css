@@ -2266,7 +2266,197 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   gap: 8px;
   margin: 8px 0 16px;
 }
-.source-block { display: none; margin-top: 8px; }
+.source-block { display: none; margin-top: 10px; }
 .source-choice-section:has(input[name="source_type"][value="tex"]:checked) .source-tex-block { display: block; }
 .source-choice-section:has(input[name="source_type"][value="pdf"]:checked) .source-pdf-block { display: block; }
 .source-external-url { display: block; margin-top: 10px; }
+
+/* ─── /submit: polished upload dropzone ─────────────────────────────
+   A label-target acts as the visible card and proxies clicks/drops to
+   the visually-hidden <input type="file"> beneath it. Inline JS in the
+   template updates `.upload-filename` text when a file is chosen.
+   The dashed border + tinted backdrop reads as a familiar "drop zone"
+   without screaming for attention. Hover/focus brighten the rule and
+   nudge the tray icon up by 1px for a small bit of physicality.
+   ──────────────────────────────────────────────────────────────── */
+.upload-dropzone {
+  position: relative;
+  margin: 6px 0 4px;
+}
+.upload-dropzone .upload-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+  /* keep the native focus ring drivable */
+  border: 0;
+  padding: 0;
+}
+.submit-form .upload-dropzone .upload-input {
+  /* override the generic .submit-form input[type="file"] styling so the
+     transparent input doesn't paint a brand button under our label */
+  background: transparent;
+  min-height: 0;
+}
+.upload-target {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  background: var(--brand-bg);
+  border: 1.5px dashed rgba(184, 67, 10, 0.40);
+  border-radius: var(--r-lg, 10px);
+  transition: border-color 0.18s var(--ease-out, ease),
+              background 0.18s var(--ease-out, ease),
+              box-shadow 0.18s var(--ease-out, ease),
+              transform 0.18s var(--ease-out, ease);
+  cursor: pointer;
+  user-select: none;
+}
+.upload-dropzone:hover .upload-target,
+.upload-input:focus-visible + .upload-target {
+  border-color: var(--brand);
+  background: #fff3e6;
+  box-shadow: 0 4px 14px rgba(184, 67, 10, 0.08), 0 1px 3px rgba(184, 67, 10, 0.06);
+}
+.upload-input:focus-visible + .upload-target {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+.upload-dropzone:hover .upload-icon { transform: translateY(-1px); }
+
+.upload-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(184, 67, 10, 0.20);
+  color: var(--brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s var(--ease-out, ease);
+}
+.upload-icon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.upload-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.upload-prompt {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.002em;
+}
+.upload-filename {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.upload-filename.has-file {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.upload-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: #fff;
+  color: var(--brand);
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid rgba(184, 67, 10, 0.40);
+  border-radius: var(--r-md, 6px);
+  letter-spacing: 0.01em;
+  transition: background 0.15s var(--ease-out, ease), color 0.15s var(--ease-out, ease);
+}
+.upload-dropzone:hover .upload-button,
+.upload-input:focus-visible + .upload-target .upload-button {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
+/* Hint chips — replace the long single-line caption with a compact
+   key/value grid so each constraint is easy to scan. */
+.upload-hint-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 18px;
+  row-gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.upload-hint-list li {
+  display: contents;
+}
+.upload-hint-key {
+  color: var(--muted);
+  font-family: var(--sans);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  align-self: baseline;
+  padding-top: 2px;
+  white-space: nowrap;
+}
+.upload-hint-val { color: var(--ink-soft); }
+.upload-hint-val code {
+  background: rgba(20, 16, 8, 0.05);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .upload-target { flex-wrap: wrap; padding: 14px 14px; gap: 12px; }
+  .upload-button { width: 100%; justify-content: center; }
+  .upload-hint-list { grid-template-columns: 1fr; row-gap: 8px; }
+  .upload-hint-key { padding-top: 0; }
+}
+
+/* Dark mode — keep the warmth but darken the tray surface so it reads
+   as "still a drop zone" rather than a flat panel. */
+:root[data-theme="dark"] .upload-target,
+:root[data-theme="auto"] .upload-target {
+  background: #2d2017;
+  border-color: rgba(217, 107, 46, 0.40);
+}
+:root[data-theme="dark"] .upload-dropzone:hover .upload-target,
+:root[data-theme="auto"] .upload-dropzone:hover .upload-target {
+  background: #3a2418;
+}
+:root[data-theme="dark"] .upload-icon,
+:root[data-theme="auto"] .upload-icon {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(217, 107, 46, 0.28);
+}
+:root[data-theme="dark"] .upload-button,
+:root[data-theme="auto"] .upload-button {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(217, 107, 46, 0.40);
+}

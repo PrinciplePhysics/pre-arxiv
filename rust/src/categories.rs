@@ -31,11 +31,13 @@ pub struct Category {
 }
 
 /// Display order for the groups; the form renders <optgroup>s in this order.
+/// Physics first, then Mathematics, then the rest — per user preference for
+/// the /submit Category dropdown.
 pub const GROUPS: &[&str] = &[
-    "Computer Science",
-    "Mathematics",
-    "Statistics",
     "Physics",
+    "Mathematics",
+    "Computer Science",
+    "Statistics",
     "Quantitative Biology",
     "Biology (bioRxiv-style)",
     "Medicine (medRxiv-style)",

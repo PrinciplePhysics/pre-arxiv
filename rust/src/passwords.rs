@@ -174,13 +174,27 @@ pub async fn find_user_by_email_or_username(
     pool: &SqlitePool,
     needle: &str,
 ) -> Result<Option<(i64, String, String)>> {
-    let row: Option<(i64, String, String)> = sqlx::query_as(
-        "SELECT id, username, email FROM users WHERE username = ? OR email = ? LIMIT 1",
+    // Look up by username OR by the blind-index `email_hash`. The plaintext
+    // `email` column may be empty post-harden, so we recover the address
+    // from `email_enc` and decrypt before returning it to the caller (used
+    // to address the password-reset email).
+    let needle_hash = crate::crypto::email_hash(needle).to_vec();
+    let row: Option<(i64, String, Option<Vec<u8>>, Option<String>)> = sqlx::query_as(
+        "SELECT id, username, email_enc, email
+           FROM users WHERE username = ? OR email_hash = ? LIMIT 1",
     )
     .bind(needle)
-    .bind(needle)
+    .bind(&needle_hash)
     .fetch_optional(pool)
     .await
     .context("looking up user for password reset")?;
-    Ok(row)
+    let Some((id, username, enc, plain)) = row else {
+        return Ok(None);
+    };
+    let email = match enc.as_deref() {
+        Some(b) => crate::crypto::open_email(b)
+            .unwrap_or_else(|_| plain.unwrap_or_default()),
+        None => plain.unwrap_or_default(),
+    };
+    Ok(Some((id, username, email)))
 }

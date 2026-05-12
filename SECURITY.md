@@ -122,9 +122,13 @@ What it does:
 
 Step 3 is the safety net: even a wrong restore leaves the previous live data intact under `current.<timestamp>.replaced`. Operator can rename it back if the restore was wrong.
 
-## 6. Off-machine backup (TODO)
+## 6. Off-machine backup
 
-Currently encrypted snapshots live only on victoria's disk. If victoria's disk dies, we lose everything between the last on-machine snapshot and the disaster. Planned mitigation: a daily `rsync /var/lib/prexiv/backups/` to the operator's Mac (or to an S3 bucket). Because the snapshots are age-encrypted (see §6a), they can safely be rsynced to untrusted storage — the off-machine target doesn't need to be a high-trust system, only the holder of the private key does.
+Encrypted snapshots are rsynced off victoria to a second host on every backup run, defending against single-disk failure and ransomware of the live host. Because the snapshots are age-encrypted (see §6a), the off-machine target is allowed to be lower-trust storage (S3 with default IAM, the operator's NAS, another VPS) — only the holder of the *private* age key can recover plaintext.
+
+**Script**: `scripts/offmachine-backup.sh` — invoked from cron after `backup.sh` completes. It rsyncs `/var/lib/prexiv/backups/*.tar.gz.age` (no `--delete` — retention is managed on the source, not by the destination) to `$PREXIV_OFFMACHINE_DEST` (e.g. `mac:~/PrexivBackups/`). Exits 0 even on partial transfer so a transient network blip doesn't take down the backup chain; the next run picks up missing files.
+
+**Verification cadence**: the operator MUST run a real `restore.sh` from an off-machine snapshot at least once per quarter. A backup you have never restored is not a backup.
 
 ## 6a. Encryption at rest
 
@@ -134,8 +138,39 @@ Personal data on PreXiv falls into four categories. Treating them all the same w
 |---|---|---|---|
 | **Irrecoverable by design** | `users.password_hash` (bcrypt cost 10); `api_tokens.token_hash` (SHA-256 hex) | The plaintext is never persisted. Bcrypt hashes are intentionally slow one-way functions; SHA-256 of a 27-byte random token has no practical preimage. | **Stronger than encryption.** Encryption implies a key holder can recover the plaintext; coercing the operator or compromising the key gets that plaintext back. With irrecoverable hashes, *no one* can derive the original — not the operator, not a court order, not a database leaker. The user is the only one who ever knew the plaintext. |
 | **Intentionally public** | `users.username`, `display_name`, `affiliation`, `bio`, `orcid`; manuscript title/abstract/authors/conductor; comments; votes | Plaintext on disk and on the wire. | Public by user choice. The user filled in these fields *to be seen*; encrypting them would prevent the only legitimate use. |
-| **Plaintext, should be encrypted at rest** *(TODO)* | `users.email` (used for login + verification); `users.totp_secret` (when 2FA lands); `webhooks.secret` (HMAC signing key, when webhooks land) | Plaintext today. Plan: column-level AES-256-GCM with a server-side key (`PREXIV_DATA_KEY` env var, 32 random bytes base64), with a deterministic `email_hash` column for UNIQUE-constraint + login lookup so the encrypted plaintext doesn't have to be decrypted-and-compared at every login attempt. | Email is the highest-priority of the three because it's already populated for every user and is the most personally identifying field in the schema. Tracked as a near-term roadmap item. |
+| **Encrypted at rest** | `users.email` (login + verification) | Column-level **AES-256-GCM** with a server-side master key in `PREXIV_DATA_KEY` (32 random bytes, hex- or base64-encoded), plus a deterministic 32-byte HMAC-SHA256 *blind index* `email_hash` so we can `WHERE email_hash = ?` without decrypting every row. Implementation: `rust/src/crypto.rs`; schema in migration `0012_email_at_rest_encryption.sql`; backfill on app startup is idempotent. | A DB dump alone yields ciphertext + an opaque hash. To reverse to a known email address an attacker needs the master key, which lives only in the systemd-managed env file (mode 0600). Future-extendable to `totp_secret` and webhook signing secrets with the same primitives. |
+| **Pending encryption** | `users.totp_secret` (2FA); `webhooks.secret` (HMAC signing key) | Plaintext today. | Same threat profile as email; same `crypto.rs` primitives apply. Tracked as the next encryption pass after `users.email` proves itself in production. |
 | **Backup tarballs leaving the box** | The tar.gz that bundles the DB + sessions + uploads, snapshotted before every deploy and on cron schedules | **age-encrypted** via X25519 to a recipient public key. The plaintext never touches disk; backup.sh pipes `tar -cz` straight through `age -r <pub>` into the final `.tar.gz.age`. | Backups are the most-portable copies of all user data: they get rsynced off-machine, sit in cron-driven archive directories, and may end up in places the live DB never goes. Encrypting *them* specifically defends the threat model where the box itself stays trusted but a backup copy gets out. |
+
+### Key management for `PREXIV_DATA_KEY` (column-level encryption)
+
+The master key for `users.email` (and future encrypted columns) is loaded once at app startup from `PREXIV_DATA_KEY`.
+
+- **Format**: 32 bytes encoded as either 64 hex chars or 44 base64 chars (standard alphabet, padded). Anything else exits non-zero before the server binds the port.
+
+- **Generation** (do this exactly once, before first deploy):
+
+  ```bash
+  openssl rand -hex 32                    # produces a 64-char hex string
+  # or
+  head -c 32 /dev/urandom | base64        # produces a 44-char base64 string
+  ```
+
+- **Where it lives on victoria**: `/etc/default/prexiv` (mode 0600, owned `root:dbai`) as the line `PREXIV_DATA_KEY=…`. systemd loads `/etc/default/prexiv` via `EnvironmentFile=` in the unit. Never check this value into git. Never `echo` it. It does not appear in `tracing` output (the crypto module hands it directly to AES + HMAC and never logs the bytes).
+
+- **Loss consequences**: an irretrievable loss of `PREXIV_DATA_KEY` bricks every encrypted column. The `email_enc` ciphertext becomes undecryptable, login-by-email stops working (the blind index is also keyed by the master key, so an attacker who steals only the DB can't link rows to known emails, but neither can a legit operator after key loss). Usernames + password hashes survive — users can still log in with their username and the password they remember. Plan accordingly: keep an off-line copy of this key the same way you keep the age backup private key.
+
+- **Rotation** (TODO; not yet implemented): on rotation, the server would dual-key for one deploy cycle (accept both old and new key for decryption, write only with the new key), re-encrypt every row using a startup pass, then drop the old key. Until that lands, treat `PREXIV_DATA_KEY` as set-once-and-keep-forever.
+
+- **Compromise**: leaking `PREXIV_DATA_KEY` alone does not directly compromise user accounts — passwords are bcrypt-hashed, session cookies are server-side. It does, however, allow an attacker who *also* gets a DB dump to recover every email address. Treat it as confidential-tier secret material.
+
+- **Operator hardening pass** (do after the first deploy proves stable): once you've watched a few logins/registrations work end-to-end on the encrypted path, run
+
+  ```sql
+  UPDATE users SET email = '' WHERE email_hash IS NOT NULL;
+  ```
+
+  to clear the plaintext `email` column. Reads already prefer `email_enc`, so this is invisible to users. The plaintext column is *kept by the migration as a rollback safety net*; clearing it removes the last on-disk plaintext copy without dropping the column shape.
 
 ### Key management for backup encryption
 
@@ -171,9 +206,9 @@ Audit run 2026-05-12 (re-audited same day). Grepped for known antipatterns; veri
 | **S-2.** Session cookie missing explicit `SameSite=Lax` | Low | **FIXED** |
 | **S-3.** Defense-in-depth: dynamic table name in `routes/votes.rs` | Informational | **FIXED** |
 | **S-4.** No rate limiting in the Rust port | Medium (abuse-aid) | Open — planned, tower-governor |
-| **S-5.** No off-machine backup | High (durability) | Open — planned, see §6 |
+| **S-5.** No off-machine backup | High (durability) | **FIXED** — `scripts/offmachine-backup.sh` rsyncs encrypted snapshots to `$PREXIV_OFFMACHINE_DEST` after every `backup.sh`; see §6 |
 | **S-6.** Backup tarballs plaintext on disk | Medium (leakage) | **FIXED** — age-encrypted to /etc/prexiv/backup.pub, see §6a |
-| **S-7.** `users.email` / future `totp_secret` / future `webhooks.secret` plaintext in DB | Medium (leakage) | Open — design documented in §6a, AES-256-GCM column-level encryption with a server-side key |
+| **S-7.** `users.email` plaintext in DB | Medium (leakage) | **FIXED for email** — AES-256-GCM column-level encryption with HMAC-SHA256 blind index; `rust/src/crypto.rs`, migration `0012_email_at_rest_encryption.sql`, app-startup backfill. `totp_secret` and `webhooks.secret` still pending — see §6a |
 | **S-8.** Session fixation: `login_session` did not rotate the session id, so a planted pre-login cookie remained valid post-login | High | **FIXED** — `auth.rs` now calls `session.cycle_id().await` before writing `user_id` |
 | **S-9.** PDF written to disk *before* CSRF check on `/submit` — a forged multipart POST left an orphan upload | High | **FIXED** — `routes/submit.rs` buffers the PDF in memory, validates CSRF + all fields, only then writes to disk |
 | **S-10.** User-enumeration: `/login` returned different messages for "no such user" vs "wrong password", and the no-such-user branch returned in microseconds vs bcrypt-time for wrong-password | Medium | **FIXED** — `verify_password_timing_safe` runs bcrypt against a fixed dummy hash when the user is missing; both branches return the same `"Incorrect username/email or password."` message |

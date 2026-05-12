@@ -52,11 +52,15 @@ pub async fn do_login(
     if !verify_csrf(&session, &form.csrf_token).await {
         return Ok(error_response(&session, maybe_user, "Form expired — please try again.", form.next.as_deref()).await);
     }
+    // Identifier may be a username or an email. Look it up via the
+    // blind index (`email_hash`) so we never need to scan plaintext.
+    // The username branch keeps using the existing index.
+    let id_hash = crate::crypto::email_hash(&form.identifier).to_vec();
     let row: Option<(i64, String)> = sqlx::query_as::<_, (i64, String)>(
-        "SELECT id, password_hash FROM users WHERE username = ? OR email = ? LIMIT 1",
+        "SELECT id, password_hash FROM users WHERE username = ? OR email_hash = ? LIMIT 1",
     )
     .bind(&form.identifier)
-    .bind(&form.identifier)
+    .bind(&id_hash)
     .fetch_optional(&state.pool)
     .await?;
 
@@ -170,11 +174,14 @@ pub async fn do_register(
     if is_password_pwned(&form.password).await {
         return Ok(mk_err("That password appears in a known data breach. Please pick another.", &form, maybe_user).await);
     }
+    let (email_hash, email_enc) = crate::crypto::seal_email(&email)
+        .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("seal_email: {e}")))?;
+    let email_hash_bytes = email_hash.to_vec();
     let existing: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
-        "SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1",
+        "SELECT id FROM users WHERE username = ? OR email_hash = ? LIMIT 1",
     )
     .bind(username)
-    .bind(&email)
+    .bind(&email_hash_bytes)
     .fetch_optional(&state.pool)
     .await?;
     if existing.is_some() {
@@ -188,12 +195,20 @@ pub async fn do_register(
         Some(form.display_name.trim().to_string())
     };
 
+    // We still populate the plaintext `email` column alongside the
+    // encrypted form during rollout. Once you've confirmed the
+    // encrypted path is reliable in production, run
+    // `UPDATE users SET email = '' WHERE email_hash IS NOT NULL;`
+    // to harden — reads already prefer `email_enc`.
     let result = sqlx::query(
-        r#"INSERT INTO users (username, email, password_hash, display_name, email_verified)
-           VALUES (?, ?, ?, ?, 0)"#,
+        r#"INSERT INTO users
+              (username, email, email_hash, email_enc, password_hash, display_name, email_verified)
+           VALUES (?, ?, ?, ?, ?, ?, 0)"#,
     )
     .bind(username)
     .bind(&email)
+    .bind(&email_hash_bytes)
+    .bind(&email_enc)
     .bind(&hash)
     .bind(&display_name)
     .execute(&state.pool)

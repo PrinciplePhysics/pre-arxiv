@@ -79,9 +79,10 @@ pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User>
         }
     }
 
-    let user = sqlx::query_as::<_, User>(
+    let mut user = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, display_name, affiliation, bio,
-                  karma, is_admin, email_verified, orcid, created_at
+                  karma, is_admin, email_verified, orcid, created_at,
+                  email_enc
            FROM users WHERE id = ?"#,
     )
     .bind(user_id)
@@ -89,6 +90,7 @@ pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User>
     .await
     .ok()
     .flatten()?;
+    user.resolve_email();
 
     // Only bump last_used_at once we know the token resolved to a real,
     // still-existing user. Avoids touching the row on tokens that point at

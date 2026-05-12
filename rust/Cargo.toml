@@ -65,6 +65,12 @@ tar = "0.4"
 flate2 = "1"
 tempfile = "3"
 
+# PII-at-rest encryption — AES-256-GCM for the ciphertext, HMAC-SHA256
+# for the deterministic lookup hash so we can query by email without
+# decrypting every row. Key material loaded from PREXIV_DATA_KEY.
+aes-gcm = "0.10"
+hmac = "0.12"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

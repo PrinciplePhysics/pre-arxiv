@@ -151,14 +151,19 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 pub async fn load_user(pool: &SqlitePool, user_id: i64) -> Result<Option<User>, sqlx::Error> {
-    sqlx::query_as::<_, User>(
+    let mut u = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, display_name, affiliation, bio,
-                  karma, is_admin, email_verified, orcid, created_at
+                  karma, is_admin, email_verified, orcid, created_at,
+                  email_enc
            FROM users WHERE id = ?"#,
     )
     .bind(user_id)
     .fetch_optional(pool)
-    .await
+    .await?;
+    if let Some(u) = u.as_mut() {
+        u.resolve_email();
+    }
+    Ok(u)
 }
 
 /// Optional current user — extracted on every request. Use when the page

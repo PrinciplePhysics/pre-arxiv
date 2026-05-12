@@ -25,13 +25,15 @@ pub async fn show(
 ) -> AppResult<Html<String>> {
     let u: Option<User> = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, display_name, affiliation, bio,
-                  karma, is_admin, email_verified, orcid, created_at
+                  karma, is_admin, email_verified, orcid, created_at,
+                  email_enc
            FROM users WHERE username = ? LIMIT 1"#,
     )
     .bind(&username)
     .fetch_optional(&state.pool)
     .await?;
-    let u = u.ok_or(AppError::NotFound)?;
+    let mut u = u.ok_or(AppError::NotFound)?;
+    u.resolve_email();
 
     let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(
         r#"SELECT id, arxiv_like_id, doi, title, authors, category,

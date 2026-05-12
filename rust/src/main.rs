@@ -21,6 +21,7 @@ mod api_auth;
 mod auth;
 mod categories;
 mod compile;
+mod crypto;
 mod db;
 mod email;
 mod error;
@@ -65,6 +66,18 @@ async fn main() -> anyhow::Result<()> {
         .run(&pool)
         .await
         .context("running sqlx migrations")?;
+
+    // S-7: load the email-at-rest master key, then backfill any legacy
+    // rows still missing an encrypted email. Both steps are idempotent —
+    // re-running on every startup is fine (and is the recovery path if
+    // someone restores from an older backup).
+    crypto::init().context("initialising PREXIV_DATA_KEY (S-7)")?;
+    let backfilled = backfill_user_emails(&pool)
+        .await
+        .context("backfilling user email_enc / email_hash")?;
+    if backfilled > 0 {
+        tracing::info!("S-7 backfill: encrypted {backfilled} legacy email rows");
+    }
 
     // Session store — shares the same DB so we don't need a second file.
     let session_store = SqliteStore::new(pool.clone());
@@ -204,4 +217,37 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
     Ok(())
+}
+
+/// S-7 startup pass: encrypt the plaintext `email` column for any
+/// user row whose `email_hash` is still NULL. Returns the number of
+/// rows updated. Idempotent — running it twice does nothing the
+/// second time. Skips rows with an empty `email` (which is what an
+/// operator-level "hard zero the plaintext" pass produces; we don't
+/// want to re-encrypt empty strings on top of a legitimate ciphertext).
+async fn backfill_user_emails(pool: &sqlx::SqlitePool) -> anyhow::Result<usize> {
+    let rows: Vec<(i64, Option<String>)> = sqlx::query_as(
+        "SELECT id, email FROM users WHERE email_hash IS NULL",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut n = 0usize;
+    for (id, email_opt) in rows {
+        let email = email_opt.unwrap_or_default();
+        if email.trim().is_empty() {
+            continue;
+        }
+        let (hash, enc) = crypto::seal_email(&email)?;
+        let hash_vec = hash.to_vec();
+        sqlx::query(
+            "UPDATE users SET email_hash = ?, email_enc = ? WHERE id = ?",
+        )
+        .bind(&hash_vec)
+        .bind(&enc)
+        .bind(id)
+        .execute(pool)
+        .await?;
+        n += 1;
+    }
+    Ok(n)
 }

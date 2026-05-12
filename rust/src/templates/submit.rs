@@ -1,7 +1,13 @@
-use maud::{html, Markup};
+use maud::{html, Markup, PreEscaped};
 
 use crate::licenses::{AI_TRAINING_OPTIONS, LICENSES};
 use super::layout::{layout, PageCtx};
+
+/// Upload-tray glyph. A simple stroked tray with an up-arrow on top —
+/// reads as "upload" at any size, doesn't depend on an icon font, and
+/// inherits `currentColor` so it follows the brand palette. Sized to 22px
+/// via the CSS rule on `.upload-icon svg`.
+const UPLOAD_ICON_SVG: &str = r##"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5v11"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M4.5 14.5v3.25A2.25 2.25 0 0 0 6.75 20h10.5a2.25 2.25 0 0 0 2.25-2.25V14.5"/></svg>"##;
 
 /// Top-tier flagships, current as of 2026-05-11. Surfaced as a
 /// <datalist> (typeahead suggestions) rather than a hard <select> — model
@@ -191,29 +197,72 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
 
                     // LaTeX source upload — visible when source_type=tex.
                     div.source-block.source-tex-block {
-                        label for="source_upload" { span.label-text { "Upload LaTeX source " span.req { "*" } } }
-                        input id="source_upload" type="file" name="source"
-                              accept=".tex,.zip,.tar.gz,.tgz,application/x-tex,application/zip,application/gzip,application/x-gzip";
-                        span.hint.no-katex {
-                            "Single "
-                            code { ".tex" }
-                            " (for math papers with no figures), "
-                            code { ".zip" }
-                            ", or "
-                            code { ".tar.gz" }
-                            ". Up to 30 MB. The archive root or a subdirectory must contain a "
-                            code { ".tex" }
-                            " with "
-                            code { "\\documentclass" }
-                            "."
+                        p.label-text { "Upload LaTeX source " span.req { "*" } }
+                        div.upload-dropzone data-bound-name="source-name" {
+                            input #source_upload.upload-input type="file" name="source"
+                                  accept=".tex,.zip,.tar.gz,.tgz,application/x-tex,application/zip,application/gzip,application/x-gzip";
+                            label.upload-target for="source_upload" {
+                                span.upload-icon aria-hidden="true" { (PreEscaped(UPLOAD_ICON_SVG)) }
+                                span.upload-copy {
+                                    strong.upload-prompt { "Click to choose, or drop your archive here" }
+                                    span.upload-filename #source-name data-empty="No file selected" { "No file selected" }
+                                }
+                                span.upload-button { "Browse" }
+                            }
+                        }
+                        ul.upload-hint-list.no-katex {
+                            li {
+                                span.upload-hint-key { "Accepts" }
+                                span.upload-hint-val {
+                                    code { ".tex" } " · " code { ".zip" } " · " code { ".tar.gz" }
+                                }
+                            }
+                            li {
+                                span.upload-hint-key { "Size limit" }
+                                span.upload-hint-val { "30 MB" }
+                            }
+                            li {
+                                span.upload-hint-key { "Required" }
+                                span.upload-hint-val {
+                                    "A " code { ".tex" } " with " code { "\\documentclass" }
+                                    " in the archive root or any subdirectory. Bibliography ("
+                                    code { ".bib" } ") and figures may sit alongside it."
+                                }
+                            }
+                            li {
+                                span.upload-hint-key { "Builder" }
+                                span.upload-hint-val {
+                                    code { "pdflatex" } " (or " code { "latexmk" } " if available), "
+                                    code { "--no-shell-escape" } ", 60-second timeout."
+                                }
+                            }
                         }
                     }
 
                     // PDF upload — visible when source_type=pdf.
                     div.source-block.source-pdf-block {
-                        label for="pdf_upload" { span.label-text { "Upload PDF " span.req { "*" } } }
-                        input id="pdf_upload" type="file" name="pdf" accept="application/pdf";
-                        span.hint.no-katex { "PDF only, up to 30 MB." }
+                        p.label-text { "Upload PDF " span.req { "*" } }
+                        div.upload-dropzone data-bound-name="pdf-name" {
+                            input #pdf_upload.upload-input type="file" name="pdf" accept="application/pdf";
+                            label.upload-target for="pdf_upload" {
+                                span.upload-icon aria-hidden="true" { (PreEscaped(UPLOAD_ICON_SVG)) }
+                                span.upload-copy {
+                                    strong.upload-prompt { "Click to choose, or drop your PDF here" }
+                                    span.upload-filename #pdf-name data-empty="No file selected" { "No file selected" }
+                                }
+                                span.upload-button { "Browse" }
+                            }
+                        }
+                        ul.upload-hint-list.no-katex {
+                            li {
+                                span.upload-hint-key { "Accepts" }
+                                span.upload-hint-val { code { ".pdf" } }
+                            }
+                            li {
+                                span.upload-hint-key { "Size limit" }
+                                span.upload-hint-val { "30 MB" }
+                            }
+                        }
                     }
 
                     // External URL — visible always (an addition to the
@@ -468,6 +517,28 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 button.btn-primary.big type="submit" { "Submit manuscript" }
             }
         }
+        // Reflect the chosen filename in each upload dropzone. Keeps the
+        // styled card honest — no orphan native "No file chosen" label.
+        script { (PreEscaped(r#"
+(function(){
+  document.querySelectorAll('.upload-dropzone').forEach(function(zone){
+    var inp = zone.querySelector('.upload-input');
+    var out = document.getElementById(zone.dataset.boundName);
+    if(!inp || !out) return;
+    var empty = out.dataset.empty || 'No file selected';
+    inp.addEventListener('change', function(){
+      var f = inp.files && inp.files[0];
+      if(f){
+        out.textContent = f.name + ' · ' + (f.size/1024/1024).toFixed(2) + ' MB';
+        out.classList.add('has-file');
+      } else {
+        out.textContent = empty;
+        out.classList.remove('has-file');
+      }
+    });
+  });
+})();
+"#)) }
     };
     layout("Submit", ctx, body)
 }

@@ -102,9 +102,10 @@ pub async fn submit(
     }
 
     // Reject if the new email already belongs to someone else.
+    let new_hash = crate::crypto::email_hash(&new_email).to_vec();
     let taken: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1")
-            .bind(&new_email)
+        sqlx::query_as("SELECT id FROM users WHERE email_hash = ? AND id != ? LIMIT 1")
+            .bind(&new_hash)
             .bind(user.id)
             .fetch_optional(&state.pool)
             .await?;
