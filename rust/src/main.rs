@@ -81,6 +81,15 @@ async fn main() -> anyhow::Result<()> {
         .map(|p| p.join("public"))
         .unwrap_or_else(|| "./public".into());
 
+    // UPLOAD_DIR lives outside the source tree on production (so a git
+    // reset --hard can't delete user PDFs). We serve it under
+    // /static/uploads/ via a second, more-specific nest_service that
+    // takes precedence over the broader /static fallback. Without this
+    // bridge the PDFs land on disk but 404 in the browser.
+    let upload_dir: std::path::PathBuf = std::env::var("UPLOAD_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| static_dir.join("uploads"));
+
     // Security headers — set on every response.
     //
     //   X-Content-Type-Options: nosniff  → stop the browser from
@@ -118,6 +127,9 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .merge(routes::router())
+        // The more-specific upload mount goes FIRST so axum picks it up
+        // before the generic /static fallback.
+        .nest_service("/static/uploads", ServeDir::new(upload_dir))
         .nest_service("/static", ServeDir::new(static_dir))
         .layer(security_headers)
         .layer(SetResponseHeaderLayer::if_not_present(
