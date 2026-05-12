@@ -68,7 +68,7 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260512i";
+const ASSET_VER: &str = "20260512j";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target { "on" } else { "" }
@@ -207,33 +207,37 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                 main.container id="main-content" { (body) }
                 footer.sitefooter {
                     div.footer-inner {
-                        div.foot-cols {
-                            div {
-                                strong.footer-brand {
-                                    span.bp { "Pre" }
-                                    span.bx { "X" }
-                                    span.bi { "iv" }
-                                }
-                                div.muted { "The preprint of preprints." }
+                        nav.footer-nav aria-label="Site links" {
+                            a.footer-brand-text href="/" {
+                                span.bp { "Pre" }
+                                span.bx { "X" }
+                                span.bi { "iv" }
                             }
-                            div {
-                                a href="/about" { "about" }
-                                a href="/guidelines" { "guidelines" }
-                                a href="/submit" { "submit a manuscript" }
-                            }
-                            div {
-                                a href="/tos" { "ToS" }
-                                a href="/privacy" { "Privacy" }
-                                a href="/licenses" { "Licenses" }
-                                a href="/dmca" { "DMCA" }
-                                a href="/policies" { "Policies" }
-                            }
-                            div {
-                                span.muted { "© " (chrono::Utc::now().format("%Y")) " PreXiv" }
-                                div.muted.small {
-                                    "Manuscripts here have not undergone formal peer review and may contain errors. Read accordingly."
-                                }
-                            }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/about"      { "About" }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/guidelines" { "Guidelines" }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/submit"     { "Submit" }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/sitemap.xml" rel="sitemap" { "Sitemap" }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/feed.rss"   rel="alternate" type="application/rss+xml" { "RSS" }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/api/v1/openapi.json" { "API" }
+                            span.footer-spacer aria-hidden="true" {}
+                            a href="/tos"        { "ToS" }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/privacy"    { "Privacy" }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/licenses"   { "Licenses" }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/dmca"       { "DMCA" }
+                            span.footer-sep aria-hidden="true" { "·" }
+                            a href="/policies"   { "Policies" }
+                        }
+                        p.footer-meta {
+                            "© " (chrono::Utc::now().format("%Y")) " PreXiv. The preprint of preprints. Manuscripts here have not undergone formal peer review."
                         }
                     }
                 }
