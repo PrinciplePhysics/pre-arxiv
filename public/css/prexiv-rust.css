@@ -2548,6 +2548,15 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   padding: 5px 12px !important;
   letter-spacing: 0.02em;
 }
+.orcid-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 6px 0 2px;
+  flex-wrap: wrap;
+}
+.orcid-inline-actions .muted.small { max-width: 540px; }
+.orcid-inline-actions button { white-space: nowrap; }
 
 /* ─── Manuscript-page advisory banners (restricted / unverified) ───
    The "unaudited" warning is amber; these are tonally calmer (blue/

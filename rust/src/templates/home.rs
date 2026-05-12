@@ -6,10 +6,17 @@ use crate::models::ManuscriptListItem;
 
 use super::layout::{layout, time_ago, PageCtx};
 
-pub fn render(ctx: &PageCtx, manuscripts: &[ManuscriptListItem]) -> Markup {
+pub fn render(
+    ctx: &PageCtx,
+    manuscripts: &[ManuscriptListItem],
+    widened: bool,
+) -> Markup {
     let logged_in = ctx.user.is_some();
     let body = html! {
         (welcome_modal())
+        @if widened {
+            (verified_widen_banner())
+        }
         @if manuscripts.is_empty() {
             div.empty {
                 p { "No manuscripts here yet." }
@@ -24,6 +31,25 @@ pub fn render(ctx: &PageCtx, manuscripts: &[ManuscriptListItem]) -> Markup {
         }
     };
     layout("Ranked", ctx, body)
+}
+
+/// Cold-start banner — rendered at the top of any default listing
+/// that auto-widened because the verified-scholar pool was empty.
+/// Tells the visitor what they're looking at and how to get on the
+/// "real" front page once verification scales up.
+pub fn verified_widen_banner() -> Markup {
+    html! {
+        div.advisory-banner role="note" {
+            span {
+                span.advisory-title { "Bootstrap mode." }
+                " No verified-scholar submissions yet, so the default ranked listing is temporarily showing "
+                em { "everything" }
+                ". The verified-only filter switches back on as soon as one verified scholar submits — "
+                a href="/me/edit" { "verify your ORCID or use an institutional email" }
+                " to be that scholar."
+            }
+        }
+    }
 }
 
 /// Welcome explainer. Rendered into the homepage markup but kept

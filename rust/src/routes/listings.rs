@@ -77,9 +77,16 @@ pub async fn new_listing(
         "SELECT {SLIM_COLS} FROM manuscripts WHERE 1=1{filter_sql}{author_sql} \
          ORDER BY created_at DESC LIMIT 50"
     );
-    let rows = fetch(&state.pool, &sql).await?;
+    let mut rows = fetch(&state.pool, &sql).await?;
+    let widened = rows.is_empty() && !filters.show_all();
+    if widened {
+        let fallback = format!(
+            "SELECT {SLIM_COLS} FROM manuscripts ORDER BY created_at DESC LIMIT 50"
+        );
+        rows = fetch(&state.pool, &fallback).await?;
+    }
     let ctx = build_ctx(&session, maybe_user, "/new").await;
-    Ok(Html(templates::listing::render(&ctx, "Newest", "Most recent manuscripts.", &rows, "/new").into_string()))
+    Ok(Html(templates::listing::render(&ctx, "Newest", "Most recent manuscripts.", &rows, "/new", widened).into_string()))
 }
 
 pub async fn top_listing(
@@ -94,9 +101,17 @@ pub async fn top_listing(
         "SELECT {SLIM_COLS} FROM manuscripts WHERE withdrawn = 0{filter_sql}{author_sql} \
          ORDER BY score DESC, created_at DESC LIMIT 50"
     );
-    let rows = fetch(&state.pool, &sql).await?;
+    let mut rows = fetch(&state.pool, &sql).await?;
+    let widened = rows.is_empty() && !filters.show_all();
+    if widened {
+        let fallback = format!(
+            "SELECT {SLIM_COLS} FROM manuscripts WHERE withdrawn = 0 \
+             ORDER BY score DESC, created_at DESC LIMIT 50"
+        );
+        rows = fetch(&state.pool, &fallback).await?;
+    }
     let ctx = build_ctx(&session, maybe_user, "/top").await;
-    Ok(Html(templates::listing::render(&ctx, "Top", "Highest-scoring manuscripts.", &rows, "/top").into_string()))
+    Ok(Html(templates::listing::render(&ctx, "Top", "Highest-scoring manuscripts.", &rows, "/top", widened).into_string()))
 }
 
 pub async fn audited_listing(
@@ -113,12 +128,16 @@ pub async fn audited_listing(
     );
     let rows = fetch(&state.pool, &sql).await?;
     let ctx = build_ctx(&session, maybe_user, "/audited").await;
+    // /audited doesn't apply the verified-author filter, so it doesn't
+    // need the cold-start widening — only restricted categories are
+    // skipped, and the legitimate fix is "audit more papers."
     Ok(Html(templates::listing::render(
         &ctx,
         "Audited",
         "Only manuscripts with a named human auditor who has signed a correctness statement.",
         &rows,
         "/audited",
+        false,
     )
     .into_string()))
 }
@@ -212,5 +231,5 @@ pub async fn browse_category(
     let ctx = build_ctx(&session, maybe_user, "/browse").await;
     let heading = format!("Browse · {cat}");
     let sub = format!("All manuscripts categorized as {cat}, newest first.");
-    Ok(Html(templates::listing::render(&ctx, &heading, &sub, &rows, &format!("/browse/{cat}")).into_string()))
+    Ok(Html(templates::listing::render(&ctx, &heading, &sub, &rows, &format!("/browse/{cat}"), false).into_string()))
 }

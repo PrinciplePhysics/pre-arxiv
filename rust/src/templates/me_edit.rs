@@ -131,11 +131,11 @@ pub fn render(
             section.form-section {
                 h2 { "ORCID " span.muted { "(optional)" } }
                 p.muted.small {
-                    "Paste your ORCID iD here, save, then click "
-                    strong { "Verify" }
-                    " above. We fetch the public record from "
+                    "Paste your ORCID iD here and click "
+                    strong { "Save & Verify" }
+                    ". We fetch the public record from "
                     code { "pub.orcid.org" }
-                    " and compare the name on file with your PreXiv display name. The verification is a one-step name match — no OAuth — so make sure your display name matches what's on your ORCID page."
+                    " and compare the name on file with your PreXiv display name (above). The verification is a one-step name match — no OAuth — so make sure your display name matches what's on your ORCID page first."
                 }
                 label {
                     span.label-text { "ORCID iD" }
@@ -144,6 +144,23 @@ pub fn render(
                           value=(v.orcid)
                           placeholder="0000-0002-1825-0097";
                     span.hint { "Format: " code { "XXXX-XXXX-XXXX-XXXX" } " (last char may be X). Editing this clears any prior verification." }
+                }
+                // Inline action — `formaction` overrides the outer
+                // form's `action`, so this single button both saves
+                // pending field edits AND triggers verification in one
+                // network round-trip. Visually de-emphasized vs the
+                // primary "Save changes" at the bottom so the user
+                // understands this is the verification path, not the
+                // generic save.
+                div.orcid-inline-actions {
+                    button.btn-primary type="submit" formaction="/me/verify-orcid" {
+                        "Save & Verify ORCID"
+                    }
+                    span.muted.small.no-katex {
+                        "Submits this whole form to "
+                        code { "/me/verify-orcid" }
+                        " — saves edits, then checks your ORCID record."
+                    }
                 }
             }
 
@@ -157,24 +174,20 @@ pub fn render(
     layout("Edit profile", ctx, body)
 }
 
-/// Compact status panel that lives at the top of the ORCID section.
-/// Shows two rows — institutional email + ORCID — each with its own
-/// pill ("verified" / "not yet"). The ORCID row carries a small POST
-/// form to /me/verify-orcid when an iD is on file but unverified.
+/// Status panel — read-only summary of the two verified-scholar
+/// signals (institutional email + ORCID). The verification *action*
+/// lives down in the ORCID section as "Save & Verify ORCID", which
+/// uses `formaction` to submit the whole edit form to /me/verify-orcid
+/// in one click. Putting the action next to the input it acts on is
+/// the clearer UX; this panel is for "where am I right now."
 fn verified_scholar_status_panel(
     user: Option<&crate::models::User>,
-    orcid_in_form: &str,
-    csrf_token: &str,
+    _orcid_in_form: &str,
+    _csrf_token: &str,
 ) -> Markup {
     let orcid_verified = user.map(|u| u.is_orcid_verified()).unwrap_or(false);
     let inst_email     = user.map(|u| u.is_institutional_email()).unwrap_or(false);
     let stored_orcid   = user.and_then(|u| u.orcid.as_deref()).unwrap_or("");
-    // Only enable Verify when the saved ORCID matches what's in the
-    // edit form — otherwise the user has unsaved changes and the
-    // server would be verifying the *old* iD.
-    let orcid_to_use = if stored_orcid.is_empty() { "" } else { stored_orcid };
-    let can_verify_now = !orcid_to_use.is_empty()
-        && (orcid_in_form.trim().is_empty() || orcid_in_form.trim() == orcid_to_use);
     html! {
         div.verified-scholar-panel {
             div.vsp-row {
@@ -196,27 +209,25 @@ fn verified_scholar_status_panel(
                 div.vsp-row-label {
                     strong { "ORCID iD" }
                     @if !stored_orcid.is_empty() {
-                        " "
-                        code.no-katex { (stored_orcid) }
+                        " " code.no-katex { (stored_orcid) }
                     }
                     span.muted.small.no-katex {
                         @if stored_orcid.is_empty() {
-                            "Paste an iD in the ORCID section below, save, then come back to verify."
+                            "Paste an iD in the ORCID section below, then click "
+                            strong { "Save & Verify ORCID" }
+                            "."
                         } @else if orcid_verified {
                             "Public ORCID name matched your display name."
                         } @else {
-                            "Saved but not verified. Click Verify to check name against the public ORCID record."
+                            "Saved but not verified. Use "
+                            strong { "Save & Verify ORCID" }
+                            " in the ORCID section below."
                         }
                     }
                 }
                 div.vsp-row-status {
                     @if orcid_verified {
                         span.vsp-pill.vsp-pill-ok { "✓ verified" }
-                    } @else if can_verify_now {
-                        form method="post" action="/me/verify-orcid" {
-                            input type="hidden" name="csrf_token" value=(csrf_token);
-                            button.btn-secondary.btn-small type="submit" { "Verify now" }
-                        }
                     } @else {
                         span.vsp-pill.vsp-pill-pending { "not yet" }
                     }

@@ -11,12 +11,16 @@ pub fn render(
     subheading: &str,
     rows: &[ManuscriptListItem],
     _self_path: &str,
+    widened: bool,
 ) -> Markup {
     let logged_in = ctx.user.is_some();
     let body = html! {
         div.page-header {
             h1 { (heading) }
             p.muted { (subheading) }
+        }
+        @if widened {
+            (super::home::verified_widen_banner())
         }
         @if rows.is_empty() {
             div.empty { p { "No manuscripts here yet." } }
