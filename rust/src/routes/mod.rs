@@ -122,7 +122,7 @@ pub fn router() -> Router<AppState> {
         .route("/robots.txt", get(static_routes::robots_txt))
         .route("/sitemap.xml", get(feeds::sitemap))
         .route("/feed.rss", get(feeds::rss_all))
-        .route("/feed/{cat}.rss", get(feeds::rss_category))
+        .route("/rss/{cat}", get(feeds::rss_category))
 
         // OAI-PMH metadata-harvest endpoint (Dublin Core).
         .route("/oai", get(oai::oai))

@@ -101,6 +101,10 @@ pub async fn rss_category(
     State(state): State<AppState>,
     Path(cat): Path<String>,
 ) -> AppResult<impl IntoResponse> {
+    // Tolerate a trailing .rss for backward compatibility with any
+    // bookmarks people may have made before /rss/{cat} replaced
+    // /feed/{cat}.rss (axum doesn't allow params mixed with literal
+    // suffixes in one segment).
     let cat = cat.trim_end_matches(".rss").to_string();
     let items = fetch_feed_items(&state.pool, Some(&cat)).await?;
     Ok(rss_response(&state, Some(&cat), &items))
@@ -122,7 +126,7 @@ fn rss_response(state: &AppState, category: Option<&str>, items: &[FeedItem]) ->
     };
     let now_rfc = chrono::Utc::now().format("%a, %d %b %Y %H:%M:%S +0000").to_string();
     let self_link = match category {
-        Some(c) => format!("{base}/feed/{c}.rss"),
+        Some(c) => format!("{base}/rss/{c}"),
         None    => format!("{base}/feed.rss"),
     };
 
