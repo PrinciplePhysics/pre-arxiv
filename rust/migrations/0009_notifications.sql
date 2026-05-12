@@ -12,6 +12,13 @@
 -- More kinds (vote milestones, revision of a followed manuscript, mentions)
 -- can land later without schema change — `kind` is free TEXT.
 
+-- Drop the JS-app-era notifications table (different shape: user_id
+-- instead of recipient_id, separate manuscript_id+comment_id columns,
+-- `seen` boolean instead of `read_at` timestamp). Empty on every
+-- deployment we've seen.
+DROP TABLE IF EXISTS notifications;
+DROP INDEX IF EXISTS idx_notif_user;
+
 CREATE TABLE notifications (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     recipient_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
