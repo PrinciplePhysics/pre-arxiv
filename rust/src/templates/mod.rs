@@ -11,6 +11,7 @@ pub mod me_edit;
 pub mod me_email;
 pub mod me_password;
 pub mod me_tokens;
+pub mod notifications;
 pub mod revise;
 pub mod versions;
 pub mod pages;

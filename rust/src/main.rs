@@ -24,6 +24,7 @@ mod licenses;
 mod markdown;
 mod email_change;
 mod models;
+mod notifications;
 mod passwords;
 mod routes;
 mod state;

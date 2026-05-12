@@ -33,7 +33,7 @@ pub async fn follow(
         set_flash(&session, "You can't follow yourself.").await;
         return Ok(Redirect::to(&format!("/u/{username}")).into_response());
     }
-    sqlx::query(
+    let res = sqlx::query(
         "INSERT INTO follows (follower_id, followee_id) VALUES (?, ?)
          ON CONFLICT(follower_id, followee_id) DO NOTHING",
     )
@@ -41,6 +41,20 @@ pub async fn follow(
     .bind(target_id)
     .execute(&state.pool)
     .await?;
+    // Notify the followee, but only on a brand-new follow (rows_affected
+    // == 0 means the ON CONFLICT DO NOTHING fired — already following,
+    // no notification needed).
+    if res.rows_affected() > 0 {
+        let _ = crate::notifications::notify(
+            &state.pool,
+            target_id,
+            Some(me.id),
+            crate::notifications::KIND_FOLLOWED,
+            Some("user"),
+            Some(target_id),
+            None,
+        ).await;
+    }
     set_flash(&session, format!("Following @{username}.")).await;
     Ok(Redirect::to(&format!("/u/{username}")).into_response())
 }

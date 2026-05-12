@@ -447,8 +447,33 @@ async fn post_comment(
     sqlx::query("UPDATE manuscripts SET comment_count = COALESCE(comment_count, 0) + 1 WHERE id = ?")
         .bind(manuscript_id)
         .execute(&mut *tx).await?;
+    let cid = res.last_insert_rowid();
+    let submitter: Option<(i64,)> = sqlx::query_as(
+        "SELECT submitter_id FROM manuscripts WHERE id = ?",
+    ).bind(manuscript_id).fetch_optional(&mut *tx).await?;
+    let parent_author: Option<(i64,)> = match body.parent_id {
+        Some(pid) => sqlx::query_as("SELECT author_id FROM comments WHERE id = ?")
+            .bind(pid).fetch_optional(&mut *tx).await?,
+        None => None,
+    };
     tx.commit().await?;
-    Ok((StatusCode::CREATED, Json(json!({"id": res.last_insert_rowid()}))))
+
+    let snippet: String = content.chars().take(140).collect();
+    if let Some((sid,)) = submitter {
+        let _ = crate::notifications::notify(
+            &state.pool, sid, Some(user.id),
+            crate::notifications::KIND_COMMENT_ON_MY_MANUSCRIPT,
+            Some("comment"), Some(cid), Some(&snippet),
+        ).await;
+    }
+    if let Some((pid_author,)) = parent_author {
+        let _ = crate::notifications::notify(
+            &state.pool, pid_author, Some(user.id),
+            crate::notifications::KIND_REPLY_TO_MY_COMMENT,
+            Some("comment"), Some(cid), Some(&snippet),
+        ).await;
+    }
+    Ok((StatusCode::CREATED, Json(json!({"id": cid}))))
 }
 
 // ─── /manuscripts/{id}/vote ────────────────────────────────────────────────

@@ -3,6 +3,7 @@
 use tower_sessions::Session;
 
 use crate::auth::{csrf_token, MaybeUser};
+use crate::state::AppState;
 use crate::templates::PageCtx;
 
 const SESSION_FLASH_KEY: &str = "flash";
@@ -50,8 +51,28 @@ pub async fn build_ctx(
         current_path: current_path.into(),
         pending_verify_token,
         pending_email_change_token,
+        unread_notifications: 0,
         og: None,
         jsonld: None,
         canonical_url: None,
     }
+}
+
+/// Variant of build_ctx that also fetches the unread-notification count
+/// for the logged-in user, so the topbar bell badge is populated. Use
+/// from routes that pass through state and want the bell visible.
+pub async fn build_ctx_with_state(
+    state: &AppState,
+    session: &Session,
+    maybe_user: MaybeUser,
+    current_path: impl Into<String>,
+) -> PageCtx {
+    let user_id = maybe_user.0.as_ref().map(|u| u.id);
+    let mut ctx = build_ctx(session, maybe_user, current_path).await;
+    if let Some(uid) = user_id {
+        ctx.unread_notifications = crate::notifications::unread_count(&state.pool, uid)
+            .await
+            .unwrap_or(0);
+    }
+    ctx
 }

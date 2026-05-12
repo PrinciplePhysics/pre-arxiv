@@ -37,6 +37,7 @@ pub mod me_edit;
 pub mod me_email;
 pub mod me_password;
 pub mod me_tokens;
+pub mod notifications;
 pub mod oai;
 pub mod pages;
 pub mod profile;
@@ -88,6 +89,9 @@ pub fn router() -> Router<AppState> {
         .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
         .route("/me/edit", get(me_edit::show).post(me_edit::submit))
         .route("/me/password", get(me_password::show).post(me_password::submit))
+        .route("/me/notifications", get(notifications::show))
+        .route("/me/notifications/{id}/read", post(notifications::mark_read))
+        .route("/me/notifications/mark-all-read", post(notifications::mark_all_read))
         .route("/me/email", get(me_email::show).post(me_email::submit))
         .route("/me/email/cancel", post(me_email::cancel))
         .route("/me/resend-verification", post(verify::resend))
@@ -121,7 +125,9 @@ pub fn router() -> Router<AppState> {
         // Crawler policy + indexer surface
         .route("/robots.txt", get(static_routes::robots_txt))
         .route("/sitemap.xml", get(feeds::sitemap))
+        .route("/sitemap.xsl", get(feeds::sitemap_xsl))
         .route("/feed.rss", get(feeds::rss_all))
+        .route("/feed.xsl", get(feeds::feed_xsl))
         .route("/rss/{cat}", get(feeds::rss_category))
 
         // OAI-PMH metadata-harvest endpoint (Dublin Core).

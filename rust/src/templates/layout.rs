@@ -26,6 +26,9 @@ pub struct PageCtx {
     /// new email →" button. Same inline-fallback pattern. Cleared by
     /// the /confirm-email-change/{token} handler on success.
     pub pending_email_change_token: Option<String>,
+    /// Unread-notification count for the logged-in user. 0 for
+    /// anonymous viewers. Drives the bell badge in the topbar.
+    pub unread_notifications: i64,
     /// Optional OpenGraph + Twitter-card metadata for this page.
     /// Populated by routes that produce a sharable resource (mostly
     /// /m/{id}). Left None on internal-only pages.
@@ -68,7 +71,7 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260512j";
+const ASSET_VER: &str = "20260512k";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target { "on" } else { "" }
@@ -186,6 +189,13 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                             @if let Some(u) = &ctx.user {
                                 a.me href={ "/u/" (u.username) } { (u.username) }
                                 span.karma title="karma" { "(" (u.karma.unwrap_or(0)) ")" }
+                                span.sep { "·" }
+                                a.notif-link href="/me/notifications" title="Notifications" {
+                                    "🔔"
+                                    @if ctx.unread_notifications > 0 {
+                                        span.notif-badge { (ctx.unread_notifications) }
+                                    }
+                                }
                                 span.sep { "·" }
                                 a href="/me/tokens" title="manage your API tokens" { "API tokens" }
                                 span.sep { "·" }

@@ -17,6 +17,28 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use crate::error::AppResult;
 use crate::state::AppState;
 
+const SITEMAP_XSL: &str = include_str!("../../../public/static/sitemap.xsl");
+const FEED_XSL: &str    = include_str!("../../../public/static/feed.xsl");
+
+/// XSL stylesheet for sitemap.xml. Served at `/sitemap.xsl` with an
+/// explicit `text/xsl` content-type so browsers apply it despite our
+/// global `X-Content-Type-Options: nosniff` header.
+pub async fn sitemap_xsl() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/xsl; charset=utf-8")],
+        SITEMAP_XSL,
+    )
+}
+
+/// XSL stylesheet for feed.rss (and per-category feeds), served at
+/// `/feed.xsl` with `text/xsl`.
+pub async fn feed_xsl() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/xsl; charset=utf-8")],
+        FEED_XSL,
+    )
+}
+
 const PAGE_FEED: usize = 30;
 
 fn xml_escape(s: &str) -> String {
@@ -132,7 +154,11 @@ fn rss_response(state: &AppState, category: Option<&str>, items: &[FeedItem]) ->
 
     let mut xml = String::with_capacity(8192);
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
-    xml.push_str("\n<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n");
+    // Browser-friendly rendering: a stylesheet that turns the raw RSS
+    // into a readable HTML page. Feed readers and harvesters ignore the
+    // PI and parse the XML directly.
+    xml.push_str("\n<?xml-stylesheet type=\"text/xsl\" href=\"/feed.xsl\"?>\n");
+    xml.push_str("<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n");
     xml.push_str("<channel>\n");
     xml.push_str(&format!("<title>{}</title>\n", xml_escape(&channel_title)));
     xml.push_str(&format!("<link>{}</link>\n",   xml_escape(&channel_url)));
@@ -170,7 +196,8 @@ pub async fn sitemap(State(state): State<AppState>) -> AppResult<impl IntoRespon
     let base = base_url(&state).trim_end_matches('/').to_string();
     let mut xml = String::with_capacity(16384);
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
-    xml.push_str("\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
+    xml.push_str("\n<?xml-stylesheet type=\"text/xsl\" href=\"/sitemap.xsl\"?>\n");
+    xml.push_str("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
 
     // Static pages.
     for (path, prio) in &[

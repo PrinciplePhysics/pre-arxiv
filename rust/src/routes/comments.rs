@@ -68,8 +68,51 @@ pub async fn post_comment(
         .bind(manuscript_id)
         .execute(&mut *tx)
         .await?;
+    let cid = res.last_insert_rowid();
+
+    // Look up the manuscript submitter and (if reply) the parent comment
+    // author, so we can fire notifications. notify() short-circuits if
+    // recipient == actor.
+    let submitter: Option<(i64,)> = sqlx::query_as(
+        "SELECT submitter_id FROM manuscripts WHERE id = ?",
+    )
+    .bind(manuscript_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let parent_author: Option<(i64,)> = match form.parent_id {
+        Some(pid) => sqlx::query_as("SELECT author_id FROM comments WHERE id = ?")
+            .bind(pid)
+            .fetch_optional(&mut *tx)
+            .await?,
+        None => None,
+    };
     tx.commit().await?;
 
-    let cid = res.last_insert_rowid();
+    // Notifications fire on a clone of the pool outside the tx so a
+    // DB hiccup here can't roll back the comment.
+    let snippet: String = content.chars().take(140).collect();
+    if let Some((sid,)) = submitter {
+        let _ = crate::notifications::notify(
+            &state.pool,
+            sid,
+            Some(user.id),
+            crate::notifications::KIND_COMMENT_ON_MY_MANUSCRIPT,
+            Some("comment"),
+            Some(cid),
+            Some(&snippet),
+        ).await;
+    }
+    if let Some((pid_author,)) = parent_author {
+        let _ = crate::notifications::notify(
+            &state.pool,
+            pid_author,
+            Some(user.id),
+            crate::notifications::KIND_REPLY_TO_MY_COMMENT,
+            Some("comment"),
+            Some(cid),
+            Some(&snippet),
+        ).await;
+    }
+
     Ok(Redirect::to(&format!("/m/{slug}#comment-{cid}")).into_response())
 }
