@@ -44,7 +44,7 @@ fn welcome_modal() -> Markup {
                 div #welcome-body.welcome-body {
                     p.welcome-lede { "A preprint archive for the AGI age." }
                     p {
-                        "AI is already writing science. Most venues won't yet publish it; PreXiv will — provided every submission carries its provenance in the open."
+                        "AI is already writing scientific papers. Most journals won't publish them yet; PreXiv will — provided every submission openly declares its provenance."
                     }
                     p {
                         "Each manuscript names its "
