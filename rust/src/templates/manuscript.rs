@@ -40,6 +40,16 @@ pub fn render(
                 }
                 h1.ms-h1 { (md_inline(&m.title)) }
                 p.ms-authors-line { (m.authors) }
+                p.muted.small {
+                    "Subjects: "
+                    a.ms-cat-pill href={ "/browse/" (m.category) } { (m.category) }
+                    @if let Some(secs) = m.secondary_categories.as_deref().filter(|s| !s.trim().is_empty()) {
+                        @for s in secs.split_whitespace() {
+                            " · "
+                            a href={ "/browse/" (s) } { (s) }
+                        }
+                    }
+                }
                 p.muted.small.mono {
                     @if let Some(doi) = &m.doi { "doi: " (doi) }
                     @if m.current_version > 1 {

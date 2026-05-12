@@ -26,6 +26,32 @@ pub struct PageCtx {
     /// new email →" button. Same inline-fallback pattern. Cleared by
     /// the /confirm-email-change/{token} handler on success.
     pub pending_email_change_token: Option<String>,
+    /// Optional OpenGraph + Twitter-card metadata for this page.
+    /// Populated by routes that produce a sharable resource (mostly
+    /// /m/{id}). Left None on internal-only pages.
+    pub og: Option<OgMeta>,
+    /// Optional schema.org JSON-LD blob, already serialised to a
+    /// string. Routes set this for indexable content (manuscript pages
+    /// with ScholarlyArticle).
+    pub jsonld: Option<String>,
+    /// Canonical absolute URL for the page (`<link rel="canonical">`).
+    /// Helps search engines pick one URL when multiple resolve to the
+    /// same content (e.g. id vs slug, with/without trailing slash).
+    pub canonical_url: Option<String>,
+}
+
+/// Compact view of OpenGraph metadata. Just enough for a sharable card
+/// on Twitter / X / Bluesky / Mastodon / iMessage previews. We hold
+/// owned strings so the route can build the values dynamically.
+#[derive(Debug, Clone)]
+pub struct OgMeta {
+    pub title: String,
+    pub description: String,
+    pub url: String,
+    pub kind: &'static str,            // "article" / "website" / "profile"
+    pub published_time: Option<String>,
+    pub modified_time: Option<String>,
+    pub author: Option<String>,
 }
 
 impl PageCtx {
@@ -50,6 +76,16 @@ fn nav_class(current: &str, target: &str) -> &'static str {
 
 pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
     let cur = ctx.current_path.as_str();
+    // OG/Twitter description falls back to the static site tagline if
+    // the route didn't supply one, so generic pages still preview
+    // reasonably when shared.
+    let default_desc = "PreXiv: agent-native preprint server for AI-authored, human-conducted manuscripts.";
+    let og_title = ctx.og.as_ref().map(|o| o.title.as_str()).unwrap_or(title);
+    let og_desc = ctx.og.as_ref().map(|o| o.description.as_str()).unwrap_or(default_desc);
+    let og_url = ctx.og.as_ref().map(|o| o.url.as_str())
+        .or(ctx.canonical_url.as_deref())
+        .unwrap_or("");
+    let og_type = ctx.og.as_ref().map(|o| o.kind).unwrap_or("website");
     html! {
         (DOCTYPE)
         html lang="en" data-theme="auto" {
@@ -57,10 +93,45 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width,initial-scale=1";
                 title { (title) " · PreXiv" }
-                meta name="description" content="PreXiv: agent-native preprint server for AI-authored, human-conducted manuscripts.";
+                meta name="description" content=(og_desc);
                 @if ctx.no_index {
                     meta name="robots" content="noindex,nofollow";
                 }
+                @if let Some(canonical) = &ctx.canonical_url {
+                    link rel="canonical" href=(canonical);
+                }
+
+                // ── OpenGraph (LinkedIn, Facebook, iMessage, Slack, Discord) ──
+                meta property="og:site_name" content="PreXiv";
+                meta property="og:locale"    content="en_US";
+                meta property="og:type"      content=(og_type);
+                meta property="og:title"     content=(og_title);
+                meta property="og:description" content=(og_desc);
+                @if !og_url.is_empty() {
+                    meta property="og:url"   content=(og_url);
+                }
+                @if let Some(og) = &ctx.og {
+                    @if let Some(pt) = &og.published_time {
+                        meta property="article:published_time" content=(pt);
+                    }
+                    @if let Some(mt) = &og.modified_time {
+                        meta property="article:modified_time"  content=(mt);
+                    }
+                    @if let Some(au) = &og.author {
+                        meta property="article:author" content=(au);
+                    }
+                }
+
+                // ── Twitter / X card ─────────────────────────────────────────
+                meta name="twitter:card"        content="summary";
+                meta name="twitter:title"       content=(og_title);
+                meta name="twitter:description" content=(og_desc);
+
+                // ── schema.org JSON-LD (Google Scholar, indexers) ────────────
+                @if let Some(jsonld) = &ctx.jsonld {
+                    script type="application/ld+json" { (PreEscaped(jsonld.as_str())) }
+                }
+
                 link rel="preconnect" href="https://fonts.googleapis.com";
                 link rel="preconnect" href="https://fonts.gstatic.com" crossorigin;
                 link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,700&display=swap" rel="stylesheet";

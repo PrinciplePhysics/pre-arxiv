@@ -139,11 +139,19 @@ pub async fn browse_category(
     maybe_user: MaybeUser,
     Path(cat): Path<String>,
 ) -> AppResult<Html<String>> {
+    // Primary OR cross-listed in `cat`. Cross-list match looks for
+    // " <cat> " inside the whitespace-padded secondary_categories
+    // string so we don't false-match `cs.L` against `cs.LG`.
+    let pattern = format!("% {} %", cat);
     let sql = format!(
-        "SELECT {SLIM_COLS} FROM manuscripts WHERE category = ? ORDER BY created_at DESC LIMIT 50"
+        "SELECT {SLIM_COLS} FROM manuscripts
+         WHERE category = ?
+            OR (' ' || COALESCE(secondary_categories, '') || ' ') LIKE ?
+         ORDER BY created_at DESC LIMIT 50"
     );
     let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(&sql)
         .bind(&cat)
+        .bind(&pattern)
         .fetch_all(&state.pool)
         .await?;
     let ctx = build_ctx(&session, maybe_user, "/browse").await;

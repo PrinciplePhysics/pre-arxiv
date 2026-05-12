@@ -1,7 +1,22 @@
+use axum::http::StatusCode;
+use axum::response::{Html, IntoResponse};
 use axum::routing::{get, post};
 use axum::Router;
 
+use crate::error::render_error_page;
 use crate::state::AppState;
+
+/// Axum fallback for unmatched routes. Same look as AppError::NotFound.
+pub async fn not_found_fallback() -> impl IntoResponse {
+    (
+        StatusCode::NOT_FOUND,
+        Html(render_error_page(
+            404,
+            "Page not found",
+            "The URL you followed doesn't match any route on PreXiv. It may have been renamed, or never existed.",
+        )),
+    )
+}
 
 pub mod admin;
 pub mod api;
@@ -9,6 +24,7 @@ pub mod auth;
 pub mod cite;
 pub mod comments;
 pub mod feed;
+pub mod feeds;
 pub mod follow;
 pub mod forgot;
 pub mod home;
@@ -21,6 +37,7 @@ pub mod me_edit;
 pub mod me_email;
 pub mod me_password;
 pub mod me_tokens;
+pub mod oai;
 pub mod pages;
 pub mod profile;
 pub mod search;
@@ -101,6 +118,12 @@ pub fn router() -> Router<AppState> {
         .route("/policies", get(pages::policies))
         .route("/licenses", get(pages::licenses))
 
-        // Crawler policy
+        // Crawler policy + indexer surface
         .route("/robots.txt", get(static_routes::robots_txt))
+        .route("/sitemap.xml", get(feeds::sitemap))
+        .route("/feed.rss", get(feeds::rss_all))
+        .route("/feed/{cat}.rss", get(feeds::rss_category))
+
+        // OAI-PMH metadata-harvest endpoint (Dublin Core).
+        .route("/oai", get(oai::oai))
 }

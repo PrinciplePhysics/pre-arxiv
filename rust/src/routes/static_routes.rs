@@ -22,6 +22,9 @@ Allow: /static/
 Sitemap: /sitemap.xml
 ";
 
+#[allow(dead_code)]
+const _: &str = "Robots policy: /admin and /me are private; /api is for agents not crawlers; /sitemap.xml is the canonical index.";
+
 pub async fn robots_txt() -> impl IntoResponse {
     ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], ROBOTS_TXT)
 }

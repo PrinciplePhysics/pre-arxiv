@@ -132,6 +132,8 @@ async fn main() -> anyhow::Result<()> {
         // before the generic /static fallback.
         .nest_service("/static/uploads", ServeDir::new(upload_dir))
         .nest_service("/static", ServeDir::new(static_dir))
+        // Unmatched routes — return the styled 404 page.
+        .fallback(routes::not_found_fallback)
         .layer(security_headers)
         .layer(SetResponseHeaderLayer::if_not_present(
             header::STRICT_TRANSPORT_SECURITY,

@@ -9,6 +9,7 @@ use crate::models::comment::CommentWithAuthor;
 use crate::models::Manuscript;
 use crate::state::AppState;
 use crate::templates;
+use crate::templates::layout::OgMeta;
 
 pub async fn view(
     State(state): State<AppState>,
@@ -28,7 +29,7 @@ pub async fn view(
                view_count, score, comment_count,
                withdrawn, withdrawn_reason, withdrawn_at,
                created_at, updated_at,
-               license, ai_training, current_version
+               license, ai_training, current_version, secondary_categories
         FROM manuscripts
         WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
         LIMIT 1
@@ -91,6 +92,116 @@ pub async fn view(
         .await
         .ok();
 
-    let ctx = build_ctx(&session, maybe_user, "/m").await;
+    // Sharing metadata. abs-truncated description for OG/Twitter card.
+    let slug = m.arxiv_like_id.as_deref().unwrap_or("").to_string();
+    let abs_excerpt = excerpt_plain(&m.r#abstract, 280);
+    let base = state.app_url.as_deref().unwrap_or("");
+    let canon = if base.is_empty() { format!("/m/{}", slug) } else { format!("{}/m/{}", base.trim_end_matches('/'), slug) };
+    let og = OgMeta {
+        title: strip_inline_md(&m.title),
+        description: abs_excerpt.clone(),
+        url: canon.clone(),
+        kind: "article",
+        published_time: m.created_at.map(|t| t.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        modified_time: m.updated_at.map(|t| t.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        author: Some(m.authors.clone()),
+    };
+    let jsonld = build_scholarly_article_jsonld(&m, &abs_excerpt, &canon);
+
+    let mut ctx = build_ctx(&session, maybe_user, "/m").await;
+    ctx.og = Some(og);
+    ctx.jsonld = Some(jsonld);
+    ctx.canonical_url = Some(canon);
     Ok(Html(templates::manuscript::render(&ctx, &m, &comments, submitter.as_ref(), &cats, my_vote).into_string()))
+}
+
+/// First N chars of `s` with markdown + LaTeX stripped, suitable for an
+/// OG description or schema.org `description` field. Doesn't try to
+/// preserve formatting — readers seeing this expect plain prose.
+fn excerpt_plain(s: &str, max: usize) -> String {
+    // Pull out anything between $…$ or $$…$$, drop common markdown
+    // markers, collapse whitespace.
+    let mut out = String::with_capacity(s.len());
+    let mut in_math = false;
+    let mut in_double = false;
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' { let _ = chars.next(); continue; }
+        if c == '$' {
+            if chars.peek() == Some(&'$') {
+                chars.next();
+                in_double = !in_double;
+                if !in_double { out.push(' '); }
+                continue;
+            }
+            in_math = !in_math;
+            if !in_math { out.push(' '); }
+            continue;
+        }
+        if in_math || in_double { continue; }
+        match c {
+            '*' | '_' | '`' | '#' | '>' | '|' => {} // strip markdown markers
+            '\n' | '\t' => out.push(' '),
+            _ => out.push(c),
+        }
+    }
+    // Collapse runs of whitespace.
+    let collapsed: String = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.chars().count() <= max {
+        collapsed
+    } else {
+        let truncated: String = collapsed.chars().take(max - 1).collect();
+        format!("{}…", truncated.trim_end())
+    }
+}
+
+fn strip_inline_md(s: &str) -> String {
+    // Titles can have $…$ inline math. For OG the math should appear as
+    // its source-form (good enough for sharing) so we just strip leading
+    // markdown markers.
+    s.replace('*', "").replace('`', "").replace('_', "")
+}
+
+fn build_scholarly_article_jsonld(m: &Manuscript, description: &str, url: &str) -> String {
+    use serde_json::json;
+    let authors: Vec<serde_json::Value> = m.authors
+        .split(',')
+        .map(|a| a.trim())
+        .filter(|a| !a.is_empty())
+        .map(|a| json!({"@type": "Person", "name": a}))
+        .collect();
+    let mut obj = serde_json::Map::new();
+    obj.insert("@context".into(), json!("https://schema.org"));
+    obj.insert("@type".into(),    json!("ScholarlyArticle"));
+    obj.insert("headline".into(), json!(strip_inline_md(&m.title)));
+    obj.insert("name".into(),     json!(strip_inline_md(&m.title)));
+    obj.insert("description".into(), json!(description));
+    obj.insert("author".into(),   json!(authors));
+    if let Some(ts) = m.created_at {
+        obj.insert("datePublished".into(),
+            json!(ts.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()));
+    }
+    if let Some(ts) = m.updated_at {
+        obj.insert("dateModified".into(),
+            json!(ts.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()));
+    }
+    obj.insert("url".into(),      json!(url));
+    obj.insert("inLanguage".into(), json!("en"));
+    obj.insert("publisher".into(), json!({
+        "@type": "Organization",
+        "name":  "PreXiv",
+        "url":   "https://victoria.tail921ea4.ts.net/",
+    }));
+    if let Some(doi) = &m.doi {
+        obj.insert("identifier".into(), json!({
+            "@type":      "PropertyValue",
+            "propertyID": "DOI",
+            "value":      doi,
+        }));
+    }
+    if let Some(lic) = &m.license {
+        obj.insert("license".into(), json!(lic));
+    }
+    obj.insert("about".into(), json!({"@type":"Thing","name":m.category}));
+    serde_json::to_string(&obj).unwrap_or_else(|_| "{}".to_string())
 }

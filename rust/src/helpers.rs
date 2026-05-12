@@ -50,5 +50,8 @@ pub async fn build_ctx(
         current_path: current_path.into(),
         pending_verify_token,
         pending_email_change_token,
+        og: None,
+        jsonld: None,
+        canonical_url: None,
     }
 }

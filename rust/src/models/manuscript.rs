@@ -47,6 +47,10 @@ pub struct Manuscript {
     /// it anyway.
     #[sqlx(default)]
     pub current_version: i64,
+    /// Cross-listed categories (arXiv-style). Whitespace-separated
+    /// category ids; the primary stays in `category`. Optional.
+    #[sqlx(default)]
+    pub secondary_categories: Option<String>,
 }
 
 /// One historical snapshot of a manuscript. Versions are immutable
