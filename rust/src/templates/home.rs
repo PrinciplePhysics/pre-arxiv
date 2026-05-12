@@ -26,14 +26,16 @@ pub fn render(ctx: &PageCtx, manuscripts: &[ManuscriptListItem]) -> Markup {
     layout("Ranked", ctx, body)
 }
 
-/// First-visit welcome explainer. Rendered into the homepage markup but
-/// kept `hidden` server-side; `/static/js/welcome-modal.js` reveals it on
-/// the first visit and remembers the dismissal in localStorage. Wording
-/// is deliberate: it acknowledges that AI-authored science is happening
-/// anyway, claims transparency (named conductor + AI model + auditor) as
-/// the price of entry, and frames PreXiv as a historical record rather
-/// than a peer-reviewed venue — three positions that each pre-empt a
-/// likely objection from first-time visitors.
+/// Welcome explainer. Rendered into the homepage markup but kept
+/// `hidden` server-side; `/static/js/welcome-modal.js` reveals it on
+/// every visit (no dismissal persistence — by operator request, the
+/// explainer reappears each time so returning visitors are reminded of
+/// PreXiv's positioning before they scroll). Wording is deliberate: it
+/// acknowledges that AI-authored science is happening anyway, claims
+/// transparency (named conductor + AI model + auditor) as the price of
+/// entry, and frames PreXiv as a historical record rather than a
+/// peer-reviewed venue — three positions that each pre-empt a likely
+/// objection from first-time visitors.
 fn welcome_modal() -> Markup {
     html! {
         div.welcome-modal #welcome-modal hidden role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-body" aria-hidden="true" {

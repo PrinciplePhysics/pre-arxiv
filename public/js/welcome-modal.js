@@ -1,27 +1,18 @@
-// First-visit welcome modal.
+// Welcome modal — shown on every visit to the homepage.
 //
-// The markup is rendered into the homepage with `hidden=true`, so return
-// visitors never see a flash. On first visit we reveal it; once the user
-// dismisses (X / "Got it" / backdrop click / Escape) we set a localStorage
-// flag so it doesn't reappear on subsequent visits.
-//
-// localStorage key is versioned so we can re-show the modal if the wording
-// is updated meaningfully later — bump the suffix.
+// The markup is rendered into the homepage with `hidden=true` (so the
+// content is invisible until the script runs, and crawlers/screen
+// readers see it announced as a dialog rather than as page content).
+// On every page load the script reveals it; the user dismisses with the
+// X button, the "Got it" button, a backdrop click, or the Escape key.
+// We deliberately do NOT persist the dismissal — the explainer reappears
+// on the next visit, matching the operator's intent that every visitor
+// (returning or new) sees PreXiv's positioning before they scroll.
 (function () {
   'use strict';
 
-  var SEEN_KEY = 'prexiv:welcome-seen-v1';
   var modal = document.getElementById('welcome-modal');
   if (!modal) return;
-
-  // Bail if the user has already dismissed this version of the welcome.
-  try {
-    if (window.localStorage && localStorage.getItem(SEEN_KEY) === '1') return;
-  } catch (e) {
-    // localStorage may be blocked (private mode, strict storage settings).
-    // In that case we still show the modal once per page load — better
-    // than silently breaking the first-visit explainer.
-  }
 
   var previouslyFocused = null;
   var bodyOverflowBefore = '';
@@ -47,12 +38,6 @@
     modal.hidden = true;
     modal.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = bodyOverflowBefore;
-
-    try {
-      if (window.localStorage) localStorage.setItem(SEEN_KEY, '1');
-    } catch (e) {
-      // ignored — re-displaying on next visit is acceptable failure mode.
-    }
 
     if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
       try { previouslyFocused.focus({ preventScroll: true }); } catch (e) {}
