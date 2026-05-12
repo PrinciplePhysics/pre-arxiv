@@ -60,22 +60,19 @@ pub fn render(
                 }
             }
             @if u.is_verified_scholar() {
-                div.profile-verified-badges {
+                p.profile-verified-badges.no-katex {
                     @if u.is_orcid_verified() {
                         @let orcid = u.orcid.as_deref().unwrap_or("");
                         span.profile-vbadge title="ORCID iD verified — the public ORCID record's name matches this user's display name." {
-                            "✓ ORCID"
+                            span.vbadge-label { "ORCID" }
                             @if !orcid.is_empty() {
-                                " "
-                                a.no-katex href={ "https://orcid.org/" (orcid) } target="_blank" rel="noopener" {
-                                    (orcid)
-                                }
+                                a href={ "https://orcid.org/" (orcid) } target="_blank" rel="noopener" { (orcid) }
                             }
                         }
                     }
                     @if u.is_institutional_email() {
                         span.profile-vbadge title="Verified email on an institutional / R&D-org domain." {
-                            "✓ Institutional email"
+                            span.vbadge-label { "Institutional email" }
                         }
                     }
                 }

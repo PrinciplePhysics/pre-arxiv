@@ -21,6 +21,43 @@ pub async fn set_flash(session: &Session, msg: impl Into<String>) {
     let _ = session.insert(SESSION_FLASH_KEY, msg.into()).await;
 }
 
+// ─── ORCID-verify inline feedback ─────────────────────────────────────
+//
+// The verify-orcid handler always redirects back to /me/edit. The
+// global flash above renders at the top of the page where it's easy
+// to miss when the user is focused on the ORCID section near the
+// middle of the form. We stash verification feedback under a separate
+// session key and render it inline INSIDE the verified-scholar status
+// panel, right next to the input that produced it.
+//
+// The value is prefixed `ok:` or `err:` so the renderer can paint the
+// success / error states distinctly without a second session lookup.
+
+const SESSION_ORCID_FLASH_KEY: &str = "orcid_verify_flash";
+
+pub async fn take_orcid_flash(session: &Session) -> Option<(String, bool)> {
+    let raw: Option<String> = session.get(SESSION_ORCID_FLASH_KEY).await.ok().flatten();
+    if raw.is_some() {
+        let _ = session.remove::<String>(SESSION_ORCID_FLASH_KEY).await;
+    }
+    raw.map(|s| {
+        if let Some(rest) = s.strip_prefix("ok:") {
+            (rest.to_string(), false)
+        } else if let Some(rest) = s.strip_prefix("err:") {
+            (rest.to_string(), true)
+        } else {
+            (s, true)
+        }
+    })
+}
+
+pub async fn set_orcid_flash(session: &Session, msg: impl Into<String>, is_error: bool) {
+    let prefix = if is_error { "err:" } else { "ok:" };
+    let _ = session
+        .insert(SESSION_ORCID_FLASH_KEY, format!("{prefix}{}", msg.into()))
+        .await;
+}
+
 pub async fn build_ctx(
     session: &Session,
     MaybeUser(user): MaybeUser,

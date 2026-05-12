@@ -3,11 +3,16 @@ use maud::{html, Markup};
 use super::layout::{layout, PageCtx};
 use crate::routes::me_edit::EditValues;
 
+// `orcid_flash` carries inline feedback from a recent POST
+// /me/verify-orcid attempt — `(message, is_error)`, or None when
+// nothing's fresh. Rendered INSIDE the verified-scholar status panel
+// so users don't have to scroll back up to discover what happened.
 pub fn render(
     ctx: &PageCtx,
     v: &EditValues,
     errors: &[String],
     pending_new_email: Option<&str>,
+    orcid_flash: Option<(&str, bool)>,
 ) -> Markup {
     let user = ctx.user.as_ref();
     let username = user.map(|u| u.username.as_str()).unwrap_or("");
@@ -125,7 +130,7 @@ pub fn render(
                     code { "/browse" }
                     " and search; it just doesn't get the front-page slot."
                 }
-                (verified_scholar_status_panel(user, &v.orcid, ctx.csrf_token.as_str()))
+                (verified_scholar_status_panel(user, &v.orcid, ctx.csrf_token.as_str(), orcid_flash))
             }
 
             section.form-section {
@@ -184,12 +189,24 @@ fn verified_scholar_status_panel(
     user: Option<&crate::models::User>,
     _orcid_in_form: &str,
     _csrf_token: &str,
+    orcid_flash: Option<(&str, bool)>,
 ) -> Markup {
     let orcid_verified = user.map(|u| u.is_orcid_verified()).unwrap_or(false);
     let inst_email     = user.map(|u| u.is_institutional_email()).unwrap_or(false);
     let stored_orcid   = user.and_then(|u| u.orcid.as_deref()).unwrap_or("");
     html! {
         div.verified-scholar-panel {
+            @if let Some((msg, is_err)) = orcid_flash {
+                @let cls = if is_err { "vsp-flash vsp-flash-err" } else { "vsp-flash vsp-flash-ok" };
+                div.(cls) role="status" aria-live="polite" {
+                    @if is_err {
+                        span.vsp-flash-icon aria-hidden="true" { "⚠" }
+                    } @else {
+                        span.vsp-flash-icon aria-hidden="true" { "✓" }
+                    }
+                    span.vsp-flash-msg { (msg) }
+                }
+            }
             div.vsp-row {
                 div.vsp-row-label {
                     strong { "Institutional email" }

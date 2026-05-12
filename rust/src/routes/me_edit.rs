@@ -8,7 +8,7 @@ use tower_sessions::Session;
 use crate::auth::{verify_csrf, MaybeUser, RequireUser};
 use crate::email_change;
 use crate::error::AppResult;
-use crate::helpers::{build_ctx, set_flash};
+use crate::helpers::{build_ctx, set_flash, set_orcid_flash, take_orcid_flash};
 use crate::state::AppState;
 use crate::templates;
 
@@ -36,10 +36,18 @@ pub async fn show(
         .ok()
         .flatten()
         .map(|(addr, _)| addr);
+    let orcid_flash = take_orcid_flash(&session).await;
     let mut ctx = build_ctx(&session, maybe_user, "/me/edit").await;
     ctx.no_index = true;
     Ok(Html(
-        templates::me_edit::render(&ctx, &values, &[], pending_email.as_deref()).into_string(),
+        templates::me_edit::render(
+            &ctx,
+            &values,
+            &[],
+            pending_email.as_deref(),
+            orcid_flash.as_ref().map(|(m, e)| (m.as_str(), *e)),
+        )
+        .into_string(),
     ))
 }
 
@@ -91,7 +99,7 @@ pub async fn submit(
         let mut ctx = build_ctx(&session, maybe_user, "/me/edit").await;
         ctx.no_index = true;
         return Ok(Html(
-            templates::me_edit::render(&ctx, &values, &errors, pending_email.as_deref()).into_string(),
+            templates::me_edit::render(&ctx, &values, &errors, pending_email.as_deref(), None).into_string(),
         ).into_response());
     }
 
@@ -161,7 +169,7 @@ pub async fn verify_orcid(
     Form(form): Form<VerifyOrcidForm>,
 ) -> AppResult<Response> {
     if !verify_csrf(&session, &form.csrf_token).await {
-        set_flash(&session, "Form expired — please try again.").await;
+        set_orcid_flash(&session, "Form expired — please try again.", true).await;
         return Ok(Redirect::to("/me/edit").into_response());
     }
 
@@ -173,13 +181,14 @@ pub async fn verify_orcid(
     let bio          = form.bio.trim();
     let orcid_form   = form.orcid.trim();
     if display_name.len() > 200 || affiliation.len() > 200 || bio.len() > 2000 {
-        set_flash(&session, "One of the fields is too long — go back and shorten it.").await;
+        set_orcid_flash(&session, "One of the fields is too long — go back and shorten it.", true).await;
         return Ok(Redirect::to("/me/edit").into_response());
     }
     if !orcid_form.is_empty() && !crate::orcid::normalize(orcid_form).is_some() {
-        set_flash(
+        set_orcid_flash(
             &session,
             "ORCID iD must look like 0000-0000-0000-000X (last char may be X).",
+            true,
         ).await;
         return Ok(Redirect::to("/me/edit").into_response());
     }
@@ -226,9 +235,10 @@ pub async fn verify_orcid(
             Some(normalised_orcid)
         }
     ) else {
-        set_flash(
+        set_orcid_flash(
             &session,
             "Paste a valid ORCID iD (0000-0000-0000-000X) in the field above, then click Save & Verify.",
+            true,
         )
         .await;
         return Ok(Redirect::to("/me/edit").into_response());
@@ -237,9 +247,10 @@ pub async fn verify_orcid(
         Ok(r) => r,
         Err(e) => {
             tracing::warn!(orcid=%orcid, error=%e, "ORCID fetch failed");
-            set_flash(
+            set_orcid_flash(
                 &session,
                 "Couldn't reach ORCID just now, or that iD doesn't exist. Try again in a minute.",
+                true,
             )
             .await;
             return Ok(Redirect::to("/me/edit").into_response());
@@ -270,16 +281,17 @@ pub async fn verify_orcid(
                  Update your display name to match (top of the form), then click Save & Verify."
             )
         };
-        set_flash(&session, &msg).await;
+        set_orcid_flash(&session, &msg, true).await;
         return Ok(Redirect::to("/me/edit").into_response());
     }
     sqlx::query("UPDATE users SET orcid_verified = 1 WHERE id = ?")
         .bind(u.id)
         .execute(&state.pool)
         .await?;
-    set_flash(
+    set_orcid_flash(
         &session,
-        &format!("ORCID iD {orcid} verified — your manuscripts will now carry the verified-scholar badge."),
+        format!("ORCID iD {orcid} verified — your manuscripts now carry the verified-scholar badge."),
+        false,
     )
     .await;
     Ok(Redirect::to("/me/edit").into_response())
