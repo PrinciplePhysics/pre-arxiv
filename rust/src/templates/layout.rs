@@ -37,6 +37,13 @@ impl PageCtx {
 
 const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="12" fill="#fff"/><path d="M 14 14 L 50 50" stroke="#b8430a" stroke-width="8" stroke-linecap="round"/><path d="M 50 14 L 14 50" stroke="#b8430a" stroke-width="3.5" stroke-linecap="round"/><circle cx="32" cy="32" r="2.6" fill="#fff"/></svg>"##;
 
+/// Cache-buster appended as a `?v=` query string on every reference to
+/// our own CSS and JS. Bump on any deploy that ships a stylesheet or
+/// script change so the browser re-fetches instead of replaying its
+/// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
+/// for same-day re-deploys.)
+const ASSET_VER: &str = "20260512c";
+
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target { "on" } else { "" }
 }
@@ -57,8 +64,8 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                 link rel="preconnect" href="https://fonts.googleapis.com";
                 link rel="preconnect" href="https://fonts.gstatic.com" crossorigin;
                 link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,700&display=swap" rel="stylesheet";
-                link rel="stylesheet" href="/static/css/style.css";
-                link rel="stylesheet" href="/static/css/prexiv-rust.css";
+                link rel="stylesheet" href={ "/static/css/style.css?v=" (ASSET_VER) };
+                link rel="stylesheet" href={ "/static/css/prexiv-rust.css?v=" (ASSET_VER) };
                 link rel="icon" type="image/svg+xml" href="/static/favicon.svg";
 
                 // KaTeX — render $…$ / $$…$$ / \(…\) / \[…\] math in
@@ -66,9 +73,9 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                 link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
                 script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" {}
                 script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" {}
-                script defer src="/static/js/katex-init.js" {}
-                script defer src="/static/js/copy-button.js" {}
-                script defer src="/static/js/welcome-modal.js" {}
+                script defer src={ "/static/js/katex-init.js?v=" (ASSET_VER) } {}
+                script defer src={ "/static/js/copy-button.js?v=" (ASSET_VER) } {}
+                script defer src={ "/static/js/welcome-modal.js?v=" (ASSET_VER) } {}
             }
             body {
                 a.skip-link href="#main-content" { "Skip to main content" }

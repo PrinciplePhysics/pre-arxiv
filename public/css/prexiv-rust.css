@@ -746,47 +746,53 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
 }
 
 /* ─── arxiv-style account info panel on /me/edit ────────────────────
-   A read-only summary panel that surfaces the key account fields plus
-   a row of action links to the change-* pages, modelled on arxiv's
-   "Your arXiv.org account: <user>" page. */
+   Read-only summary surfacing the key account fields plus a row of
+   action links to the change-* pages. Visual model: arxiv's "Your
+   arXiv.org account: <user>" header — thin-bordered box, compact
+   two-column dl, an uppercase tag-style heading, and a
+   pipe-separated action row underneath. */
 .account-info-panel {
-  background: var(--bg-card-alt);
+  background: var(--bg-card);
   border: 1px solid var(--rule-strong);
-  border-radius: 6px;
-  padding: 14px 18px;
-  margin: 16px 0 22px;
+  border-radius: 4px;
+  padding: 14px 18px 12px;
+  margin: 18px 0 24px;
+  font-family: var(--sans);
 }
 .account-info-title {
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
   margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
 }
 .account-info-grid {
   display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 4px 16px;
-  margin: 0;
+  grid-template-columns: 120px 1fr;
+  column-gap: 18px;
+  row-gap: 5px;
+  margin: 2px 0;
   align-items: baseline;
+  font-size: 14px;
 }
 .account-info-grid dt {
   font-weight: 600;
   color: var(--ink-soft);
-  font-size: 14px;
+  text-align: right;
 }
 .account-info-grid dd {
   margin: 0;
-  font-size: 14px;
   color: var(--ink);
   min-width: 0;
   word-break: break-word;
 }
 .account-info-email {
-  font-family: var(--mono);
-  font-size: 13px;
+  font-family: var(--sans);
+  margin-right: 4px;
 }
 .account-info-grid code {
   background: var(--code-bg);
@@ -796,14 +802,15 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
 }
 .account-badge {
   display: inline-block;
-  margin-left: 8px;
-  padding: 1px 8px;
+  margin-left: 6px;
+  padding: 1px 8px 2px;
   border-radius: 10px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  vertical-align: 1px;
+  line-height: 1.45;
   font-family: var(--sans);
+  vertical-align: 1px;
 }
 .account-badge-ok {
   background: var(--ok-bg);
@@ -817,22 +824,26 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
 }
 
 .account-info-actions {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px dotted var(--rule-strong);
-  font-size: 14px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  font-family: var(--sans);
 }
 .account-info-link {
   color: var(--link);
   font-weight: 600;
+  white-space: nowrap;
 }
 .account-info-link:hover {
   color: var(--link-hover);
+  text-decoration: underline;
 }
 .account-info-sep {
   color: var(--rule-strong);
-  margin: 0 8px;
+  margin: 0 10px;
   user-select: none;
+  font-weight: 400;
 }
 
 /* Email-change banner reuses .verify-banner palette/layout but with a
@@ -847,11 +858,31 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   color: var(--accent-blue);
 }
 
-@media (max-width: 520px) {
-  .account-info-panel { padding: 12px 14px; }
-  .account-info-grid { grid-template-columns: 1fr; gap: 1px 0; }
-  .account-info-grid dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-  .account-info-grid dd { margin-bottom: 8px; }
+@media (max-width: 560px) {
+  .account-info-panel { padding: 12px 14px 10px; }
+  .account-info-grid {
+    grid-template-columns: 1fr;
+    row-gap: 8px;
+  }
+  .account-info-grid dt {
+    text-align: left;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: -3px;
+  }
+  .account-info-grid dd { padding-left: 0; }
   .account-info-sep { display: none; }
-  .account-info-actions { display: flex; flex-direction: column; gap: 6px; }
+  .account-info-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .account-info-link {
+    padding: 4px 0;
+    border-bottom: 1px dotted var(--rule);
+  }
+  .account-info-link:last-child { border-bottom: none; }
 }
