@@ -200,10 +200,19 @@ pub async fn do_register(
     // encrypted path is reliable in production, run
     // `UPDATE users SET email = '' WHERE email_hash IS NOT NULL;`
     // to harden — reads already prefer `email_enc`.
+    //
+    // We also tag `institutional_email = 1` at insert time if the
+    // domain looks like a research-org address (.edu / .ac.<cc> / etc.,
+    // see `email::is_institutional`). The user's email_verified flag
+    // is *still* 0 until they click the verification link, so this
+    // alone doesn't grant them the verified-scholar badge — the badge
+    // gating logic AND-s the two.
+    let inst_email: i64 = if crate::email::is_institutional(&email) { 1 } else { 0 };
     let result = sqlx::query(
         r#"INSERT INTO users
-              (username, email, email_hash, email_enc, password_hash, display_name, email_verified)
-           VALUES (?, ?, ?, ?, ?, ?, 0)"#,
+              (username, email, email_hash, email_enc, password_hash, display_name,
+               email_verified, institutional_email)
+           VALUES (?, ?, ?, ?, ?, ?, 0, ?)"#,
     )
     .bind(username)
     .bind(&email)
@@ -211,6 +220,7 @@ pub async fn do_register(
     .bind(&email_enc)
     .bind(&hash)
     .bind(&display_name)
+    .bind(inst_email)
     .execute(&state.pool)
     .await?;
 

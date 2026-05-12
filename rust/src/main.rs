@@ -31,6 +31,7 @@ mod markdown;
 mod email_change;
 mod models;
 mod notifications;
+mod orcid;
 mod passwords;
 mod routes;
 mod state;
@@ -77,6 +78,14 @@ async fn main() -> anyhow::Result<()> {
         .context("backfilling user email_enc / email_hash")?;
     if backfilled > 0 {
         tracing::info!("S-7 backfill: encrypted {backfilled} legacy email rows");
+    }
+    let inst_set = backfill_institutional_email(&pool)
+        .await
+        .context("backfilling users.institutional_email")?;
+    if inst_set > 0 {
+        tracing::info!(
+            "verified-scholar backfill: tagged {inst_set} users with institutional_email=1"
+        );
     }
 
     // Session store — shares the same DB so we don't need a second file.
@@ -225,6 +234,36 @@ async fn main() -> anyhow::Result<()> {
 /// second time. Skips rows with an empty `email` (which is what an
 /// operator-level "hard zero the plaintext" pass produces; we don't
 /// want to re-encrypt empty strings on top of a legitimate ciphertext).
+/// One-time pass that flips `institutional_email = 1` for any row
+/// whose plaintext email (still populated during the S-7 rollout) is
+/// on the institutional-domain allowlist AND whose email has been
+/// verified. Idempotent — the `WHERE institutional_email = 0` guard
+/// means re-running this on every startup costs one cheap scan.
+async fn backfill_institutional_email(pool: &sqlx::SqlitePool) -> anyhow::Result<usize> {
+    let rows: Vec<(i64, Option<String>, i64)> = sqlx::query_as(
+        "SELECT id, email, email_verified FROM users
+          WHERE institutional_email = 0 AND email IS NOT NULL AND email <> ''",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut n = 0usize;
+    for (id, email_opt, verified) in rows {
+        if verified == 0 {
+            continue;
+        }
+        let email = email_opt.unwrap_or_default();
+        if !crate::email::is_institutional(&email) {
+            continue;
+        }
+        sqlx::query("UPDATE users SET institutional_email = 1 WHERE id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        n += 1;
+    }
+    Ok(n)
+}
+
 async fn backfill_user_emails(pool: &sqlx::SqlitePool) -> anyhow::Result<usize> {
     let rows: Vec<(i64, Option<String>)> = sqlx::query_as(
         "SELECT id, email FROM users WHERE email_hash IS NULL",

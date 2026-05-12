@@ -30,6 +30,52 @@ pub struct Category {
     pub group: &'static str,
 }
 
+/// Categories that historically attract cranks / "I overturn Einstein"
+/// submissions across preprint servers — physics.gen-ph, the *.GN
+/// "general" buckets in econ / q-fin, etc. Submissions to these are
+/// **not surfaced** in the default ranked listings (`/`, `/new`,
+/// `/top`, `/audited`); they're still reachable via `/browse`,
+/// `/search`, direct ID, and OAI-PMH. The listing routes can
+/// override the filter with `?show_all=1`.
+///
+/// We mark them by id rather than by group so a careful submission to
+/// e.g. `gr-qc` (which is legitimate) still surfaces, while the same
+/// person's `physics.gen-ph` submission doesn't.
+pub const RESTRICTED_CATEGORIES: &[&str] = &[
+    "physics.gen-ph", // "General Physics" — TOE / anti-relativity attractor
+    "econ.GN",        // "General Economics" — anti-mainstream-econ attractor
+    "q-fin.GN",       // "General Finance" — get-rich-quick model attractor
+];
+
+pub fn is_restricted(category_id: &str) -> bool {
+    RESTRICTED_CATEGORIES.contains(&category_id)
+}
+
+/// SQL fragment for `category NOT IN ('id1','id2',…)`. Built once at
+/// startup-equivalent (it's a `const`-derived `String`-via-`format!`)
+/// rather than per-query; callers concat it into their WHERE clause.
+/// Returns an empty string if the list is empty, which is a no-op
+/// when ANDed in.
+pub fn restricted_not_in_clause() -> String {
+    if RESTRICTED_CATEGORIES.is_empty() {
+        return String::new();
+    }
+    let mut s = String::from("category NOT IN (");
+    for (i, c) in RESTRICTED_CATEGORIES.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        // These are compile-time constants from our own source; not
+        // user input. Safe to interpolate. The single quotes are
+        // single-character literals which can't contain a quote.
+        s.push('\'');
+        s.push_str(c);
+        s.push('\'');
+    }
+    s.push(')');
+    s
+}
+
 /// Display order for the groups; the form renders <optgroup>s in this order.
 /// Physics first, then Mathematics, then the rest — per user preference for
 /// the /submit Category dropdown.

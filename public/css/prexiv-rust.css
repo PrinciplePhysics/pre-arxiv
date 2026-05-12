@@ -2499,3 +2499,106 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
     border-color: rgba(217, 107, 46, 0.40);
   }
 }
+
+/* ─── /me/edit · Verified-scholar status panel ───────────────────────
+   Two-row grid showing the institutional-email and ORCID state. Each
+   row has a left "what + why" block and a right pill/Verify action.
+   Pills follow the same green/amber semantic as account-badge.
+   ──────────────────────────────────────────────────────────────── */
+.verified-scholar-panel {
+  margin: 8px 0 6px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md, 6px);
+  background: var(--bg-card);
+  overflow: hidden;
+}
+.vsp-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+.vsp-row + .vsp-row { border-top: 1px solid var(--rule); }
+.vsp-row-label { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.vsp-row-label strong { font-weight: 600; color: var(--ink); }
+.vsp-row-label .muted.small { font-size: 12px; }
+.vsp-row-status { flex-shrink: 0; }
+.vsp-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.vsp-pill-ok {
+  background: rgba(46, 154, 71, 0.13);
+  color: #1f6633;
+  border: 1px solid rgba(46, 154, 71, 0.25);
+}
+.vsp-pill-pending {
+  background: rgba(20, 16, 8, 0.05);
+  color: var(--muted);
+  border: 1px solid var(--rule-strong);
+}
+.btn-small {
+  font-size: 12px !important;
+  padding: 5px 12px !important;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Manuscript-page advisory banners (restricted / unverified) ───
+   The "unaudited" warning is amber; these are tonally calmer (blue/
+   slate) because they're FYI rather than danger. Reader is being told
+   "this manuscript hasn't passed certain trust gates," not "this
+   manuscript could be wrong." Stacks with .audit-banner.unaudited. */
+.advisory-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  margin: 14px 0;
+  border: 1px solid var(--rule-strong);
+  border-left: 4px solid #8a9ba8;
+  background: rgba(116, 138, 156, 0.06);
+  border-radius: var(--r-sm, 4px);
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+.advisory-banner .advisory-title {
+  font-weight: 700;
+  color: var(--ink);
+  margin-right: 4px;
+}
+.advisory-banner code {
+  background: rgba(20, 16, 8, 0.06);
+  padding: 0 5px;
+  border-radius: 3px;
+}
+
+/* ─── Profile badges (verified scholar) ──────────────────────────── */
+.profile-verified-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+.profile-vbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: rgba(46, 154, 71, 0.10);
+  color: #1f6633;
+  border: 1px solid rgba(46, 154, 71, 0.22);
+}
+.profile-vbadge svg { width: 14px; height: 14px; }
+.profile-vbadge a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.profile-vbadge a:hover { color: var(--brand); }

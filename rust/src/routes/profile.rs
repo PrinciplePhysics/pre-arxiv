@@ -26,7 +26,7 @@ pub async fn show(
     let u: Option<User> = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, display_name, affiliation, bio,
                   karma, is_admin, email_verified, orcid, created_at,
-                  email_enc
+                  email_enc, orcid_verified, institutional_email
            FROM users WHERE username = ? LIMIT 1"#,
     )
     .bind(&username)

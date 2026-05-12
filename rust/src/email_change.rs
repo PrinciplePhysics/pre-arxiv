@@ -163,14 +163,17 @@ pub async fn consume_and_apply(
         return Ok(false);
     }
 
+    let inst_email: i64 = if crate::email::is_institutional(new_email) { 1 } else { 0 };
     sqlx::query(
         "UPDATE users
-           SET email = ?, email_hash = ?, email_enc = ?, email_verified = 1
+           SET email = ?, email_hash = ?, email_enc = ?,
+               email_verified = 1, institutional_email = ?
          WHERE id = ?",
     )
         .bind(new_email)
         .bind(&new_hash)
         .bind(&enc)
+        .bind(inst_email)
         .bind(user_id)
         .execute(&mut *tx)
         .await

@@ -95,18 +95,118 @@ pub async fn submit(
         ).into_response());
     }
 
-    sqlx::query(
-        "UPDATE users SET display_name = ?, affiliation = ?, bio = ?, orcid = ? WHERE id = ?",
-    )
-    .bind(opt(display_name))
-    .bind(opt(affiliation))
-    .bind(opt(bio))
-    .bind(opt(orcid))
-    .bind(u.id)
-    .execute(&state.pool)
-    .await?;
+    // If the ORCID iD changed (or got blanked), drop any prior
+    // verification — the user must re-verify against the new value.
+    let prior_orcid = u.orcid.as_deref().unwrap_or("");
+    let normalised = if orcid.is_empty() { String::new() }
+                     else { crate::orcid::normalize(orcid).unwrap_or_else(|| orcid.to_string()) };
+    let orcid_changed = normalised != prior_orcid;
+    let reset_verified = orcid_changed && u.orcid_verified != 0;
+
+    if reset_verified {
+        sqlx::query(
+            "UPDATE users
+                SET display_name = ?, affiliation = ?, bio = ?, orcid = ?,
+                    orcid_verified = 0
+              WHERE id = ?",
+        )
+        .bind(opt(display_name))
+        .bind(opt(affiliation))
+        .bind(opt(bio))
+        .bind(opt(if normalised.is_empty() { orcid } else { &normalised }))
+        .bind(u.id)
+        .execute(&state.pool)
+        .await?;
+    } else {
+        sqlx::query(
+            "UPDATE users SET display_name = ?, affiliation = ?, bio = ?, orcid = ?
+              WHERE id = ?",
+        )
+        .bind(opt(display_name))
+        .bind(opt(affiliation))
+        .bind(opt(bio))
+        .bind(opt(if normalised.is_empty() { orcid } else { &normalised }))
+        .bind(u.id)
+        .execute(&state.pool)
+        .await?;
+    }
     set_flash(&session, "Profile updated.").await;
     Ok(Redirect::to(&format!("/u/{}", u.username)).into_response())
+}
+
+// ─── POST /me/verify-orcid ────────────────────────────────────────────
+//
+// Fetches the public ORCID record for the user's stored iD and flips
+// `orcid_verified = 1` if the name on file matches their PreXiv
+// display name. Surfaces a flash with the ORCID-side name on
+// mismatch so the user knows what to align.
+#[derive(Deserialize)]
+pub struct VerifyOrcidForm {
+    pub csrf_token: String,
+}
+
+pub async fn verify_orcid(
+    State(state): State<AppState>,
+    session: Session,
+    _maybe_user: MaybeUser,
+    RequireUser(u): RequireUser,
+    Form(form): Form<VerifyOrcidForm>,
+) -> AppResult<Response> {
+    if !verify_csrf(&session, &form.csrf_token).await {
+        set_flash(&session, "Form expired — please try again.").await;
+        return Ok(Redirect::to("/me/edit").into_response());
+    }
+    let orcid_raw = u.orcid.as_deref().unwrap_or("");
+    let Some(orcid) = crate::orcid::normalize(orcid_raw) else {
+        set_flash(
+            &session,
+            "Set a valid ORCID iD (form 0000-0000-0000-000X) first, then click Verify.",
+        )
+        .await;
+        return Ok(Redirect::to("/me/edit").into_response());
+    };
+    let record = match crate::orcid::fetch_record(&orcid).await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(orcid=%orcid, error=%e, "ORCID fetch failed");
+            set_flash(
+                &session,
+                "Couldn't reach ORCID just now, or that iD doesn't exist. Try again in a minute.",
+            )
+            .await;
+            return Ok(Redirect::to("/me/edit").into_response());
+        }
+    };
+    let name = record
+        .person
+        .as_ref()
+        .and_then(|p| p.name.as_ref())
+        .map(|n| n.assembled())
+        .unwrap_or_default();
+    let display = u.display_name.as_deref().unwrap_or(&u.username);
+    if !crate::orcid::name_matches(&name, display) {
+        let msg = if name.is_empty() {
+            "That ORCID record has no public name on file. Either make your ORCID name public, \
+             or use the institutional-email path instead.".to_string()
+        } else {
+            format!(
+                "ORCID record shows \"{name}\" but your PreXiv display name is \"{display}\". \
+                 Update your display name to match (under \"Display name\") and try again."
+            )
+        };
+        set_flash(&session, &msg).await;
+        return Ok(Redirect::to("/me/edit").into_response());
+    }
+    sqlx::query("UPDATE users SET orcid_verified = 1 WHERE id = ?")
+        .bind(u.id)
+        .execute(&state.pool)
+        .await?;
+    set_flash(
+        &session,
+        &format!("ORCID iD {orcid} verified — your manuscripts will now carry the verified-scholar badge."),
+    )
+    .await;
+    Ok(Redirect::to("/me/edit").into_response())
 }
 
 fn opt(s: &str) -> Option<&str> { if s.is_empty() { None } else { Some(s) } }

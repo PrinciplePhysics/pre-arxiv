@@ -1,16 +1,59 @@
 //! Listing variants: /new, /top, /audited, /browse, /browse/{cat}.
 //! All share the same template; only the SQL and the page heading differ.
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::response::Html;
+use serde::Deserialize;
 use tower_sessions::Session;
 
 use crate::auth::MaybeUser;
+use crate::categories::restricted_not_in_clause;
 use crate::error::AppResult;
 use crate::helpers::build_ctx;
 use crate::models::ManuscriptListItem;
 use crate::state::AppState;
 use crate::templates;
+
+/// `?show_all=1` opts the curated listings (`/`, `/new`, `/top`,
+/// `/audited`) into the firehose — restricted-category manuscripts
+/// (physics.gen-ph etc.) and unverified-author submissions are
+/// included. Anything truthy after `serde` parse counts; we treat the
+/// raw integer as a boolean.
+#[derive(Default, Deserialize)]
+pub struct ListingFilters {
+    #[serde(default)]
+    pub show_all: u8,
+}
+impl ListingFilters {
+    pub fn show_all(&self) -> bool { self.show_all != 0 }
+}
+
+/// SQL fragment that excludes restricted categories. Returns an empty
+/// string when the filter is off (so the caller can splice it into a
+/// WHERE clause unconditionally).
+fn restricted_filter(filters: &ListingFilters) -> String {
+    if filters.show_all() {
+        String::new()
+    } else {
+        let c = restricted_not_in_clause();
+        if c.is_empty() { String::new() } else { format!(" AND {c}") }
+    }
+}
+
+/// SQL fragment that limits the listing to manuscripts submitted by a
+/// verified scholar (ORCID-verified OR institutional-email). Empty
+/// string when the toggle is off. Used by /, /new, /top — but NOT by
+/// /audited, since the named-auditor signal already does this job.
+fn verified_author_filter(filters: &ListingFilters) -> &'static str {
+    if filters.show_all() {
+        ""
+    } else {
+        " AND submitter_id IN (
+            SELECT id FROM users
+             WHERE orcid_verified = 1 OR institutional_email = 1
+        )"
+    }
+}
 
 const SLIM_COLS: &str = r#"id, arxiv_like_id, doi, title, authors, category,
     conductor_type, conductor_ai_model, conductor_ai_model_public,
@@ -26,9 +69,13 @@ pub async fn new_listing(
     State(state): State<AppState>,
     session: Session,
     maybe_user: MaybeUser,
+    Query(filters): Query<ListingFilters>,
 ) -> AppResult<Html<String>> {
+    let filter_sql = restricted_filter(&filters);
+    let author_sql = verified_author_filter(&filters);
     let sql = format!(
-        "SELECT {SLIM_COLS} FROM manuscripts ORDER BY created_at DESC LIMIT 50"
+        "SELECT {SLIM_COLS} FROM manuscripts WHERE 1=1{filter_sql}{author_sql} \
+         ORDER BY created_at DESC LIMIT 50"
     );
     let rows = fetch(&state.pool, &sql).await?;
     let ctx = build_ctx(&session, maybe_user, "/new").await;
@@ -39,9 +86,13 @@ pub async fn top_listing(
     State(state): State<AppState>,
     session: Session,
     maybe_user: MaybeUser,
+    Query(filters): Query<ListingFilters>,
 ) -> AppResult<Html<String>> {
+    let filter_sql = restricted_filter(&filters);
+    let author_sql = verified_author_filter(&filters);
     let sql = format!(
-        "SELECT {SLIM_COLS} FROM manuscripts WHERE withdrawn = 0 ORDER BY score DESC, created_at DESC LIMIT 50"
+        "SELECT {SLIM_COLS} FROM manuscripts WHERE withdrawn = 0{filter_sql}{author_sql} \
+         ORDER BY score DESC, created_at DESC LIMIT 50"
     );
     let rows = fetch(&state.pool, &sql).await?;
     let ctx = build_ctx(&session, maybe_user, "/top").await;
@@ -52,9 +103,13 @@ pub async fn audited_listing(
     State(state): State<AppState>,
     session: Session,
     maybe_user: MaybeUser,
+    Query(filters): Query<ListingFilters>,
 ) -> AppResult<Html<String>> {
+    let filter_sql = restricted_filter(&filters);
     let sql = format!(
-        "SELECT {SLIM_COLS} FROM manuscripts WHERE has_auditor = 1 AND withdrawn = 0 ORDER BY created_at DESC LIMIT 50"
+        "SELECT {SLIM_COLS} FROM manuscripts \
+         WHERE has_auditor = 1 AND withdrawn = 0{filter_sql} \
+         ORDER BY created_at DESC LIMIT 50"
     );
     let rows = fetch(&state.pool, &sql).await?;
     let ctx = build_ctx(&session, maybe_user, "/audited").await;

@@ -19,12 +19,16 @@ pub fn render(
     ctx: &PageCtx,
     m: &Manuscript,
     comments: &[CommentWithAuthor],
-    submitter: Option<&(String, Option<String>)>,
+    submitter: Option<&(String, Option<String>, i64, i64)>,
     cats: &[(String, i64)],
     my_vote: i64,
 ) -> Markup {
     let logged_in = ctx.user.is_some();
     let slug = m.arxiv_like_id.as_deref().unwrap_or("");
+    let submitter_verified_scholar = submitter
+        .map(|(_, _, ov, ie)| *ov != 0 || *ie != 0)
+        .unwrap_or(false);
+    let cat_restricted = crate::categories::is_restricted(&m.category);
 
     let body = html! {
         div.bx-grid {
@@ -116,6 +120,35 @@ pub fn render(
                                     @if let Some(n) = &m.auditor_name { (n) }
                                     @if let Some(a) = &m.auditor_affiliation { " (" (a) ")" }
                                     " has read the manuscript and provided a signed correctness statement (see below)."
+                                }
+                            }
+                        }
+
+                        // Soft FYI banners: restricted category + unverified author.
+                        // Slate / blue palette so they read as advisory, not warning —
+                        // distinct from the amber "Unaudited" banner above which signals
+                        // potential correctness risk.
+                        @if cat_restricted {
+                            div.advisory-banner role="note" {
+                                span {
+                                    span.advisory-title { "Restricted category." }
+                                    " "
+                                    code { (m.category) }
+                                    " is one of a handful of \"general\" buckets that historically attract speculative work. PreXiv keeps it reachable via "
+                                    code { "/browse" }
+                                    " and direct link, but does "
+                                    em { "not" }
+                                    " surface its contents on the default ranked listings (/, /new, /top, /audited)."
+                                }
+                            }
+                        }
+                        @if !submitter_verified_scholar && !m.is_withdrawn() {
+                            div.advisory-banner role="note" {
+                                span {
+                                    span.advisory-title { "Unverified author." }
+                                    " The submitter has not linked a verified ORCID iD or registered with an institutional email. Default listings only surface verified-scholar work; this submission is reachable via search, "
+                                    code { "/browse" }
+                                    ", and direct link."
                                 }
                             }
                         }
@@ -306,10 +339,15 @@ pub fn render(
                 div.bx-sidebar-block {
                     h3 { "Subject area" }
                     a.ms-cat-pill href={ "/browse/" (m.category) } { (m.category) }
-                    @if let Some((un, dn)) = submitter {
+                    @if let Some((un, dn, ov, ie)) = submitter {
                         p.muted.small style="margin:12px 0 0" {
                             "Submitted by "
                             a href={ "/u/" (un) } { (dn.as_deref().unwrap_or(un.as_str())) }
+                            @if *ov != 0 || *ie != 0 {
+                                " "
+                                span.profile-vbadge title="Verified scholar"
+                                    style="font-size:10.5px;padding:2px 7px" { "✓ verified" }
+                            }
                         }
                     }
                 }

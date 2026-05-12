@@ -92,6 +92,7 @@ pub fn router() -> Router<AppState> {
         .route("/me/tokens", get(me_tokens::show).post(me_tokens::create))
         .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
         .route("/me/edit", get(me_edit::show).post(me_edit::submit))
+        .route("/me/verify-orcid", post(me_edit::verify_orcid))
         .route("/me/password", get(me_password::show).post(me_password::submit))
         .route("/me/notifications", get(notifications::show))
         .route("/me/notifications/{id}/read", post(notifications::mark_read))

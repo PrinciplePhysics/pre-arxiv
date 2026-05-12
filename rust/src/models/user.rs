@@ -24,6 +24,12 @@ pub struct User {
     /// AES-256-GCM ciphertext of the email. Never sent to clients.
     #[serde(skip)]
     pub email_enc: Option<Vec<u8>>,
+    /// "Verified scholar" signals — see migration `0013_verified_scholar.sql`.
+    /// Either flag alone makes the user a verified scholar (see [`is_verified_scholar`]).
+    #[serde(default)]
+    pub orcid_verified: i64,
+    #[serde(default)]
+    pub institutional_email: i64,
 }
 
 impl User {
@@ -36,6 +42,14 @@ impl User {
     pub fn display(&self) -> &str {
         self.display_name.as_deref().unwrap_or(&self.username)
     }
+
+    /// `true` if the user has either a verified ORCID iD on file or
+    /// registered with an institutional-looking email domain.
+    pub fn is_verified_scholar(&self) -> bool {
+        self.orcid_verified != 0 || self.institutional_email != 0
+    }
+    pub fn is_orcid_verified(&self) -> bool { self.orcid_verified != 0 }
+    pub fn is_institutional_email(&self) -> bool { self.institutional_email != 0 }
 
     /// Replace `self.email` with the decrypted form of `email_enc` if
     /// present. Falls back to whatever plaintext is already in `email`

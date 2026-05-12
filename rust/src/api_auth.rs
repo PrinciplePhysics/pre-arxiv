@@ -82,7 +82,7 @@ pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User>
     let mut user = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, display_name, affiliation, bio,
                   karma, is_admin, email_verified, orcid, created_at,
-                  email_enc
+                  email_enc, orcid_verified, institutional_email
            FROM users WHERE id = ?"#,
     )
     .bind(user_id)

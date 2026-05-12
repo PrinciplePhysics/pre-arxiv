@@ -57,8 +57,9 @@ pub async fn view(
     .fetch_all(&state.pool)
     .await?;
 
-    let submitter: Option<(String, Option<String>)> = sqlx::query_as(
-        "SELECT username, display_name FROM users WHERE id = ?",
+    let submitter: Option<(String, Option<String>, i64, i64)> = sqlx::query_as(
+        "SELECT username, display_name, orcid_verified, institutional_email
+           FROM users WHERE id = ?",
     )
     .bind(m.submitter_id)
     .fetch_optional(&state.pool)
