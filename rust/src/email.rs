@@ -110,6 +110,35 @@ action is taken until the link is followed.
     .await
 }
 
+/// Sends the email-change confirmation to the NEW address. Confirming
+/// the link is how the user proves they actually control that mailbox.
+pub async fn send_email_change_confirmation(
+    new_address: &str,
+    username: &str,
+    confirm_link: &str,
+) -> Result<()> {
+    send_transactional(
+        new_address,
+        "Confirm your new email — PreXiv",
+        &format!(
+"Hi {username},
+
+You asked us to change the email on your PreXiv account to this address. Click
+the link below to confirm — until you do, your account email stays unchanged
+and password-reset mail continues to go to the previous address:
+
+  {confirm_link}
+
+The link expires in 24 hours. If you didn't request this change, ignore this
+email; the request will simply expire and the account email won't be touched.
+
+— PreXiv
+"
+        ),
+    )
+    .await
+}
+
 /// Sends the password-reset email. Shorter TTL (1h) is reflected in
 /// the body copy so the user knows to act quickly.
 pub async fn send_password_reset_email(

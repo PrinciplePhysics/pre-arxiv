@@ -6,6 +6,7 @@ use serde::Deserialize;
 use tower_sessions::Session;
 
 use crate::auth::{verify_csrf, MaybeUser, RequireUser};
+use crate::email_change;
 use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
 use crate::state::AppState;
@@ -19,6 +20,7 @@ pub struct EditValues {
 }
 
 pub async fn show(
+    State(state): State<AppState>,
     session: Session,
     maybe_user: MaybeUser,
     RequireUser(u): RequireUser,
@@ -29,9 +31,16 @@ pub async fn show(
         bio:          u.bio.clone().unwrap_or_default(),
         orcid:        u.orcid.clone().unwrap_or_default(),
     };
+    let pending_email = email_change::pending_for_user(&state.pool, u.id)
+        .await
+        .ok()
+        .flatten()
+        .map(|(addr, _)| addr);
     let mut ctx = build_ctx(&session, maybe_user, "/me/edit").await;
     ctx.no_index = true;
-    Ok(Html(templates::me_edit::render(&ctx, &values, &[]).into_string()))
+    Ok(Html(
+        templates::me_edit::render(&ctx, &values, &[], pending_email.as_deref()).into_string(),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -74,9 +83,16 @@ pub async fn submit(
             bio:          form.bio.clone(),
             orcid:        form.orcid.clone(),
         };
+        let pending_email = email_change::pending_for_user(&state.pool, u.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|(addr, _)| addr);
         let mut ctx = build_ctx(&session, maybe_user, "/me/edit").await;
         ctx.no_index = true;
-        return Ok(Html(templates::me_edit::render(&ctx, &values, &errors).into_string()).into_response());
+        return Ok(Html(
+            templates::me_edit::render(&ctx, &values, &errors, pending_email.as_deref()).into_string(),
+        ).into_response());
     }
 
     sqlx::query(

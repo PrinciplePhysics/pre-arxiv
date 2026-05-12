@@ -37,6 +37,11 @@ pub async fn build_ctx(
         .await
         .ok()
         .flatten();
+    let pending_email_change_token: Option<String> = session
+        .get::<String>("pending_email_change_token")
+        .await
+        .ok()
+        .flatten();
     PageCtx {
         user,
         csrf_token,
@@ -44,5 +49,6 @@ pub async fn build_ctx(
         flash,
         current_path: current_path.into(),
         pending_verify_token,
+        pending_email_change_token,
     }
 }

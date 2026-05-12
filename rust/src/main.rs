@@ -22,6 +22,7 @@ mod error;
 mod helpers;
 mod licenses;
 mod markdown;
+mod email_change;
 mod models;
 mod passwords;
 mod routes;

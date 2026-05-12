@@ -8,6 +8,7 @@ pub mod layout;
 pub mod listing;
 pub mod manuscript;
 pub mod me_edit;
+pub mod me_email;
 pub mod me_password;
 pub mod me_tokens;
 pub mod pages;

@@ -744,3 +744,114 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   margin: 0 0 6px;
   color: var(--ink-soft);
 }
+
+/* ─── arxiv-style account info panel on /me/edit ────────────────────
+   A read-only summary panel that surfaces the key account fields plus
+   a row of action links to the change-* pages, modelled on arxiv's
+   "Your arXiv.org account: <user>" page. */
+.account-info-panel {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin: 16px 0 22px;
+}
+.account-info-title {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+.account-info-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+  align-items: baseline;
+}
+.account-info-grid dt {
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.account-info-grid dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+  min-width: 0;
+  word-break: break-word;
+}
+.account-info-email {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.account-info-grid code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+.account-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+  font-family: var(--sans);
+}
+.account-badge-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border: 1px solid var(--ok-rule);
+}
+.account-badge-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border: 1px solid var(--warn-rule);
+}
+
+.account-info-actions {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dotted var(--rule-strong);
+  font-size: 14px;
+}
+.account-info-link {
+  color: var(--link);
+  font-weight: 600;
+}
+.account-info-link:hover {
+  color: var(--link-hover);
+}
+.account-info-sep {
+  color: var(--rule-strong);
+  margin: 0 8px;
+  user-select: none;
+}
+
+/* Email-change banner reuses .verify-banner palette/layout but with a
+   slightly cooler tint so it doesn't read as "alert" — this is an
+   in-flight action, not a problem to fix. */
+.verify-banner.verify-banner-info {
+  background: #eef4f9;
+  border-color: #9fbcd9;
+  border-left-color: var(--accent-blue);
+}
+.verify-banner.verify-banner-info .verify-banner-text strong {
+  color: var(--accent-blue);
+}
+
+@media (max-width: 520px) {
+  .account-info-panel { padding: 12px 14px; }
+  .account-info-grid { grid-template-columns: 1fr; gap: 1px 0; }
+  .account-info-grid dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .account-info-grid dd { margin-bottom: 8px; }
+  .account-info-sep { display: none; }
+  .account-info-actions { display: flex; flex-direction: column; gap: 6px; }
+}

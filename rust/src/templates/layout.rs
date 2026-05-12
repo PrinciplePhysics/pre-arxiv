@@ -21,6 +21,11 @@ pub struct PageCtx {
     /// Persists until the user successfully verifies (the /verify/{token}
     /// handler clears it on success).
     pub pending_verify_token: Option<String>,
+    /// Plaintext email-change confirmation token, stashed by the
+    /// /me/email POST handler so /me/edit can render an inline "Confirm
+    /// new email →" button. Same inline-fallback pattern. Cleared by
+    /// the /confirm-email-change/{token} handler on success.
+    pub pending_email_change_token: Option<String>,
 }
 
 impl PageCtx {

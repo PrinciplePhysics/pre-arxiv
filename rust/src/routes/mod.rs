@@ -16,6 +16,7 @@ pub mod listings;
 pub mod manuscript;
 pub mod me;
 pub mod me_edit;
+pub mod me_email;
 pub mod me_password;
 pub mod me_tokens;
 pub mod pages;
@@ -65,8 +66,11 @@ pub fn router() -> Router<AppState> {
         .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
         .route("/me/edit", get(me_edit::show).post(me_edit::submit))
         .route("/me/password", get(me_password::show).post(me_password::submit))
+        .route("/me/email", get(me_email::show).post(me_email::submit))
+        .route("/me/email/cancel", post(me_email::cancel))
         .route("/me/resend-verification", post(verify::resend))
         .route("/verify/{token}", get(verify::show))
+        .route("/confirm-email-change/{token}", get(me_email::confirm))
 
         // Forgot / reset password (anonymous flow)
         .route("/forgot-password", get(forgot::show_forgot).post(forgot::submit_forgot))
