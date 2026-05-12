@@ -1,10 +1,12 @@
 use std::net::SocketAddr;
 
 use anyhow::Context;
+use axum::http::{header, HeaderValue};
 use axum::Router;
 use time::Duration;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tower_sessions::cookie::SameSite;
 use tower_sessions::{Expiry, SessionManagerLayer};
@@ -75,9 +77,53 @@ async fn main() -> anyhow::Result<()> {
         .map(|p| p.join("public"))
         .unwrap_or_else(|| "./public".into());
 
+    // Security headers — set on every response.
+    //
+    //   X-Content-Type-Options: nosniff  → stop the browser from
+    //     content-sniffing an uploaded PDF as HTML/JS.
+    //   X-Frame-Options: DENY            → defeat clickjacking (no
+    //     other site can embed PreXiv in an iframe).
+    //   Referrer-Policy: strict-origin-when-cross-origin
+    //                                    → don't leak full URLs (which
+    //     may include manuscript ids that aren't yet public) to outbound
+    //     links.
+    //   Permissions-Policy: interest-cohort=()
+    //                                    → opt out of FLoC-style tracking
+    //     (cheap; harmless to set).
+    //   Strict-Transport-Security        → only in production, where the
+    //     Tailscale Funnel serves HTTPS. Browsers ignore HSTS sent over
+    //     plaintext HTTP, but spec says don't send it — so we gate on
+    //     `secure_cookies` (same flag that means "we're behind HTTPS").
+    let security_headers = tower::ServiceBuilder::new()
+        .layer(SetResponseHeaderLayer::overriding(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::HeaderName::from_static("permissions-policy"),
+            HeaderValue::from_static("interest-cohort=()"),
+        ));
+
     let app = Router::new()
         .merge(routes::router())
         .nest_service("/static", ServeDir::new(static_dir))
+        .layer(security_headers)
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::STRICT_TRANSPORT_SECURITY,
+            if secure_cookies {
+                HeaderValue::from_static("max-age=31536000; includeSubDomains")
+            } else {
+                HeaderValue::from_static("max-age=0")
+            },
+        ))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(session_layer)

@@ -28,6 +28,30 @@ pub fn verify_password(plain: &str, hash: &str) -> bool {
     bcrypt::verify(plain, hash).unwrap_or(false)
 }
 
+/// A real bcrypt hash of a value no user will ever submit. Used by
+/// `verify_password_timing_safe` to keep the no-such-user branch
+/// indistinguishable (by wall-clock) from the wrong-password branch.
+///
+/// Cost 10 to match `hash_password`. Generated once with bcrypt cost 10
+/// of a random 32-byte value the user can never produce.
+const DUMMY_BCRYPT_HASH: &str =
+    "$2b$10$zLMZvyd5qzLz7CV9OX1KF.VTSvKmiD.x3i2yTTC3Cw1VdKB5Qfzoy";
+
+/// Always run bcrypt on `plain`. If the user was found we use their real
+/// hash; if not, we use a dummy hash so the no-such-user branch costs the
+/// same wall-clock time as the wrong-password branch. Always returns
+/// `false` in the dummy case. This closes a classic user-enumeration
+/// timing oracle on /login.
+pub fn verify_password_timing_safe(plain: &str, real_hash: Option<&str>) -> bool {
+    match real_hash {
+        Some(h) => bcrypt::verify(plain, h).unwrap_or(false),
+        None => {
+            let _ = bcrypt::verify(plain, DUMMY_BCRYPT_HASH);
+            false
+        }
+    }
+}
+
 /// HIBP k-anonymity check: send only the first 5 SHA-1 hex chars to the
 /// pwnedpasswords range API and scan for our suffix. On any error or
 /// timeout, warn-and-allow (return false) — never block a registration on
@@ -74,7 +98,17 @@ pub async fn current_user_id(session: &Session) -> Option<i64> {
     session.get::<i64>(SESSION_USER_KEY).await.ok().flatten()
 }
 
+/// Establish a logged-in session for `user_id`.
+///
+/// We rotate the session id (`cycle_id`) before writing the user id, to
+/// defend against **session fixation**: if an attacker can plant a known
+/// cookie value in the victim's browser (via shared device, XSS that sets
+/// document.cookie, etc.) and the victim then logs in, without `cycle_id`
+/// the attacker keeps an authenticated handle on that fixed cookie. With
+/// `cycle_id`, login mints a fresh server-side session id, so the
+/// pre-login cookie becomes worthless. Standard OWASP guidance.
 pub async fn login_session(session: &Session, user_id: i64) -> anyhow::Result<()> {
+    session.cycle_id().await?;
     session.insert(SESSION_USER_KEY, user_id).await?;
     Ok(())
 }

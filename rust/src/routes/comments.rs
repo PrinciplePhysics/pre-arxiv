@@ -37,14 +37,22 @@ pub async fn post_comment(
         return Ok(Redirect::to(&format!("/m/{id}")).into_response());
     }
 
-    let m: Option<(i64, String)> = sqlx::query_as::<_, (i64, String)>(
-        "SELECT id, COALESCE(arxiv_like_id, CAST(id AS TEXT)) FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
+    let m: Option<(i64, String, i64)> = sqlx::query_as::<_, (i64, String, i64)>(
+        "SELECT id, COALESCE(arxiv_like_id, CAST(id AS TEXT)), withdrawn FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
     )
     .bind(&id)
     .bind(&id)
     .fetch_optional(&state.pool)
     .await?;
-    let (manuscript_id, slug) = m.ok_or(AppError::NotFound)?;
+    let (manuscript_id, slug, withdrawn) = m.ok_or(AppError::NotFound)?;
+
+    // Reject comments on withdrawn manuscripts. The HTML hides the comment
+    // form for withdrawn rows, but a hand-crafted POST would otherwise
+    // succeed and leave new commentary attached to a tombstoned record.
+    if withdrawn != 0 {
+        set_flash(&session, "This manuscript has been withdrawn; new comments are disabled.").await;
+        return Ok(Redirect::to(&format!("/m/{slug}")).into_response());
+    }
 
     let mut tx = state.pool.begin().await?;
     let res = sqlx::query(

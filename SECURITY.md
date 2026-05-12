@@ -161,7 +161,7 @@ If the recipient file (`/etc/prexiv/backup.pub`) doesn't exist, `backup.sh` fall
 
 ## 7. Code-level security audit — findings to date
 
-Audit run 2026-05-12. Grepped for known antipatterns; verified the high-risk surfaces.
+Audit run 2026-05-12 (re-audited same day). Grepped for known antipatterns; verified the high-risk surfaces.
 
 ### Findings
 
@@ -174,6 +174,15 @@ Audit run 2026-05-12. Grepped for known antipatterns; verified the high-risk sur
 | **S-5.** No off-machine backup | High (durability) | Open — planned, see §6 |
 | **S-6.** Backup tarballs plaintext on disk | Medium (leakage) | **FIXED** — age-encrypted to /etc/prexiv/backup.pub, see §6a |
 | **S-7.** `users.email` / future `totp_secret` / future `webhooks.secret` plaintext in DB | Medium (leakage) | Open — design documented in §6a, AES-256-GCM column-level encryption with a server-side key |
+| **S-8.** Session fixation: `login_session` did not rotate the session id, so a planted pre-login cookie remained valid post-login | High | **FIXED** — `auth.rs` now calls `session.cycle_id().await` before writing `user_id` |
+| **S-9.** PDF written to disk *before* CSRF check on `/submit` — a forged multipart POST left an orphan upload | High | **FIXED** — `routes/submit.rs` buffers the PDF in memory, validates CSRF + all fields, only then writes to disk |
+| **S-10.** User-enumeration: `/login` returned different messages for "no such user" vs "wrong password", and the no-such-user branch returned in microseconds vs bcrypt-time for wrong-password | Medium | **FIXED** — `verify_password_timing_safe` runs bcrypt against a fixed dummy hash when the user is missing; both branches return the same `"Incorrect username/email or password."` message |
+| **S-11.** Vote/comment endpoints (both HTML form and `/api/v1/manuscripts/{id}/{vote,comments}`) accepted writes against withdrawn manuscripts | Medium | **FIXED** — every write-side handler now reads `withdrawn` along with the lookup and short-circuits with a flash/409 |
+| **S-12.** PDF uploads were accepted on filename extension alone (`.pdf`); content was not inspected | Medium | **FIXED** — first 5 bytes must equal `%PDF-` (the PDF magic header). Defense-in-depth: combined with `X-Content-Type-Options: nosniff`, browsers won't render a disguised HTML payload |
+| **S-13.** No application-level security response headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) | Low–Medium | **FIXED** — set globally in `main.rs` via `tower_http::set_header`. HSTS gated on `NODE_ENV=production` to avoid pinning over plaintext HTTP in dev |
+| **S-14.** Latent open redirect: vote handler used the `Referer` header verbatim for its redirect target | Low | **FIXED** — `routes/votes.rs::safe_back_path` strips scheme+host and only accepts same-origin paths, with the same hardening rules as `sanitize_next` |
+| **S-15.** API token `last_used_at` was bumped before confirming the linked user still exists | Low | **FIXED** — `api_auth.rs::find_user_by_bearer` now updates `last_used_at` only after the user-row fetch succeeds |
+| **S-16.** API endpoints returned 200 OK for validation failures (`vote_manuscript`) and "no such token" (`revoke_token`) | Informational | **FIXED** — now 422 and 404 respectively, matching the rest of the API |
 
 ### Verified clean
 

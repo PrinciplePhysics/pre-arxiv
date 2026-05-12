@@ -5,7 +5,7 @@ use tower_sessions::Session;
 
 use crate::auth::{
     hash_password, is_password_pwned, load_user, login_session, logout_session, verify_csrf,
-    verify_password, MaybeUser,
+    verify_password_timing_safe, MaybeUser,
 };
 use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
@@ -59,12 +59,21 @@ pub async fn do_login(
     .fetch_optional(&state.pool)
     .await?;
 
-    let Some((user_id, hash)) = row else {
-        return Ok(error_response(&session, maybe_user, "No account with that username or email.", form.next.as_deref()).await);
-    };
-    if !verify_password(&form.password, &hash) {
-        return Ok(error_response(&session, maybe_user, "Wrong password.", form.next.as_deref()).await);
+    // Run bcrypt unconditionally (against a dummy hash if the user didn't
+    // exist) so wrong-username and wrong-password cost the same wall-clock
+    // time. Returning a single generic message also avoids leaking which
+    // of the two branches failed. Defends against user enumeration.
+    let real_hash = row.as_ref().map(|(_, h)| h.as_str());
+    let password_ok = verify_password_timing_safe(&form.password, real_hash);
+
+    if !password_ok {
+        return Ok(error_response(
+            &session, maybe_user,
+            "Incorrect username/email or password.",
+            form.next.as_deref(),
+        ).await);
     }
+    let user_id = row.expect("password_ok implies row is Some").0;
     login_session(&session, user_id).await.map_err(crate::error::AppError::Other)?;
     let dest = sanitize_next(form.next.as_deref());
     Ok(Redirect::to(&dest).into_response())

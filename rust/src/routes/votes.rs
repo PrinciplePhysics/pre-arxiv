@@ -24,10 +24,16 @@ pub async fn vote(
     headers: HeaderMap,
     Form(form): Form<VoteForm>,
 ) -> AppResult<Response> {
+    // Same-origin-only redirect target derived from Referer. Browsers
+    // populate Referer with the full URL of the page that submitted the
+    // form, including scheme + host. We accept it only when it's a path
+    // (no scheme, no host), defending against a malicious page that
+    // managed to plant a forged Referer turning /vote into an open
+    // redirect to an attacker-controlled site.
     let back = headers
         .get("referer")
         .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
+        .and_then(safe_back_path)
         .unwrap_or_else(|| "/".to_string());
 
     if !verify_csrf(&session, &form.csrf_token).await {
@@ -39,6 +45,21 @@ pub async fn vote(
     }
     if !matches!(form.value, -1 | 1) {
         return Ok(Redirect::to(&back).into_response());
+    }
+
+    // Reject votes on withdrawn manuscripts. The HTML hides the vote
+    // buttons for withdrawn rows, but a hand-crafted POST would otherwise
+    // succeed. Withdrawal is the user's signal that the manuscript should
+    // no longer accrue social signal.
+    if form.target_type == "manuscript" {
+        let w: Option<(i64,)> = sqlx::query_as("SELECT withdrawn FROM manuscripts WHERE id = ?")
+            .bind(form.target_id)
+            .fetch_optional(&state.pool)
+            .await?;
+        if matches!(w, Some((1,))) {
+            set_flash(&session, "This manuscript has been withdrawn and can no longer be voted on.").await;
+            return Ok(Redirect::to(&back).into_response());
+        }
     }
 
     let mut tx = state.pool.begin().await?;
@@ -110,4 +131,34 @@ pub async fn vote(
 
     tx.commit().await?;
     Ok(Redirect::to(&back).into_response())
+}
+
+/// Extract a same-origin path from a possibly-absolute Referer URL.
+///
+/// Accepts a path starting with `/` (but not `//` which browsers treat as
+/// protocol-relative cross-origin) and rejects anything with scheme,
+/// authority, CR/LF, or excessive length. Strips an `http(s)://host`
+/// prefix and keeps just the path so a Referer of
+/// `https://attacker.example/x` collapses to a safe default.
+fn safe_back_path(s: &str) -> Option<String> {
+    let path_part = if let Some(rest) = s.strip_prefix("https://").or_else(|| s.strip_prefix("http://")) {
+        // Drop scheme+authority — keep only path-and-query.
+        match rest.find('/') {
+            Some(i) => &rest[i..],
+            None => "/",
+        }
+    } else {
+        s
+    };
+    if path_part.starts_with('/')
+        && !path_part.starts_with("//")
+        && !path_part.starts_with("/\\")
+        && !path_part.contains('\n')
+        && !path_part.contains('\r')
+        && path_part.len() <= 512
+    {
+        Some(path_part.to_string())
+    } else {
+        None
+    }
 }

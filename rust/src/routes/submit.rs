@@ -33,12 +33,15 @@ pub async fn do_submit(
     mut multipart: Multipart,
 ) -> AppResult<Response> {
     let mut fields: SubmitFields = SubmitFields::default();
-    let mut pdf_path: Option<String> = None;
-
-    let upload_dir = upload_dir();
-    fs::create_dir_all(&upload_dir)
-        .await
-        .map_err(|e| crate::error::AppError::Other(e.into()))?;
+    // Buffer the PDF in memory first; only write it to disk AFTER CSRF and
+    // field validation pass. This closes two issues:
+    //   (1) A forged CSRF request would previously leave the uploaded PDF
+    //       on disk even though the manuscript row was never created — an
+    //       attacker could fill the upload directory by repeatedly posting
+    //       multipart forms with bad CSRF tokens.
+    //   (2) It also lets us reject obviously-non-PDF uploads up front via
+    //       a magic-bytes check.
+    let mut pdf_buf: Option<(String, axum::body::Bytes)> = None;
 
     while let Some(field) = multipart
         .next_field()
@@ -62,20 +65,15 @@ pub async fn do_submit(
             if data.len() > 30 * 1024 * 1024 {
                 return Ok(err_page(&session, maybe_user, "PDF exceeds 30 MB.").await);
             }
-            let stored = format!(
-                "{}-{}-{}",
-                chrono::Utc::now().timestamp_millis(),
-                rand::thread_rng().gen_range(100_000..1_000_000),
-                safe
-            );
-            let full = upload_dir.join(&stored);
-            let mut f = fs::File::create(&full)
-                .await
-                .map_err(|e| crate::error::AppError::Other(e.into()))?;
-            f.write_all(&data)
-                .await
-                .map_err(|e| crate::error::AppError::Other(e.into()))?;
-            pdf_path = Some(stored);
+            // Magic-bytes check: the file must actually be a PDF, not just
+            // named .pdf. Defends against an attacker uploading HTML/JS
+            // disguised as a PDF (browsers would still render it as
+            // application/pdf via mime_guess, but defense in depth — and
+            // it also prevents accidental corruption from being persisted).
+            if !data.starts_with(b"%PDF-") {
+                return Ok(err_page(&session, maybe_user, "Uploaded file is not a valid PDF (missing %PDF header).").await);
+            }
+            pdf_buf = Some((safe, data));
         } else {
             let value = field
                 .text()
@@ -166,6 +164,30 @@ pub async fn do_submit(
 
     let arxiv_like_id = make_prexiv_id();
     let synthetic_doi = format!("10.99999/{}", arxiv_like_id);
+
+    // All validation passed → now (and only now) persist the PDF.
+    let pdf_path: Option<String> = if let Some((safe, data)) = pdf_buf {
+        let upload_dir = upload_dir();
+        fs::create_dir_all(&upload_dir)
+            .await
+            .map_err(|e| crate::error::AppError::Other(e.into()))?;
+        let stored = format!(
+            "{}-{}-{}",
+            chrono::Utc::now().timestamp_millis(),
+            rand::thread_rng().gen_range(100_000..1_000_000),
+            safe
+        );
+        let full = upload_dir.join(&stored);
+        let mut f = fs::File::create(&full)
+            .await
+            .map_err(|e| crate::error::AppError::Other(e.into()))?;
+        f.write_all(&data)
+            .await
+            .map_err(|e| crate::error::AppError::Other(e.into()))?;
+        Some(stored)
+    } else {
+        None
+    };
 
     let result = sqlx::query(
         r#"INSERT INTO manuscripts (

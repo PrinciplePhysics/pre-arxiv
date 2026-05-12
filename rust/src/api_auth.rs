@@ -79,12 +79,7 @@ pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User>
         }
     }
 
-    let _ = sqlx::query("UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?")
-        .bind(token_id)
-        .execute(pool)
-        .await;
-
-    sqlx::query_as::<_, User>(
+    let user = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, display_name, affiliation, bio,
                   karma, is_admin, email_verified, orcid, created_at
            FROM users WHERE id = ?"#,
@@ -93,7 +88,17 @@ pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User>
     .fetch_optional(pool)
     .await
     .ok()
-    .flatten()
+    .flatten()?;
+
+    // Only bump last_used_at once we know the token resolved to a real,
+    // still-existing user. Avoids touching the row on tokens that point at
+    // deleted accounts or on errors further down the request.
+    let _ = sqlx::query("UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(token_id)
+        .execute(pool)
+        .await;
+
+    Some(user)
 }
 
 /// Required-bearer extractor. Use on agent-only endpoints; returns 401

@@ -113,16 +113,16 @@ async fn revoke_token(
     State(state): State<AppState>,
     ApiUser(u): ApiUser,
     Path(id): Path<i64>,
-) -> AppResult<Json<Value>> {
+) -> AppResult<(StatusCode, Json<Value>)> {
     let res = sqlx::query("DELETE FROM api_tokens WHERE id = ? AND user_id = ?")
         .bind(id)
         .bind(u.id)
         .execute(&state.pool)
         .await?;
     if res.rows_affected() == 0 {
-        return Ok(Json(json!({"ok": false, "error": "no such token"})));
+        return Ok((StatusCode::NOT_FOUND, Json(json!({"ok": false, "error": "no such token"}))));
     }
-    Ok(Json(json!({"ok": true, "deleted_id": id})))
+    Ok((StatusCode::OK, Json(json!({"ok": true, "deleted_id": id}))))
 }
 
 // ─── /categories ───────────────────────────────────────────────────────────
@@ -398,12 +398,15 @@ async fn post_comment(
     if content.is_empty() || content.len() > 8000 {
         return Ok((StatusCode::UNPROCESSABLE_ENTITY, Json(json!({"error": "content must be 1..=8000 chars"}))));
     }
-    let m: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
-        "SELECT id FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
+    let m: Option<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT id, withdrawn FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
-    let manuscript_id = m.ok_or(crate::error::AppError::NotFound)?.0;
+    let (manuscript_id, withdrawn) = m.ok_or(crate::error::AppError::NotFound)?;
+    if withdrawn != 0 {
+        return Ok((StatusCode::CONFLICT, Json(json!({"error": "manuscript is withdrawn; comments are disabled"}))));
+    }
 
     let mut tx = state.pool.begin().await?;
     let res = sqlx::query("INSERT INTO comments (manuscript_id, author_id, parent_id, content) VALUES (?, ?, ?, ?)")
@@ -429,16 +432,19 @@ async fn vote_manuscript(
     ApiUser(user): ApiUser,
     Path(id): Path<String>,
     Json(body): Json<VoteBody>,
-) -> AppResult<Json<Value>> {
+) -> AppResult<(StatusCode, Json<Value>)> {
     if !matches!(body.value, -1 | 1) {
-        return Ok(Json(json!({"error": "value must be -1 or 1"})));
+        return Ok((StatusCode::UNPROCESSABLE_ENTITY, Json(json!({"error": "value must be -1 or 1"}))));
     }
-    let m: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
-        "SELECT id FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
+    let m: Option<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT id, withdrawn FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
-    let target_id = m.ok_or(crate::error::AppError::NotFound)?.0;
+    let (target_id, withdrawn) = m.ok_or(crate::error::AppError::NotFound)?;
+    if withdrawn != 0 {
+        return Ok((StatusCode::CONFLICT, Json(json!({"error": "manuscript is withdrawn; voting is disabled"}))));
+    }
 
     let mut tx = state.pool.begin().await?;
     sqlx::query(
@@ -456,7 +462,7 @@ async fn vote_manuscript(
         .bind(score).bind(target_id)
         .execute(&mut *tx).await?;
     tx.commit().await?;
-    Ok(Json(json!({"ok": true, "score": score})))
+    Ok((StatusCode::OK, Json(json!({"ok": true, "score": score}))))
 }
 
 // ─── /search ───────────────────────────────────────────────────────────────
