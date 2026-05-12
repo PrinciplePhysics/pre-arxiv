@@ -582,3 +582,62 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   :root[data-theme="auto"] .welcome-body code { background: #2a251f; }
   :root[data-theme="auto"] .welcome-backdrop  { background: rgba(0, 0, 0, 0.75); }
 }
+
+/* ─── /submit · Upload PDF + External URL pair ───────────────────────
+   The native `<input type="file">` is the only field the browser draws
+   with its own button — by default that comes out as a small grey OS
+   button that visually misfits next to the styled URL input. We style
+   ::file-selector-button to match the rest of the form: brand-accent
+   button on the left, chosen-filename text flowing to the right, same
+   height as the sibling URL input.
+   ──────────────────────────────────────────────────────────────── */
+.submit-form input[type="file"] {
+  padding: 0;
+  background: #fff;
+  cursor: pointer;
+  min-height: 38px;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.submit-form input[type="file"]::file-selector-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0 12px 0 0;
+  padding: 0 16px;
+  border: 0;
+  border-right: 1px solid var(--rule-strong);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  height: auto;
+}
+.submit-form input[type="file"]::file-selector-button:hover {
+  background: var(--brand);
+  color: #fff;
+}
+.submit-form input[type="file"]::-webkit-file-upload-button {
+  /* Safari historical alias — same styling so old WebKit still matches. */
+  margin: 0 12px 0 0;
+  padding: 0 16px;
+  border: 0;
+  border-right: 1px solid var(--rule-strong);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Match the sibling URL input exactly so the two halves line up. */
+.submit-form .row-fields input[type="url"],
+.submit-form .row-fields input[type="text"] {
+  min-height: 38px;
+}

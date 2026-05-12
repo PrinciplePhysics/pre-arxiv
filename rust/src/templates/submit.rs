@@ -147,12 +147,13 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     div.grow.field {
                         label for="pdf_upload" { span.label-text { "Upload PDF" } }
                         input id="pdf_upload" type="file" name="pdf" accept="application/pdf";
-                        span.hint.no-katex { "Optional if you provide an external URL. Max 30 MB." }
+                        span.hint.no-katex { "Either this or an external URL. PDF only, up to 30 MB." }
                     }
                     label.grow {
                         span.label-text { "External URL" }
                         input type="url" name="external_url" maxlength="500"
                               placeholder="https://… (e.g., GitHub repo or hosted PDF)";
+                        span.hint.no-katex { "Either this or a PDF upload. Use for hosted-elsewhere copies (arXiv, GitHub, journal site)." }
                     }
                 }
             }
