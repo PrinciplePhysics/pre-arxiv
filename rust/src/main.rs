@@ -23,6 +23,7 @@ mod helpers;
 mod licenses;
 mod markdown;
 mod models;
+mod passwords;
 mod routes;
 mod state;
 mod templates;

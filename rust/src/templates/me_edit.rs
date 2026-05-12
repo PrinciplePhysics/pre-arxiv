@@ -73,6 +73,16 @@ pub fn render(ctx: &PageCtx, v: &EditValues, errors: &[String]) -> Markup {
                 a.btn-secondary href={ "/u/" (username) } { "Cancel" }
             }
         }
+
+        section.form-section.me-edit-security {
+            h2 { "Security" }
+            p.muted.small {
+                "Update your password. We'll confirm your current password and check the new one against the public Have-I-Been-Pwned breach corpus before saving."
+            }
+            p {
+                a.btn-secondary href="/me/password" { "Change your password →" }
+            }
+        }
     };
     layout("Edit profile", ctx, body)
 }

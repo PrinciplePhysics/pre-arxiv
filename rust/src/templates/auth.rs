@@ -36,6 +36,11 @@ pub fn render_login(ctx: &PageCtx, error: Option<&str>, next: Option<&str>) -> M
                 " "
                 a.btn-secondary href="/register" { "Create an account" }
             }
+
+            p.muted.small.login-forgot {
+                a href="/forgot-password" { "Forgot your password?" }
+                " — we'll email you a one-time reset link."
+            }
         }
     };
     layout("Sign in", ctx, body)

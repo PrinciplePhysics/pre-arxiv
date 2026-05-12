@@ -725,3 +725,22 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   .verify-banner-actions .btn-primary,
   .verify-banner-actions .btn-secondary { width: 100%; text-align: center; }
 }
+
+/* ─── Password flows (login forgot link + /me/edit security section) ── */
+.login-forgot {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dotted var(--rule-strong);
+}
+.login-forgot a { color: var(--link); font-weight: 600; }
+
+.me-edit-security {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+.me-edit-security h2 {
+  font-size: 16px;
+  margin: 0 0 6px;
+  color: var(--ink-soft);
+}

@@ -10,11 +10,13 @@ pub mod cite;
 pub mod comments;
 pub mod feed;
 pub mod follow;
+pub mod forgot;
 pub mod home;
 pub mod listings;
 pub mod manuscript;
 pub mod me;
 pub mod me_edit;
+pub mod me_password;
 pub mod me_tokens;
 pub mod pages;
 pub mod profile;
@@ -62,8 +64,15 @@ pub fn router() -> Router<AppState> {
         .route("/me/tokens", get(me_tokens::show).post(me_tokens::create))
         .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
         .route("/me/edit", get(me_edit::show).post(me_edit::submit))
+        .route("/me/password", get(me_password::show).post(me_password::submit))
         .route("/me/resend-verification", post(verify::resend))
         .route("/verify/{token}", get(verify::show))
+
+        // Forgot / reset password (anonymous flow)
+        .route("/forgot-password", get(forgot::show_forgot).post(forgot::submit_forgot))
+        .route("/forgot-password/sent", get(forgot::show_sent))
+        .route("/reset-password/{token}", get(forgot::show_reset).post(forgot::submit_reset))
+
         .route("/feed", get(feed::show))
 
         // Admin

@@ -1,9 +1,9 @@
 //! Outbound email — HTTPS POST to Brevo's transactional API.
 //!
 //! Why not SMTP: victoria sits behind a carrier-grade NAT whose ISP blocks
-//! outbound ports 25 / 465 / 587. SMTP relaying through any provider is
-//! impossible on this network. Brevo's HTTPS API works on port 443 — the
-//! same channel the HIBP password check uses — and is reachable.
+//! outbound ports 25 / 465 / 587 to the well-known consumer providers.
+//! Brevo's HTTPS API works on port 443 — the same channel HIBP uses —
+//! which IS reachable.
 //!
 //! Config:
 //!
@@ -11,8 +11,8 @@
 //!   MAIL_FROM_NAME     PreXiv              (default if unset)
 //!   MAIL_FROM_ADDRESS  bydonfancy@gmail.com (must match a verified sender on Brevo)
 //!
-//! Dev mode (no BREVO_API_KEY) logs the verification link to tracing::warn
-//! instead of sending, so `cargo run` locally doesn't need credentials.
+//! Dev mode (no BREVO_API_KEY) logs the link to tracing::warn instead of
+//! sending, so a local `cargo run` doesn't need credentials.
 
 use std::env;
 use std::time::Duration;
@@ -29,54 +29,27 @@ fn from_pair() -> Result<(String, String)> {
     Ok((name, addr))
 }
 
-/// Sends the account verification email via Brevo's transactional API.
-///
-/// `to` is the recipient address, `username` is the greeting target, and
-/// `verify_link` is the absolute URL the user should click. Returns Ok in
-/// dev mode (no `BREVO_API_KEY`) without actually sending — the link is
-/// logged so a local cargo run still produces something the developer
-/// can click.
-///
-/// The HTTP call is given a 10-second timeout; outbound that takes longer
-/// than that is treated as a failure so a slow provider doesn't pin the
-/// caller (the register handler awaits this in a tokio::spawn, but we
-/// still don't want orphaned futures piling up).
-pub async fn send_verification_email(to: &str, username: &str, verify_link: &str) -> Result<()> {
+/// Low-level transactional send. Both verification and password-reset
+/// emails route through here so the wire format / timeout / error
+/// handling stay in one place.
+async fn send_transactional(to: &str, subject: &str, text_body: &str) -> Result<()> {
     let api_key = match env::var("BREVO_API_KEY") {
         Ok(k) if !k.trim().is_empty() => k,
         _ => {
             tracing::warn!(
                 target: "prexiv::email",
-                %to, %username, link = %verify_link,
-                "BREVO_API_KEY not configured — dev mode, verification link logged only"
+                %to, %subject,
+                "BREVO_API_KEY not configured — dev mode, email not sent"
             );
             return Ok(());
         }
     };
 
     let (from_name, from_addr) = from_pair()?;
-
-    let subject = "Verify your email — PreXiv";
-    let text_body = format!(
-"Hi {username},
-
-You registered an account at PreXiv. Click the link below to verify your email
-address — verification is required before you can submit manuscripts or mint
-API tokens:
-
-  {verify_link}
-
-The link expires in 24 hours. If you didn't register, ignore this email; no
-action is taken until the link is followed.
-
-— PreXiv
-"
-    );
-
     let payload = json!({
-        "sender":    { "name": from_name, "email": from_addr },
-        "to":        [ { "email": to } ],
-        "subject":   subject,
+        "sender":      { "name": from_name, "email": from_addr },
+        "to":          [ { "email": to } ],
+        "subject":     subject,
         "textContent": text_body,
     });
 
@@ -98,21 +71,69 @@ action is taken until the link is followed.
 
     let status = resp.status();
     if !status.is_success() {
-        // Pull whatever the API said about the failure so logs are useful
-        // when a sender isn't verified, a key is wrong, the quota is
-        // exhausted, etc. Cap body length so a HTML error page can't
-        // flood the journal.
+        // Cap the body snippet so a verbose error page can't flood the
+        // journal. Brevo's structured errors are short JSON anyway.
         let body = resp.text().await.unwrap_or_default();
         let snippet: String = body.chars().take(500).collect();
-        return Err(anyhow!(
-            "Brevo returned {status}: {snippet}"
-        ));
+        return Err(anyhow!("Brevo returned {status}: {snippet}"));
     }
 
     tracing::info!(
         target: "prexiv::email",
-        %to, %username,
-        "verification email accepted by Brevo"
+        %to, %subject,
+        "transactional email accepted by Brevo"
     );
     Ok(())
+}
+
+/// Sends the email-verification email.
+pub async fn send_verification_email(to: &str, username: &str, verify_link: &str) -> Result<()> {
+    send_transactional(
+        to,
+        "Verify your email — PreXiv",
+        &format!(
+"Hi {username},
+
+You registered an account at PreXiv. Click the link below to verify your email
+address — verification is required before you can submit manuscripts or mint
+API tokens:
+
+  {verify_link}
+
+The link expires in 24 hours. If you didn't register, ignore this email; no
+action is taken until the link is followed.
+
+— PreXiv
+"
+        ),
+    )
+    .await
+}
+
+/// Sends the password-reset email. Shorter TTL (1h) is reflected in
+/// the body copy so the user knows to act quickly.
+pub async fn send_password_reset_email(
+    to: &str,
+    username: &str,
+    reset_link: &str,
+) -> Result<()> {
+    send_transactional(
+        to,
+        "Reset your PreXiv password",
+        &format!(
+"Hi {username},
+
+We received a request to reset the password on your PreXiv account. Click the
+link below to set a new password — the link is good for 1 hour:
+
+  {reset_link}
+
+If you didn't request this, ignore this email; no action is taken until the
+link is followed, and the link will simply expire.
+
+— PreXiv
+"
+        ),
+    )
+    .await
 }
