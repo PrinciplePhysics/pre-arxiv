@@ -61,6 +61,8 @@ pub fn render(
                 span.account-info-sep { "|" }
                 a.account-info-link href="/me/password" { "Change password" }
                 span.account-info-sep { "|" }
+                a.account-info-link href="/me/2fa"      { "Two-factor auth" }
+                span.account-info-sep { "|" }
                 a.account-info-link href="/me/tokens"   { "API tokens" }
             }
         }

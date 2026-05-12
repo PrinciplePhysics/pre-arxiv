@@ -1748,6 +1748,7 @@ dependencies = [
  "ammonia",
  "anyhow",
  "axum 0.8.9",
+ "base32",
  "base64",
  "bcrypt",
  "chrono",

@@ -44,6 +44,7 @@ pub mod profile;
 pub mod search;
 pub mod static_routes;
 pub mod submit;
+pub mod two_factor;
 pub mod verify;
 pub mod votes;
 pub mod withdraw;
@@ -77,6 +78,7 @@ pub fn router() -> Router<AppState> {
 
         // Auth
         .route("/login", get(auth::show_login).post(auth::do_login))
+        .route("/login/2fa", get(two_factor::show_login_2fa).post(two_factor::submit_login_2fa))
         .route("/register", get(auth::show_register).post(auth::do_register))
         .route("/logout", post(auth::do_logout))
 
@@ -92,6 +94,9 @@ pub fn router() -> Router<AppState> {
         .route("/me/notifications", get(notifications::show))
         .route("/me/notifications/{id}/read", post(notifications::mark_read))
         .route("/me/notifications/mark-all-read", post(notifications::mark_all_read))
+        .route("/me/2fa", get(two_factor::show).post(two_factor::start_enroll))
+        .route("/me/2fa/confirm", post(two_factor::confirm))
+        .route("/me/2fa/disable", post(two_factor::disable))
         .route("/me/email", get(me_email::show).post(me_email::submit))
         .route("/me/email/cancel", post(me_email::cancel))
         .route("/me/resend-verification", post(verify::resend))

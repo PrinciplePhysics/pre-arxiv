@@ -2111,3 +2111,38 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   width: 80px;
 }
 .sitemap-table tr:last-child td { border-bottom: none; }
+
+/* ─── 2FA enrollment QR + secret block ───────────────────────────── */
+.totp-qr {
+  display: flex;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 14px;
+  margin: 12px 0;
+  box-shadow: var(--shadow-sm);
+}
+.totp-qr img {
+  display: block;
+  border-radius: var(--r-sm);
+}
+.totp-manual { margin-top: 10px; font-size: 13px; }
+.totp-manual summary {
+  cursor: pointer;
+  color: var(--link);
+  font-weight: 600;
+  padding: 4px 0;
+}
+.totp-manual summary:hover { color: var(--link-hover); }
+.totp-manual pre {
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+  margin: 8px 0 0;
+}

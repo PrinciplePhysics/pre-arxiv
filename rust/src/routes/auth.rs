@@ -75,6 +75,19 @@ pub async fn do_login(
         ).await);
     }
     let user_id = row.expect("password_ok implies row is Some").0;
+
+    // 2FA gate: if the user has TOTP enabled, stash the candidate id in
+    // the session and redirect to /login/2fa. login_session is NOT
+    // called yet — we're not logged in until the second factor verifies.
+    if crate::totp::is_enabled(&state.pool, user_id).await {
+        let _ = session.insert("pending_2fa_user_id", user_id).await;
+        let target = match form.next.as_deref() {
+            Some(n) if !n.is_empty() => format!("/login/2fa?next={}", urlencoding::encode(n)),
+            _ => "/login/2fa".to_string(),
+        };
+        return Ok(Redirect::to(&target).into_response());
+    }
+
     login_session(&session, user_id).await.map_err(crate::error::AppError::Other)?;
     let dest = sanitize_next(form.next.as_deref());
     Ok(Redirect::to(&dest).into_response())

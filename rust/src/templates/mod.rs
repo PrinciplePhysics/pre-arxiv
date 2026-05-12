@@ -18,5 +18,6 @@ pub mod pages;
 pub mod profile;
 pub mod search;
 pub mod submit;
+pub mod two_factor;
 
 pub use layout::{layout, PageCtx};
