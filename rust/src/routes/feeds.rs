@@ -20,21 +20,20 @@ use crate::state::AppState;
 const SITEMAP_XSL: &str = include_str!("../../../public/static/sitemap.xsl");
 const FEED_XSL: &str    = include_str!("../../../public/static/feed.xsl");
 
-/// XSL stylesheet for sitemap.xml. Served at `/sitemap.xsl` with an
-/// explicit `text/xsl` content-type so browsers apply it despite our
-/// global `X-Content-Type-Options: nosniff` header.
+/// XSL stylesheet for sitemap.xml. Served as `application/xslt+xml`,
+/// the canonical XSL 1.0+ content-type — accepted by every browser
+/// with nosniff enabled.
 pub async fn sitemap_xsl() -> impl IntoResponse {
     (
-        [(header::CONTENT_TYPE, "text/xsl; charset=utf-8")],
+        [(header::CONTENT_TYPE, "application/xslt+xml; charset=utf-8")],
         SITEMAP_XSL,
     )
 }
 
-/// XSL stylesheet for feed.rss (and per-category feeds), served at
-/// `/feed.xsl` with `text/xsl`.
+/// XSL stylesheet for feed.rss (and per-category feeds).
 pub async fn feed_xsl() -> impl IntoResponse {
     (
-        [(header::CONTENT_TYPE, "text/xsl; charset=utf-8")],
+        [(header::CONTENT_TYPE, "application/xslt+xml; charset=utf-8")],
         FEED_XSL,
     )
 }
@@ -184,8 +183,14 @@ fn rss_response(state: &AppState, category: Option<&str>, items: &[FeedItem]) ->
     }
     xml.push_str("</channel>\n</rss>\n");
 
+    // Content-Type: serve as application/xml rather than
+    // application/rss+xml so Chrome applies the XSL stylesheet (some
+    // Chrome versions special-case +xml feed types into a raw-text
+    // fallback that skips XSL processing). Feed readers identify the
+    // format by parsing the <rss> root element, not by mime type, so
+    // they continue to work.
     (
-        [(header::CONTENT_TYPE, "application/rss+xml; charset=utf-8")],
+        [(header::CONTENT_TYPE, "application/xml; charset=utf-8")],
         xml,
     )
 }

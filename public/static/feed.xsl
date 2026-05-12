@@ -13,8 +13,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title><xsl:value-of select="channel/title"/></title>
 <meta name="robots" content="noindex"/>
-<link rel="stylesheet" href="/static/css/style.css?v=20260512j"/>
-<link rel="stylesheet" href="/static/css/prexiv-rust.css?v=20260512j"/>
+<link rel="stylesheet" href="/static/css/style.css?v=20260512k"/>
+<link rel="stylesheet" href="/static/css/prexiv-rust.css?v=20260512k"/>
 </head>
 <body>
 <header class="topbar"><div class="topbar-inner">
@@ -24,33 +24,39 @@
 </a>
 </div></header>
 <main class="container">
+
 <div class="page-header">
-<h1><xsl:value-of select="channel/title"/></h1>
-<p class="muted"><xsl:value-of select="channel/description"/></p>
-<p class="muted small">
-This is the RSS feed at <a href="{channel/atom:link/@href}"><code><xsl:value-of select="channel/atom:link/@href"/></code></a>.
-Subscribe with any feed reader — your browser is rendering it as a page because raw RSS is hard to read.
-</p>
+  <h1>📡 <xsl:value-of select="channel/title"/></h1>
+  <p class="muted"><xsl:value-of select="channel/description"/></p>
+  <p class="muted small">
+    This is an RSS feed: <a><xsl:attribute name="href"><xsl:value-of select="channel/atom:link/@href"/></xsl:attribute><code><xsl:value-of select="channel/atom:link/@href"/></code></a>.
+    Subscribe in any feed reader to follow new submissions. Your browser is rendering it
+    as a readable page; aggregators and harvesters parse the underlying XML directly.
+  </p>
 </div>
 
 <ol class="ms-list">
 <xsl:for-each select="channel/item">
 <li class="ms-row">
+  <div class="ms-rank">·</div>
   <div class="ms-body">
     <div class="ms-title-line">
-      <a class="ms-title" href="{link}"><xsl:value-of select="title"/></a>
+      <a class="ms-title"><xsl:attribute name="href"><xsl:value-of select="link"/></xsl:attribute><xsl:value-of select="title"/></a>
+      <xsl:text> </xsl:text>
+      <span class="ms-arxivid">[<xsl:value-of select="substring-after(substring-after(link, '://'), '/m/')"/>]</span>
     </div>
     <div class="ms-meta">
       <span class="ms-authors"><xsl:value-of select="dc:creator"/></span>
-      <xsl:text> · </xsl:text>
+      <xsl:text> </xsl:text><span class="dot">·</span><xsl:text> </xsl:text>
       <span><xsl:value-of select="category"/></span>
-      <xsl:text> · </xsl:text>
-      <span class="muted"><xsl:value-of select="pubDate"/></span>
+      <xsl:text> </xsl:text><span class="dot">·</span><xsl:text> </xsl:text>
+      <span class="muted small"><xsl:value-of select="pubDate"/></span>
     </div>
   </div>
 </li>
 </xsl:for-each>
 </ol>
+
 </main>
 </body>
 </html>
