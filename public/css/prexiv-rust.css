@@ -533,10 +533,35 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
 .welcome-actions {
   display: flex;
   gap: 10px;
-  justify-content: flex-end;
+  align-items: center;
   margin-top: 18px;
   flex-wrap: wrap;
 }
+
+/* Suppress checkbox — small muted control that pushes the action
+   buttons to the right on desktop (margin-right: auto). Clicking the
+   label toggles the checkbox via the for= association on the maud
+   markup, so the whole "Don't show this again" text is a hit target. */
+.welcome-suppress {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.welcome-suppress:hover { color: var(--ink-soft); }
+.welcome-suppress input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand);
+}
+.welcome-suppress:focus-within { color: var(--ink); }
 
 @keyframes welcome-fadein { from { opacity: 0; } to { opacity: 1; } }
 @keyframes welcome-slidein {
@@ -555,11 +580,23 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   .welcome-lede  { font-size: 16px; }
   .welcome-body  { font-size: 15px; }
   .welcome-coda  { font-size: 14px; }
-  .welcome-actions { flex-direction: column-reverse; gap: 8px; }
+  .welcome-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
   .welcome-actions .btn-primary,
   .welcome-actions .btn-secondary {
     width: 100%;
     text-align: center;
+  }
+  /* Suppress checkbox at the bottom of the stack on phones (column-
+     reverse with the checkbox first in DOM order puts it last visually
+     — primary action on top for thumb-reach). */
+  .welcome-suppress {
+    margin-right: 0;
+    justify-content: center;
+    padding-top: 4px;
   }
 }
 

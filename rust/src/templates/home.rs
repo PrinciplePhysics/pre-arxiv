@@ -67,6 +67,10 @@ fn welcome_modal() -> Markup {
                     }
                 }
                 div.welcome-actions {
+                    label.welcome-suppress for="welcome-suppress" {
+                        input #welcome-suppress type="checkbox";
+                        span { "Don't show this again" }
+                    }
                     a.btn-secondary href="/guidelines" { "Read the guidelines" }
                     button.btn-primary type="button" data-welcome-dismiss="1" { "Got it" }
                 }
