@@ -37,6 +37,7 @@ pub async fn show(
         r#"SELECT m.id, m.arxiv_like_id, m.doi, m.title, m.authors, m.category,
                   m.conductor_type, m.conductor_ai_model, m.conductor_ai_model_public,
                   m.conductor_human, m.conductor_human_public,
+                  m.has_auditor, m.auditor_name,
                   m.score, m.comment_count, m.withdrawn, m.created_at
            FROM manuscripts m
            JOIN follows f ON f.followee_id = m.submitter_id

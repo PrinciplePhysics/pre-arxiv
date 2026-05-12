@@ -57,10 +57,27 @@ pub struct ManuscriptListItem {
     pub conductor_ai_model_public: i64,
     pub conductor_human: Option<String>,
     pub conductor_human_public: i64,
+    pub has_auditor: i64,
+    pub auditor_name: Option<String>,
     pub score: Option<i64>,
     pub comment_count: Option<i64>,
     pub withdrawn: i64,
     pub created_at: Option<NaiveDateTime>,
+}
+
+/// Three-way audit status, computed from has_auditor + auditor_name vs
+/// conductor_human. Listing rows + manuscript page agree on the rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditStatus { Unaudited, SelfAudited, ThirdParty }
+
+impl ManuscriptListItem {
+    pub fn audit_status(&self) -> AuditStatus {
+        if self.has_auditor == 0 { return AuditStatus::Unaudited; }
+        let an = self.auditor_name.as_deref().map(str::trim).unwrap_or("");
+        let ch = self.conductor_human.as_deref().map(str::trim).unwrap_or("");
+        if !an.is_empty() && an == ch { AuditStatus::SelfAudited }
+        else { AuditStatus::ThirdParty }
+    }
 }
 
 impl Manuscript {

@@ -268,6 +268,30 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
 }
 .audit-self-callout strong { color: var(--warn); }
 
+/* Self-audit badge — a new state for listing rows. The conductor and the
+   auditor are the same person; stronger than 'unaudited' (a real signed
+   statement exists), weaker than third-party 'audited'. Visual sits
+   between .badge-audited (green) and .badge-unaudited (amber):
+   a soft yellow/gold so a scanning reader immediately reads it as
+   'partial credit, not full credit'. */
+.badge.badge-self-audited {
+  background: #fff5d6;
+  color: #8b6914;
+  border-color: #e6cb84;
+}
+:root[data-theme="dark"] .badge.badge-self-audited {
+  background: #3a2f12;
+  color: #f0d68a;
+  border-color: #6b5524;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] .badge.badge-self-audited {
+    background: #3a2f12;
+    color: #f0d68a;
+    border-color: #6b5524;
+  }
+}
+
 /* Withdrawn manuscripts: the JS app's style.css strikes through the title.
    Per user feedback that the strikethrough is visually noisy, we just gray
    the title and let the "⊘ withdrawn" badge carry the signal. */

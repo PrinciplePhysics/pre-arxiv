@@ -1,6 +1,7 @@
 use maud::{html, Markup, PreEscaped};
 
 use crate::markdown;
+use crate::models::manuscript::AuditStatus;
 use crate::models::ManuscriptListItem;
 
 use super::layout::{layout, time_ago, PageCtx};
@@ -22,6 +23,12 @@ pub fn render(ctx: &PageCtx, manuscripts: &[ManuscriptListItem]) -> Markup {
         }
     };
     layout("Ranked", ctx, body)
+}
+
+fn truncate_name(s: &str) -> String {
+    let s = s.trim();
+    if s.chars().count() <= 24 { s.to_string() }
+    else { let mut t: String = s.chars().take(22).collect(); t.push('…'); t }
 }
 
 pub fn manuscript_row(ctx: &PageCtx, m: &ManuscriptListItem, rank: usize, logged_in: bool) -> Markup {
@@ -70,7 +77,24 @@ pub fn manuscript_row(ctx: &PageCtx, m: &ManuscriptListItem, rank: usize, logged
                         span.badge.badge-withdrawn title="The submitter (or an admin) withdrew this manuscript" { "⊘ withdrawn" }
                     } @else {
                         @if m.conductor_type == "ai-agent" {
-                            span.badge.badge-agent title="Produced autonomously by an AI agent" { "⚙ AI-agent" }
+                            span.badge.badge-agent title="Produced autonomously by an AI agent — no human conductor" { "⚙ AI-agent" }
+                        }
+                        @match m.audit_status() {
+                            AuditStatus::ThirdParty => {
+                                span.badge.badge-audited title=(format!("Audited by {}", m.auditor_name.as_deref().unwrap_or(""))) {
+                                    "✓ audited"
+                                    @if let Some(n) = &m.auditor_name { " by " (truncate_name(n)) }
+                                }
+                            }
+                            AuditStatus::SelfAudited => {
+                                span.badge.badge-self-audited title=(format!("Self-audit: conductor {} is also the auditor — stronger than unaudited, weaker than a third-party audit", m.auditor_name.as_deref().unwrap_or(""))) {
+                                    "◐ self-audited"
+                                    @if let Some(n) = &m.auditor_name { " by " (truncate_name(n)) }
+                                }
+                            }
+                            AuditStatus::Unaudited => {
+                                span.badge.badge-unaudited title="No auditor — no human takes responsibility for correctness" { "⚠ unaudited" }
+                            }
                         }
                     }
                 }

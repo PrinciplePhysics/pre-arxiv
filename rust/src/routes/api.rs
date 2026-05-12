@@ -156,6 +156,7 @@ async fn list_manuscripts(
     let base = "SELECT id, arxiv_like_id, doi, title, authors, category,
                 conductor_type, conductor_ai_model, conductor_ai_model_public,
                 conductor_human, conductor_human_public,
+                has_auditor, auditor_name,
                 score, comment_count, withdrawn, created_at
                 FROM manuscripts";
 
@@ -480,6 +481,7 @@ async fn search(
         r#"SELECT m.id, m.arxiv_like_id, m.doi, m.title, m.authors, m.category,
                   m.conductor_type, m.conductor_ai_model, m.conductor_ai_model_public,
                   m.conductor_human, m.conductor_human_public,
+                  m.has_auditor, m.auditor_name,
                   m.score, m.comment_count, m.withdrawn, m.created_at
            FROM manuscripts m
            JOIN manuscripts_fts f ON f.rowid = m.id

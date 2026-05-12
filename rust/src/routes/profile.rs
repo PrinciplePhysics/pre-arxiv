@@ -37,6 +37,7 @@ pub async fn show(
         r#"SELECT id, arxiv_like_id, doi, title, authors, category,
                   conductor_type, conductor_ai_model, conductor_ai_model_public,
                   conductor_human, conductor_human_public,
+                  has_auditor, auditor_name,
                   score, comment_count, withdrawn, created_at
            FROM manuscripts WHERE submitter_id = ? ORDER BY created_at DESC LIMIT 50"#,
     )

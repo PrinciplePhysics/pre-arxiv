@@ -19,6 +19,7 @@ pub async fn index(
         SELECT id, arxiv_like_id, doi, title, authors, category,
                conductor_type, conductor_ai_model, conductor_ai_model_public,
                conductor_human, conductor_human_public,
+               has_auditor, auditor_name,
                score, comment_count, withdrawn, created_at
         FROM manuscripts
         ORDER BY created_at DESC

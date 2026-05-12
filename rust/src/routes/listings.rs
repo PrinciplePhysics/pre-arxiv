@@ -15,6 +15,7 @@ use crate::templates;
 const SLIM_COLS: &str = r#"id, arxiv_like_id, doi, title, authors, category,
     conductor_type, conductor_ai_model, conductor_ai_model_public,
     conductor_human, conductor_human_public,
+    has_auditor, auditor_name,
     score, comment_count, withdrawn, created_at"#;
 
 async fn fetch(pool: &sqlx::SqlitePool, sql: &str) -> Result<Vec<ManuscriptListItem>, sqlx::Error> {
