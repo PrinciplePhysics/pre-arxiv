@@ -18,6 +18,13 @@
 --   - withdrawal status
 -- Changing any of these means a new submission, not a revision.
 
+-- An older `manuscript_versions` table existed in the JS-app schema with
+-- a different shape (and is empty on every PreXiv deployment we know of
+-- — it was an unfinished experiment). Drop it so our CREATE TABLE below
+-- works cleanly. Guarded by IF EXISTS so fresh installs don't fail.
+DROP TABLE IF EXISTS manuscript_versions;
+DROP INDEX IF EXISTS idx_versions_manuscript;
+
 ALTER TABLE manuscripts ADD COLUMN current_version INTEGER NOT NULL DEFAULT 1;
 
 CREATE TABLE manuscript_versions (
