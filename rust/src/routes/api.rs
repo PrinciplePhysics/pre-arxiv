@@ -127,33 +127,10 @@ async fn revoke_token(
 
 // ─── /categories ───────────────────────────────────────────────────────────
 
-const CATEGORIES: &[(&str, &str)] = &[
-    ("cs.AI", "Artificial Intelligence"),
-    ("cs.LG", "Machine Learning"),
-    ("cs.CL", "Computation & Language"),
-    ("cs.CV", "Computer Vision"),
-    ("cs.SE", "Software Engineering"),
-    ("math.AG", "Algebraic Geometry"),
-    ("math.NT", "Number Theory"),
-    ("math.PR", "Probability"),
-    ("math.OC", "Optimization & Control"),
-    ("physics.gen-ph", "General Physics"),
-    ("hep-th", "High Energy Physics — Theory"),
-    ("hep-ph", "High Energy Physics — Phenomenology"),
-    ("nucl-th", "Nuclear Theory"),
-    ("cond-mat", "Condensed Matter"),
-    ("astro-ph", "Astrophysics"),
-    ("q-bio", "Quantitative Biology"),
-    ("q-fin", "Quantitative Finance"),
-    ("stat.ML", "Statistics — Machine Learning"),
-    ("econ", "Economics"),
-    ("misc", "Miscellaneous"),
-];
-
 async fn get_categories() -> Json<Value> {
-    let arr: Vec<Value> = CATEGORIES
+    let arr: Vec<Value> = crate::categories::CATEGORIES
         .iter()
-        .map(|(id, name)| json!({"id": id, "name": name}))
+        .map(|c| json!({"id": c.id, "name": c.name, "group": c.group}))
         .collect();
     Json(json!(arr))
 }

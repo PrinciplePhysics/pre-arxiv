@@ -81,6 +81,57 @@ pub async fn browse_index(
     Ok(Html(templates::listing::render_browse(&ctx, &counts).into_string()))
 }
 
+/// Helper exposed for the template — keeps the grouping logic out of maud.
+pub fn browse_groups(counts: &[(String, i64)]) -> Vec<(&'static str, Vec<BrowseEntry>)> {
+    use crate::categories;
+    use std::collections::HashMap;
+
+    // Build count map for O(1) lookup. Categories that aren't in our
+    // canonical taxonomy (legacy data) bucket into "Other".
+    let count_map: HashMap<&str, i64> =
+        counts.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+
+    let mut groups: Vec<(&'static str, Vec<BrowseEntry>)> = Vec::new();
+    for &g in categories::GROUPS {
+        let mut entries: Vec<BrowseEntry> = categories::in_group(g)
+            .map(|c| BrowseEntry {
+                id: c.id,
+                name: c.name,
+                count: *count_map.get(c.id).unwrap_or(&0),
+            })
+            .collect();
+        // Sort by count desc, then by id asc (stable).
+        entries.sort_by(|a, b| b.count.cmp(&a.count).then(a.id.cmp(b.id)));
+        groups.push((g, entries));
+    }
+    // Append any DB categories not in our taxonomy as a synthetic group.
+    let canonical: std::collections::HashSet<&str> =
+        categories::CATEGORIES.iter().map(|c| c.id).collect();
+    let legacy: Vec<BrowseEntry> = counts
+        .iter()
+        .filter(|(k, _)| !canonical.contains(k.as_str()))
+        .map(|(k, n)| BrowseEntry { id: leak(k.clone()), name: "(uncategorised in current taxonomy)", count: *n })
+        .collect();
+    if !legacy.is_empty() {
+        groups.push(("Legacy ids", legacy));
+    }
+    groups
+}
+
+#[derive(Debug)]
+pub struct BrowseEntry {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub count: i64,
+}
+
+fn leak(s: String) -> &'static str {
+    // Tiny static-leak shim so legacy category ids from the DB can flow
+    // through a Vec<BrowseEntry { id: &'static str }>. Only called once
+    // per browse-index render for at-most-a-handful of legacy ids.
+    Box::leak(s.into_boxed_str())
+}
+
 pub async fn browse_category(
     State(state): State<AppState>,
     session: Session,

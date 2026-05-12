@@ -59,28 +59,7 @@ const ROLES: &[&str] = &[
     "hobbyist",
 ];
 
-const CATEGORIES: &[(&str, &str)] = &[
-    ("cs.AI", "Artificial Intelligence"),
-    ("cs.LG", "Machine Learning"),
-    ("cs.CL", "Computation & Language"),
-    ("cs.CV", "Computer Vision"),
-    ("cs.SE", "Software Engineering"),
-    ("math.AG", "Algebraic Geometry"),
-    ("math.NT", "Number Theory"),
-    ("math.PR", "Probability"),
-    ("math.OC", "Optimization & Control"),
-    ("physics.gen-ph", "General Physics"),
-    ("hep-th", "High Energy Physics — Theory"),
-    ("hep-ph", "High Energy Physics — Phenomenology"),
-    ("nucl-th", "Nuclear Theory"),
-    ("cond-mat", "Condensed Matter"),
-    ("astro-ph", "Astrophysics"),
-    ("q-bio", "Quantitative Biology"),
-    ("q-fin", "Quantitative Finance"),
-    ("stat.ML", "Statistics — Machine Learning"),
-    ("econ", "Economics"),
-    ("misc", "Miscellaneous"),
-];
+use crate::categories::{self as cats};
 
 pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
     let body = html! {
@@ -133,9 +112,19 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     span.label-text { "Category " span.req { "*" } }
                     select name="category" required {
                         option value="" { "— select —" }
-                        @for (id, name) in CATEGORIES {
-                            option value=(id) { (id) " — " (name) }
+                        @for g in cats::GROUPS {
+                            optgroup label=(g) {
+                                @for c in cats::in_group(g) {
+                                    option value=(c.id) { (c.id) " — " (c.name) }
+                                }
+                            }
                         }
+                    }
+                    span.hint.no-katex {
+                        "Grouped by subject area. The "
+                        code { "cs.*" } " / " code { "math.*" } " / " code { "stat.*" } " / " code { "hep-*" } " / " code { "q-bio.*" } " / " code { "q-fin.*" } " / " code { "econ.*" }
+                        " namespaces are arXiv-canonical (an id like " code { "cs.AI" } " here means the same thing as on arXiv). "
+                        code { "bio.*" } " mirrors bioRxiv's wet-bio subject areas; " code { "med.*" } " mirrors medRxiv's clinical / public-health areas. Pick the most specific match; " code { "misc" } " is fine if nothing fits."
                     }
                 }
 

@@ -13,6 +13,7 @@ use tracing_subscriber::EnvFilter;
 
 mod api_auth;
 mod auth;
+mod categories;
 mod db;
 mod error;
 mod helpers;
