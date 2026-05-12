@@ -193,6 +193,14 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("prexiv (rust) listening on http://{addr}");
-    axum::serve(listener, app).await?;
+    // ConnectInfo<SocketAddr> is required by tower_governor's default
+    // PeerIpKeyExtractor — without it, every rate-limited request
+    // 500s. `into_make_service_with_connect_info::<SocketAddr>` is
+    // the standard fix.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }
