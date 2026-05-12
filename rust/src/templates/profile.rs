@@ -35,7 +35,6 @@ pub fn render(
             div style="display:flex;gap:8px;margin-top:8px" {
                 @if viewer_is_self {
                     a.btn-secondary href="/me/edit" { "Edit profile" }
-                    a.btn-secondary href="/me/tokens" { "API tokens" }
                 } @else if logged_in {
                     @if stats.viewer_follows {
                         form action={"/u/" (u.username) "/unfollow"} method="post" style="display:inline" {
