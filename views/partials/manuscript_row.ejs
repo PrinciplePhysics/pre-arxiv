@@ -49,7 +49,7 @@
         <% if (m.has_auditor) { %>
           <span class="badge badge-audited" title="An auditor has signed off">✓ audited · <%= escapeHtml(m.auditor_name) %></span>
         <% } else { %>
-          <span class="badge badge-unaudited" title="No auditor — no human is responsible for correctness">⚠ unaudited</span>
+          <span class="badge badge-unaudited" title="No auditor has signed a correctness statement">⚠ unaudited</span>
         <% } %>
       <% } %>
     </div>

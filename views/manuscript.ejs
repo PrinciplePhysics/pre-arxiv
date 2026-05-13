@@ -22,9 +22,9 @@
       <strong>AI agent (autonomous).</strong>
       This manuscript was produced by <%= escapeHtml(aiModelDisplay) %> acting on its own, without ongoing human direction.
       <% if (!m.has_auditor) { %>
-        <strong>No human</strong> &mdash; including the submitter &mdash; takes responsibility for its conduct or contents.
+        No human conductor directed the production, and no auditor has signed a correctness statement. The submitter remains responsible for lawful posting and accurate provenance disclosure.
       <% } else { %>
-        A human auditor has separately reviewed the contents (see auditor section below); no human directed the production itself.
+        A human auditor has separately reviewed the contents within the scope of their statement (see auditor section below); no human conductor directed the production itself.
       <% } %>
     </div>
     <% } %>
@@ -40,7 +40,7 @@
       <strong>Audited.</strong>
       <%= escapeHtml(m.auditor_name) %><% if (m.auditor_affiliation) { %> (<%= escapeHtml(m.auditor_affiliation) %>)<% } %>
       has read the manuscript and provided a signed correctness statement (see below).
-      Audit endorses what was reviewed; it is not a guarantee.
+      Audit is a scoped signed opinion, not formal peer review or a guarantee.
     </div>
     <% } %>
 
@@ -153,14 +153,14 @@
         <tr><th>Submitted by</th><td>
           <a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a>
           <% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %>
-          <span class="muted small">— posting only; not responsible for the content</span>
+          <span class="muted small">— posted the work and disclosed autonomous production</span>
         </td></tr>
         <% if (m.conductor_notes) { %>
         <tr><th>Notes</th><td><%- renderMarkdown(m.conductor_notes) %></td></tr>
         <% } %>
       </table>
     <% } else { %>
-      <p class="muted small">The conductor is the pair (human, AI) responsible for producing the manuscript.</p>
+      <p class="muted small">The conductor identifies who directed the AI workflow. It is a provenance disclosure, not a legal-authorship determination.</p>
       <table class="kv">
         <tr><th>Human conductor</th><td>
           <strong<%= humanHidden ? ' class="redacted"' : '' %>><%= escapeHtml(humanDisplay) %></strong>
@@ -198,7 +198,7 @@
       <p class="muted small">Auditor ORCID iDs entered on manuscripts are self-claimed unless the manuscript separately documents an authenticated auditor identity. Submitter ORCID ownership is shown on the submitter profile when connected through ORCID OAuth.</p>
     <% } else { %>
       <div class="no-auditor">
-        <p><strong>No auditor.</strong> The submitter elected not to designate a human auditor and has acknowledged that they are <em>not</em> responsible for the correctness of this work.</p>
+        <p><strong>No auditor.</strong> No human auditor has signed a correctness statement. Treat this as a manuscript offered for inspection and discussion, not as verified work.</p>
         <p class="muted small">If you are a domain expert and have read the manuscript, you may comment with a signed correctness opinion below — those carry no formal status, but readers find them useful.</p>
       </div>
     <% } %>

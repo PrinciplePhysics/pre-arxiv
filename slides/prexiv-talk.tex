@@ -97,7 +97,7 @@
 % rust-red background) deliberately uses the plain wordmark so the X
 % inherits the white head/foot color, not the rust X used on white slides.
 \title[\PreXivPlain]{\PreXiv}
-\subtitle{a preprint repository for the AI-authored genre}
+\subtitle{a preprint repository for AI-assisted research}
 \author{An open-source side project}
 \institute{\small\texttt{github.com/PrinciplePhysics/pre-arxiv}}
 \date{2026}
@@ -110,7 +110,7 @@
   \vspace{-0.6em}
   \begin{center}
     \footnotesize\itshape\color{prexivmuted}
-    A community archive for AI-authored manuscripts that don't yet meet the bar for arXiv ---\\
+    A community archive for AI-assisted manuscripts that don't yet meet the bar for arXiv ---\\
     but deserve to be seen, discussed, and (sometimes) corrected.
   \end{center}
 \end{frame}
@@ -173,7 +173,7 @@
   \medskip\pause
   \begin{idea}[The gap]
     Between ``private chat output'' and ``arXiv preprint'' there is a missing rung.\\
-    \PreXiv\ is an attempt at that rung: \alert{a preprint of preprints.}
+    \PreXiv\ is an attempt at that rung: \alert{a provenance-first preprint archive.}
   \end{idea}
 \end{frame}
 
@@ -219,7 +219,7 @@
 
 \begin{frame}{What \PreXiv\ is}
   \begin{idea}[In one sentence]
-    A community archive for AI-authored manuscripts that have not yet passed rigorous human audit, with explicit machinery for declaring \emph{who is responsible for what.}
+    A community archive for AI-assisted manuscripts that have not yet passed rigorous human audit, with explicit machinery for declaring provenance, posting authority, and audit status.
   \end{idea}
 
   \medskip
@@ -245,12 +245,12 @@
     \column{0.48\textwidth}
       \begin{block}{1.\ \ Human + AI}
         A named human directed the AI.\\[3pt]
-        Accepts responsibility for the \emph{conduct} --- the questions, the prompts, the edits --- \emph{but not necessarily the correctness.}
+        Accepts responsibility for the \emph{conduct} --- the questions, the prompts, the edits --- while correctness is a separate audit claim.
       \end{block}
     \column{0.48\textwidth}
       \begin{alertblock}{2.\ \ AI agent (autonomous)}
         AI produced the work without ongoing human direction.\\[3pt]
-        \alert{No human takes responsibility} for either conduct or content; the submitter only puts it on the site.
+        No human conductor directed production; the submitter remains responsible for lawful posting and accurate disclosure.
       \end{alertblock}
   \end{columns}
 
@@ -300,7 +300,7 @@
     % cells, anchored north so each row aligns at its top edge
     \node[cell,fill=prexivwarnbg]  at (0.0, 2.55) {Common case. ``Unaudited'' warning. Submitter directed but doesn't vouch.};
     \node[cell,fill=prexivokbg]    at (5.2, 2.55) {The default ``preprint'' shape: human conducted, human signed off.};
-    \node[cell,fill=prexivagentbg] at (0.0,-0.30) {Strongest disclaimer. \emph{No human responsible at all.}};
+    \node[cell,fill=prexivagentbg] at (0.0,-0.30) {Autonomous production. No human conductor; legal posting responsibility stays with submitter.};
     \node[cell,fill=prexivlight]   at (5.2,-0.30) {A human auditor read agent output and stands behind it.};
   \end{tikzpicture}
 
@@ -539,7 +539,7 @@ Same fields the web form takes. Same validator. Same response shape.
   \centering
   \vspace{1em}
   {\Huge\PreXiv}\\[10pt]
-  {\Large\itshape\color{prexivmuted}the preprint of preprints}\\[28pt]
+  {\Large\itshape\color{prexivmuted}AI-use disclosure for preprints}\\[28pt]
   \large\texttt{github.com/PrinciplePhysics/pre-arxiv}\\[6pt]
   {\small\color{prexivmuted}\itshape open issues, pull requests, criticism welcome}\\[28pt]
   {\small Thanks for listening.}

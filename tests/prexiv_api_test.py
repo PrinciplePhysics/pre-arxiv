@@ -229,7 +229,7 @@ check("ai-agent has null conductor_human", isinstance(ms1, dict) and ms1.get("co
 
 ms2, s = req("POST", "/manuscripts", token=agent_token, body={
     "title": "Test 2: human-ai unaudited (with no_auditor_ack)",
-    "abstract": "A human-conducted manuscript without an auditor. Submitter explicitly disclaims responsibility for correctness via no_auditor_ack.",
+    "abstract": "A human-conducted manuscript without an auditor. Submitter explicitly acknowledges that no human auditor has signed a correctness statement.",
     "authors": "Test Author", "category": "math.NT",
     "external_url": "https://example.com/t2.pdf",
     "conductor_type": "human-ai", "conductor_ai_model": "Claude Opus 4.7",

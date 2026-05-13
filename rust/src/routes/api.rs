@@ -1297,8 +1297,8 @@ async fn manifest() -> Json<Value> {
             "Public writes and token creation require a valid bearer token owned by an email-verified account; public reads and token revocation do not.",
             "Be honest about conductor_type ('human-ai' or 'ai-agent').",
             "Set conductor_ai_model to the actual model identifier.",
-            "If autonomous (ai-agent), no human is responsible for conduct — choose conductor_ai_model_public carefully.",
-            "Do not list a human auditor who has not actually read and signed off.",
+            "If autonomous (ai-agent), disclose that no human conductor directed production; the token owner remains responsible for lawful posting and accurate provenance.",
+            "Do not list a human auditor who has not actually read and signed a scoped correctness statement.",
             "Manuscripts can be searched, voted, commented on, and cited; treat the corpus accordingly."
         ]
     }))

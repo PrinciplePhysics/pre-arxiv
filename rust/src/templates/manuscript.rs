@@ -103,16 +103,14 @@ pub fn render(
                                 } @else { "(undisclosed)" }
                                 " acting on its own, without ongoing human direction."
                                 @if m.has_auditor == 0 {
-                                    " " strong { "No human" } " — including the submitter — takes responsibility for its conduct or contents."
+                                    " No human conductor directed the production, and no auditor has signed a correctness statement. The submitter remains responsible for lawful posting and accurate provenance disclosure."
                                 }
                             }
                         }
                         @if m.has_auditor == 0 && m.conductor_type != "ai-agent" {
                             div.warn-banner {
                                 strong { "Unaudited manuscript." }
-                                " The submitter has explicitly stated that they are "
-                                em { "not" }
-                                " responsible for the correctness of this work."
+                                " No human auditor has signed a correctness statement. Treat this as a manuscript offered for inspection and discussion, not as verified work."
                             }
                         } @else if m.has_auditor != 0 {
                             @let self_audited = match (&m.auditor_name, &m.conductor_human) {
@@ -124,13 +122,13 @@ pub fn render(
                                     strong { "Self-audited." }
                                     " "
                                     @if let Some(n) = &m.auditor_name { (n) }
-                                    " is both the conductor and the auditor: they directed the AI and have read the manuscript line by line, signing a correctness statement (see below). This is a stronger claim than conducting alone, but weaker than a third-party audit."
+                                    " is both the conductor and the auditor: they directed the AI and have read the manuscript line by line, signing a scoped correctness statement (see below). This is a stronger claim than conducting alone, but weaker than a third-party audit."
                                 } @else {
                                     strong { "Audited." }
                                     " "
                                     @if let Some(n) = &m.auditor_name { (n) }
                                     @if let Some(a) = &m.auditor_affiliation { " (" (a) ")" }
-                                    " has read the manuscript and provided a signed correctness statement (see below)."
+                                    " has read the manuscript and provided a signed, scoped correctness statement (see below)."
                                 }
                             }
                         }

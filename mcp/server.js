@@ -186,11 +186,11 @@ function manuscriptFieldsSchema({ allRequired }) {
     conductor_role: { type: 'string', enum: ROLES, description: 'Required when conductor_type=human-ai. The conductor\'s role.' },
     conductor_notes: { type: 'string', description: 'Optional free-form notes about the conductor or the production process.' },
     agent_framework: { type: 'string', description: 'Optional. For conductor_type=ai-agent, the framework or harness used (e.g. `Anthropic Agent SDK`).' },
-    ai_agent_ack: { type: 'boolean', description: 'Required true when conductor_type=ai-agent — explicit acknowledgement that no human is responsible for correctness.' },
-    has_auditor: { type: 'boolean', description: 'Whether a named human auditor has signed a correctness statement.' },
+    ai_agent_ack: { type: 'boolean', description: 'Required true when conductor_type=ai-agent — explicit acknowledgement that no human conductor directed production and the submitter remains responsible for lawful posting and accurate disclosure.' },
+    has_auditor: { type: 'boolean', description: 'Whether a named human auditor has signed a scoped correctness statement.' },
     auditor_name: { type: 'string', description: 'Required when has_auditor=true. The auditor\'s display name.' },
     auditor_role: { type: 'string', enum: ROLES, description: 'Required when has_auditor=true. The auditor\'s role.' },
-    auditor_statement: { type: 'string', minLength: 20, description: 'Required when has_auditor=true. Signed correctness statement (≥20 chars).' },
+    auditor_statement: { type: 'string', minLength: 20, description: 'Required when has_auditor=true. Signed, scoped correctness statement (≥20 chars).' },
     no_auditor_ack: { type: 'boolean', description: 'Required true when has_auditor=false and conductor_type=human-ai — acknowledgement that the work is unaudited.' },
   };
   // `conductor_ai_model` and `conductor_ai_models` are alternatives.

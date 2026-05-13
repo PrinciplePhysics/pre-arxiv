@@ -58,6 +58,13 @@ npm run seed
 | `ORCID_CLIENT_ID` / `ORCID_CLIENT_SECRET` | unset | Enable authenticated ORCID OAuth/OpenID binding. Use ORCID sandbox credentials with `ORCID_BASE_URL=https://sandbox.orcid.org` while testing. |
 | `ORCID_REDIRECT_URI` | `${APP_URL}/auth/orcid/callback` | OAuth callback URI registered with ORCID. Must exactly match the ORCID client settings. |
 | `ORCID_BASE_URL` | `https://orcid.org` | ORCID OAuth host; set to `https://sandbox.orcid.org` for sandbox testing. |
+| `PREXIV_OPERATOR_NAME` | `the PreXiv operator` | Public controller/operator name shown on policy pages. |
+| `PREXIV_LEGAL_CONTACT` | `mailto:legal@prexiv.org` | General legal-notice contact shown on `/tos` and `/dmca`; may be `mailto:` or HTTPS. |
+| `PREXIV_PRIVACY_CONTACT` | `mailto:privacy@prexiv.org` | Privacy/GDPR/CCPA request contact shown on `/privacy`. |
+| `PREXIV_DMCA_CONTACT` | `mailto:dmca@prexiv.org` | Copyright notice and counter-notice contact shown on `/dmca`. |
+| `PREXIV_APPEALS_CONTACT` | `mailto:appeals@prexiv.org` | Moderation appeal contact shown on `/policies`. |
+| `PREXIV_GOVERNING_LAW` | operator-domicile default | Public governing-law text shown on `/tos`. Configure explicitly for production. |
+| `PREXIV_DMCA_COUNTER_JURISDICTION` | statutory generic text | Counter-notice jurisdiction language shown on `/dmca`. |
 | SMTP env | `/etc/prexiv/smtp.env` in production | Optional outbound verification email settings sourced by `scripts/start-rust.sh`; inline verification fallback still works without SMTP. |
 
 ## Product surface
@@ -143,6 +150,12 @@ PORT=3000
 # ORCID_CLIENT_ID=...
 # ORCID_CLIENT_SECRET=...
 # ORCID_REDIRECT_URI=https://victoria.tail921ea4.ts.net/auth/orcid/callback
+# Public legal/policy contacts:
+# PREXIV_OPERATOR_NAME="PreXiv operator"
+# PREXIV_LEGAL_CONTACT=mailto:legal@prexiv.org
+# PREXIV_PRIVACY_CONTACT=mailto:privacy@prexiv.org
+# PREXIV_DMCA_CONTACT=mailto:dmca@prexiv.org
+# PREXIV_APPEALS_CONTACT=mailto:appeals@prexiv.org
 ```
 
 Keep `UPLOAD_DIR` outside the git checkout so deploys cannot delete user PDFs/source. Back up both `DATA_DIR/prearxiv.db` and `UPLOAD_DIR`. The bundled `scripts/deploy.sh` snapshots DB/uploads first, verifies SQLite integrity, fetches `origin/main`, resets the deployment checkout to it, builds the Rust binary, restarts via `scripts/start-rust.sh`, and health-checks localhost.

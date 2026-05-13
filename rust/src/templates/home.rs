@@ -138,7 +138,7 @@ fn welcome_modal() -> Markup {
                         strong { "AI model" }
                         " that drafted it, and — when one exists — a named "
                         strong { "auditor" }
-                        " who has read the work and signed off on correctness. No auditor, no green check. Readers see at a glance who staked their name on what."
+                        " who has read the work and signed a scoped correctness statement. No auditor, no green check. Readers see at a glance who staked their name on what."
                     }
                     p {
                         "The same API is open to humans and CLI agents. After signing in, open "
@@ -240,7 +240,7 @@ pub fn manuscript_row(
                                 }
                             }
                             AuditStatus::Unaudited => {
-                                span.badge.badge-unaudited title="No auditor — no human takes responsibility for correctness" { "⚠ unaudited" }
+                                span.badge.badge-unaudited title="No auditor has signed a correctness statement" { "⚠ unaudited" }
                             }
                         }
                     }

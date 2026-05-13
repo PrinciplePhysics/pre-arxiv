@@ -233,8 +233,8 @@ Audit run 2026-05-12 (re-audited same day). Grepped for known antipatterns; veri
 
 ### Caveats
 
-- **Email verification is not enforced for API submission** in the Rust port — the JS app gates `POST /api/v1/manuscripts` on `email_verified`, the Rust port doesn't yet. Documented in the parity table in README.md. The mitigation is bearer-token auth: an unverified account that wants to abuse the API still has to mint a token first, and tokens are revocable by the user or by admin via the `audit_log` / `api_tokens` table.
-- **No abuse-heuristic layer yet.** Beyond rate limiting (which is itself missing), there's no shadow-banning, no captcha for known-spam IPs, no submission-frequency dampening. The deployment is small enough today (single-digit users) that this is acceptable; revisit when traffic grows.
+- **Verified-only write policy is enforced.** Manuscript submission, revision, comment, vote, flag, and API-token minting require an email-verified account in the Rust production path. Admins can bypass this for moderation/operational work.
+- **No advanced abuse-heuristic layer yet.** Rate limits cover auth, submit, comment, vote, flag, and API writes, but there is no shadow-banning, captcha for known-spam IPs, or submission-frequency dampening beyond those limits. Revisit when traffic grows.
 
 ## 8. Operator runbook
 

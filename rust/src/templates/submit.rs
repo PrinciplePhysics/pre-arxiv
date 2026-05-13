@@ -74,9 +74,9 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
             p.muted {
                 "A manuscript on PreXiv is a piece of work with substantial AI assistance or autonomous agent production. The "
                 strong { "conductor" }
-                " is the human who guided the AI (or, in autonomous mode, the authorized agent that produced it); the "
+                " is the human who guided the AI, or records that no human conductor directed an autonomous agent workflow; the "
                 strong { "auditor" }
-                " (optional) is a human expert who has verified its correctness."
+                " (optional) is a human expert who has signed a scoped correctness statement. These fields are provenance disclosures, not legal authorship labels."
             }
         }
 
@@ -280,7 +280,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                             span.muted.small {
                                 "A named human directed the AI to produce this work. The human accepts responsibility for the "
                                 em { "conduct" }
-                                " of the work (not necessarily its correctness — that's what an auditor is for)."
+                                " of the workflow and the honesty of the disclosure. Correctness is a separate audit claim."
                             }
                         }
                     }
@@ -289,9 +289,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         div.ctype-body {
                             strong { "AI agent alone " span.muted { "(autonomous)" } }
                             span.muted.small {
-                                "The manuscript was produced by an AI agent acting on its own — no human direction beyond an initial task description. "
-                                em { "No human" }
-                                " takes responsibility for either conduct or content; you (the submitter) only post it on the site."
+                                "The manuscript was produced by an AI agent acting on its own after an initial authorization. No human conductor directed the production; the submitter is still responsible for lawful posting and accurate disclosure."
                             }
                         }
                     }
@@ -365,9 +363,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         span {
                             "I acknowledge that this manuscript was produced by an AI agent acting "
                             strong { "autonomously" }
-                            ". "
-                            strong { "No human" }
-                            " — including me — takes responsibility for its conduct or contents. The manuscript page will display a prominent "
+                            ". No human conductor directed the production, and no auditor has signed a correctness statement unless I add one below. I remain responsible for having rights to post it and for describing the agent honestly. The manuscript page will display a prominent "
                             em { "\"AI-agent (autonomous)\"" }
                             " banner alongside any auditing status."
                         }
@@ -384,9 +380,9 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
             section.form-section.audit-section {
                 h2 { "3 — Auditor " span.muted { "(optional but encouraged)" } }
                 p.muted.small.no-katex {
-                    "A human auditor is someone who has read the manuscript line by line and is willing to attach their professional reputation to a correctness statement. This is "
+                    "A human auditor is someone who has read the manuscript line by line and is willing to attach their professional reputation to a scoped correctness statement. This is "
                     em { "not" }
-                    " formal peer review — it's a signed opinion. Listing an auditor who has not actually read and signed off is the fastest way to get the submission removed."
+                    " formal peer review, not platform endorsement, and not professional advice to readers. Listing an auditor who has not actually read and signed off is the fastest way to get the submission removed."
                 }
 
                 div.audit-choice role="radiogroup" aria-label="Audit status" {
@@ -422,8 +418,8 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         input type="checkbox" name="no_auditor_ack";
                         span {
                             "I understand and acknowledge that "
-                            strong { "without an auditor I am NOT responsible for the correctness of this manuscript." }
-                            " The work is offered to the community for inspection and discussion in its current form. A prominent "
+                            strong { "no human auditor is signing a correctness statement for this manuscript." }
+                            " I remain responsible for lawful posting, accurate provenance disclosure, and not misrepresenting what has been checked. A prominent "
                             em { "\"unaudited\"" }
                             " warning will be displayed on the manuscript page."
                         }
@@ -433,7 +429,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 div.audit-self-block {
                     div.audit-self-callout {
                         strong { "Self-audit is a stronger claim than just conducting." }
-                        " You're asserting that you've reviewed every line of the manuscript and that the result holds up. Readers will see "
+                        " You're asserting that you've reviewed every line of the manuscript and that the result holds up within the scope of your statement. Readers will see "
                         em { "“Self-audited by [your name]”" }
                         " on the page — calibrate accordingly. Don't tick this if you only directed the AI and trusted its output."
                     }
@@ -484,7 +480,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 p.muted.small {
                     "Two orthogonal choices: what readers may do with the manuscript, and whether AI systems may train on it. Read "
                     a href="/licenses" target="_blank" rel="noopener" { "the full licensing page" }
-                    " for per-license details and the autonomous-AI copyright caveat."
+                    " for per-license details and the autonomous-AI copyright discussion."
                 }
 
                 div.field {
@@ -497,7 +493,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         }
                     }
                     span.hint.no-katex {
-                        "Hover an option for the one-paragraph summary. Defaults to CC BY 4.0. For autonomous AI-agent submissions, CC0 is the safer choice — under most jurisdictions, purely AI-generated work has no human copyright anyway."
+                        "Hover an option for the one-paragraph summary. Defaults to CC BY 4.0. For autonomous AI-agent submissions, CC0 is often the clearer signal because copyright status may depend on human authorship and jurisdiction."
                     }
                 }
 

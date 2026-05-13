@@ -15,8 +15,8 @@
 
   <h2>What we collect</h2>
   <ul>
-    <li><strong>Account data</strong> — username, email address, password (stored only as a bcrypt hash; we never see the plaintext after registration), optional display name, optional affiliation, optional bio, optional ORCID. Set by you on register and editable from your profile.</li>
-    <li><strong>Manuscripts you submit</strong> — title, abstract, authors, category, the PDF you upload (if any), any external URL you provide, conductor metadata (AI model, human conductor name, role) and (optional) auditor metadata. The PDF body is parsed to plain text for full-text search.</li>
+    <li><strong>Account data</strong> — username, email address, password (stored only as a bcrypt hash; we never see the plaintext after registration), optional display name, optional affiliation, optional bio, and optional authenticated ORCID iD. If you connect ORCID through OAuth, we store the authenticated ORCID iD, verification timestamp, and no ORCID password or long-lived ORCID access token. Set by you on register and editable from your profile.</li>
+    <li><strong>Manuscripts you submit</strong> — title, abstract, authors, category, the PDF or source artifact you upload, any external URL you provide, conductor metadata (AI model, human conductor name, role) and (optional) auditor metadata. The PDF body may be parsed to plain text for full-text search. If you include personal, confidential, patient, or sensitive information inside a manuscript, that material may become public unless you use the redaction controls or withdraw it.</li>
     <li><strong>Comments, votes, flags</strong> — what you wrote / how you voted / what you flagged, plus timestamps.</li>
     <li><strong>API tokens</strong> — name, creation/last-used timestamp, and a SHA-256 hash of the token. The plaintext is shown to you exactly once at creation and never persisted.</li>
     <li><strong>Webhook subscriptions</strong> — the URL, event list, signing secret, and per-delivery status (last attempt, status code, failure count) for any webhook you register.</li>
@@ -35,9 +35,10 @@
 
   <h2>Third parties</h2>
   <ul>
-    <li><strong>Cloudflare</strong> (or whichever CDN/edge the operator has configured) sees the same request data any HTTP host sees: source IP, request URL, browser User-Agent. We do not pass user content to Cloudflare beyond what's needed to serve the request.</li>
+    <li><strong>Reverse proxy / CDN</strong> (for example Cloudflare, if the operator has configured it) sees the same request data any HTTP host sees: source IP, request URL, browser User-Agent. We do not pass user content to that provider beyond what's needed to serve the request.</li>
     <li><strong>Zenodo</strong> — only if the operator has set <code>ZENODO_TOKEN</code>. When enabled, every newly submitted manuscript's metadata (title, abstract, authors, category, conductor info) is sent to <code>zenodo.org</code> (or the sandbox) to mint a real DOI. The PDF is NOT uploaded to Zenodo by default.</li>
     <li><strong>Have I Been Pwned</strong> — when you set or change a password we send <em>only the first five hex characters</em> of the SHA-1 of your password to the HIBP range API for k-anonymity breach checking. The plaintext password never leaves your browser session.</li>
+    <li><strong>ORCID</strong> — only when you click Connect with ORCID. You are redirected to orcid.org, then ORCID returns an authorization code to PreXiv. PreXiv exchanges it server-side, verifies the signed OpenID token, and stores the authenticated ORCID iD on your account.</li>
     <li><strong>HTTP webhook subscribers you register</strong> — when an event you subscribed to fires, we POST a signed envelope to the URL <em>you</em> chose. Be aware that this means you can voluntarily forward content from your account to a third party of your choosing.</li>
     <li>No other third parties. No Google Analytics, no Meta pixel, no Sentry by default.</li>
   </ul>
@@ -50,7 +51,7 @@
     <li><strong>Right to access &amp; portability:</strong> a complete machine-readable export of your data is available at <a href="/me/export">/me/export</a> (web, downloads JSON) and <code>GET /api/v1/me/export</code> (API).</li>
     <li><strong>Right to rectification:</strong> edit your profile from your user page; edit a manuscript from its page.</li>
     <li><strong>Right to erasure:</strong> delete your account at <a href="/me/delete-account">/me/delete-account</a>.</li>
-    <li><strong>Right to object / restrict processing:</strong> email the contact below and we will work with you. In practice, the only "processing" beyond running the site is the optional Zenodo deposit; you can opt out by withdrawing the manuscript.</li>
+    <li><strong>Right to object / restrict processing:</strong> use the contact below and we will work with you. In practice, the only "processing" beyond running the site is the optional Zenodo deposit; you can opt out by withdrawing the manuscript.</li>
     <li><strong>Right to lodge a complaint with a supervisory authority:</strong> if you're in the EU/UK and unhappy with how we've handled your request, you may complain to your local data-protection authority.</li>
   </ul>
 
@@ -61,13 +62,13 @@
   <p>Passwords are bcrypt-hashed; API tokens are SHA-256 hashed and only the hash is stored. The session cookie is HTTP-only and (in production) Secure. CSRF protection is on every state-changing form. Rate limiting protects auth, submit, comment, and vote endpoints. PDFs are extracted to plain text in a bounded sandbox.</p>
 
   <h2>International transfers</h2>
-  <p>The operator's servers may be located outside your home jurisdiction. By using the site you consent to your data being processed there. We don't make any further onward transfers beyond the third parties listed above.</p>
+  <p>The operator's servers and service providers may be located outside your home jurisdiction. Your data may be processed where the operator, hosting provider, or listed third parties operate. We do not sell personal data, and we do not make onward transfers beyond operating the site and the third parties listed above.</p>
 
   <h2>Changes</h2>
   <p>We will update this page when our practices change. Substantive changes will be flagged in a banner on the home page for at least seven days.</p>
 
   <h2>Contact</h2>
-  <p>Privacy / GDPR enquiries: <code>privacy@example.invalid</code> <em>(operator: replace with a real address before going live)</em>. Designated controller of personal data: the named operator listed in the source-repo README.</p>
+  <p>Privacy / GDPR / CCPA enquiries: <a href="mailto:privacy@prexiv.org"><code>privacy@prexiv.org</code></a>. Designated controller of personal data: the PreXiv operator.</p>
 </article>
 
 <%- include('partials/footer') %>
