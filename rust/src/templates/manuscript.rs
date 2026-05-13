@@ -65,6 +65,14 @@ pub fn render(
         .map(|s| s.contains("redacted"))
         .unwrap_or(false)
         || ((m.conductor_human_public == 0 || m.conductor_ai_model_public == 0) && hosted_source);
+    let viewer_is_submitter = ctx
+        .user
+        .as_ref()
+        .map(|u| u.id == m.submitter_id)
+        .unwrap_or(false);
+    let viewer_is_admin = ctx.user.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+    let can_revise = (viewer_is_submitter || viewer_is_admin) && !m.is_withdrawn();
+    let can_withdraw = !m.is_withdrawn() && (viewer_is_submitter || viewer_is_admin);
 
     let body = html! {
         div.bx-grid {
@@ -378,14 +386,33 @@ pub fn render(
                                 span.val { (time_ago(ts)) }
                             }
                         }
+                        li { span.lbl { "Score" }    span.val { (m.score.unwrap_or(0)) } }
+                        li { span.lbl { "Views" }    span.val { (m.view_count.unwrap_or(0)) } }
+                        li { span.lbl { "Comments" } span.val { (m.comment_count.unwrap_or(0)) } }
                     }
-                    @if let Some(ts) = &m.created_at {
-                        p.muted.small style="margin:6px 0 0" { "Posted " (time_ago(ts)) "." }
+                    div.bx-sidebar-inline style="margin-top:8px" {
+                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/versions" } { "Version history" }
+                        @if can_revise {
+                            a.bx-sidebar-btn href={ "/m/" (slug) "/revise" } { "New revision" }
+                        }
                     }
                 }
 
                 div.bx-sidebar-block {
-                    h3 { "Trust signals" }
+                    h3 { "Trust and subject" }
+                    div.bx-subject-compact {
+                        a.ms-cat-pill href={ "/browse/" (m.category) } { (m.category) }
+                        @if let Some((un, dn, ev, ie, oo)) = submitter {
+                            span.muted.small {
+                                "by "
+                                a href={ "/u/" (un) } { (dn.as_deref().unwrap_or(un.as_str())) }
+                                @if *oo != 0 || (*ev != 0 && *ie != 0) {
+                                    " "
+                                    span.profile-vbadge title="Verified scholar" { "✓ verified" }
+                                }
+                            }
+                        }
+                    }
                     div.trust-badges aria-label="Trust and provenance badges" {
                         @if submitter_email_verified {
                             (trust_badge("Email verified", "The submitter confirmed control of their account email address."))
@@ -424,9 +451,6 @@ pub fn render(
 
                 div.bx-sidebar-block {
                     h3 { "Access and citation" }
-                    @if let Some(ts) = &m.created_at {
-                        p.muted.small style="margin:0 0 8px" { "Latest public record posted " (ts.format("%B %-d, %Y")) "." }
-                    }
                     @if let Some(path) = &m.pdf_path {
                         a.bx-sidebar-btn href={ "/static/uploads/" (path) } target="_blank" rel="noopener" {
                             "Download hosted PDF"
@@ -440,10 +464,10 @@ pub fn render(
                     @if let Some(url) = &m.external_url {
                         (sidebar_external(url))
                     }
-                    a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite" } { "Citation tools" }
-                    div style="display:flex;gap:6px;margin-top:6px" {
-                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite.bib" } style="flex:1;margin:0" { "BibTeX" }
-                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite.ris" } style="flex:1;margin:0" { "RIS" }
+                    div.bx-sidebar-inline {
+                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite" } { "Cite" }
+                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite.bib" } { "BibTeX" }
+                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite.ris" } { "RIS" }
                     }
                 }
 
@@ -497,117 +521,85 @@ pub fn render(
                     }
                 }
 
-                div.bx-sidebar-block {
-                    h3 { "Statistics" }
-                    ul.bx-stats {
-                        li { span.lbl { "Score" }    span.val { (m.score.unwrap_or(0)) } }
-                        li { span.lbl { "Views" }    span.val { (m.view_count.unwrap_or(0)) } }
-                        li { span.lbl { "Comments" } span.val { (m.comment_count.unwrap_or(0)) } }
-                        li { span.lbl { "Version" }  span.val { "v" (m.current_version) } }
-                    }
-                }
-
-                // Versions block: list link + revise CTA when allowed.
-                @let viewer_is_submitter = ctx.user.as_ref().map(|u| u.id == m.submitter_id).unwrap_or(false);
-                @let viewer_is_admin     = ctx.user.as_ref().map(|u| u.is_admin()).unwrap_or(false);
-                @let can_revise = (viewer_is_submitter || viewer_is_admin) && !m.is_withdrawn();
-                div.bx-sidebar-block {
-                    h3 { "Versions" }
-                    @if m.current_version > 1 {
-                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/versions" } {
-                            "View all " (m.current_version) " versions"
-                        }
-                    } @else {
-                        p.muted.small style="margin:0 0 6px" { "Only v1 has been published." }
-                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/versions" } { "Version history" }
-                    }
-                    @if can_revise {
-                        a.bx-sidebar-btn href={ "/m/" (slug) "/revise" } style="margin-top:6px" {
-                            "\u{2728} Publish a new revision"
-                        }
-                    }
-                }
-
-                div.bx-sidebar-block {
-                    h3 { "Subject area" }
-                    a.ms-cat-pill href={ "/browse/" (m.category) } { (m.category) }
-                    @if let Some((un, dn, ev, ie, oo)) = submitter {
-                        p.muted.small style="margin:12px 0 0" {
-                            "Submitted by "
-                            a href={ "/u/" (un) } { (dn.as_deref().unwrap_or(un.as_str())) }
-                            @if *oo != 0 || (*ev != 0 && *ie != 0) {
-                                " "
-                                span.profile-vbadge title="Verified scholar"
-                                    style="font-size:10.5px;padding:2px 7px" { "✓ verified" }
-                            }
-                        }
-                    }
-                }
-
                 @let license_id = m.license.as_deref().unwrap_or("CC-BY-4.0");
                 @let lic = licenses::lookup(license_id);
                 @let ai_id = m.ai_training.as_deref().unwrap_or("allow");
                 @let ai = licenses::ai_training_lookup(ai_id);
                 div.bx-sidebar-block {
                     h3 { "License" }
-                    @if let Some(l) = lic {
-                        a href=(l.url) target="_blank" rel="noopener" style="font-weight:600" { (l.short) }
-                        p.muted.small style="margin:6px 0 0" { (l.summary) }
-                    } @else {
-                        span.muted { (license_id) }
-                    }
-                    hr style="margin:10px 0;border:none;border-top:1px solid var(--rule)";
-                    h3 { "AI training" }
-                    @if let Some(o) = ai {
-                        strong { (o.short) }
-                        p.muted.small style="margin:6px 0 0" {
-                            @if ai_id == "disallow" {
-                                "Submitter requests this manuscript NOT be used as training data."
-                            } @else if ai_id == "allow-with-attribution" {
-                                "Training permitted; submitter requests attribution in trained-model output."
-                            } @else {
-                                "Training permitted under the reader license above."
+                    ul.bx-stats {
+                        li {
+                            span.lbl { "Reader license" }
+                            span.val {
+                                @if let Some(l) = lic {
+                                    a href=(l.url) target="_blank" rel="noopener" { (l.short) }
+                                } @else {
+                                    (license_id)
+                                }
+                            }
+                        }
+                        li {
+                            span.lbl { "AI training" }
+                            span.val {
+                                @if let Some(o) = ai { (o.short) } @else { (ai_id) }
                             }
                         }
                     }
-                    p.muted.small style="margin:8px 0 0" {
-                        a href="/licenses" { "What do these mean?" }
+                    details.bx-sidebar-fold {
+                        summary { "Details" }
+                        @if let Some(l) = lic {
+                            p.muted.small { (l.summary) }
+                        }
+                        @if let Some(_o) = ai {
+                            p.muted.small {
+                                @if ai_id == "disallow" {
+                                    "Submitter requests this manuscript NOT be used as training data."
+                                } @else if ai_id == "allow-with-attribution" {
+                                    "Training permitted; submitter requests attribution in trained-model output."
+                                } @else {
+                                    "Training permitted under the reader license above."
+                                }
+                            }
+                        }
+                        p.muted.small {
+                            a href="/licenses" { "What do these mean?" }
+                        }
                     }
                 }
 
-                @let can_withdraw = match &ctx.user {
-                    Some(u) => !m.is_withdrawn() && (u.id == m.submitter_id || u.is_admin()),
-                    None => false,
-                };
                 @if can_withdraw {
                     div.bx-sidebar-block {
                         h3 { "Submitter actions" }
-                        p.muted.small style="margin:0 0 8px" {
-                            "You are the submitter of this manuscript. "
-                            @if let Some(u) = &ctx.user { @if u.is_admin() && u.id != m.submitter_id { "(Admin override.) " } }
-                            "Withdrawing replaces this page with a tombstone — id, DOI, title, conductor metadata, and the reason stay so citations don't break, but the body, PDF link, and search index drop."
-                        }
-                        form action={"/m/" (slug) "/withdraw"} method="post" {
-                            input type="hidden" name="csrf_token" value=(ctx.csrf_token);
-                            textarea name="reason" rows="3" maxlength="500"
-                                     style="width:100%;font-size:0.9em"
-                                     placeholder="Reason (optional but encouraged — shown on the tombstone). e.g. 'duplicate of prexiv:…', 'Lemma 2 has a fatal hole', 'replaced by journal version'." {}
-                            button.btn-secondary.danger type="submit"
-                                   style="margin-top:6px;width:100%"
-                                   onclick="return confirm('Withdraw this manuscript? The page will be replaced with a tombstone immediately. This action is not reversible from the UI.');"
-                                { "▾ Withdraw manuscript" }
+                        details.bx-sidebar-fold.bx-sidebar-fold-danger {
+                            summary { "Withdraw manuscript" }
+                            p.muted.small {
+                                "Withdrawing replaces this page with a tombstone. The id, DOI, title, conductor metadata, and reason stay so citations do not break; the body, PDF link, and search index drop."
+                                @if let Some(u) = &ctx.user { @if u.is_admin() && u.id != m.submitter_id { " Admin override." } }
+                            }
+                            form action={"/m/" (slug) "/withdraw"} method="post" {
+                                input type="hidden" name="csrf_token" value=(ctx.csrf_token);
+                                textarea name="reason" rows="3" maxlength="500"
+                                         style="width:100%;font-size:0.9em"
+                                         placeholder="Reason shown on the tombstone." {}
+                                button.btn-secondary.danger type="submit"
+                                       style="margin-top:6px;width:100%"
+                                       onclick="return confirm('Withdraw this manuscript? The page will be replaced with a tombstone immediately. This action is not reversible from the UI.');"
+                                    { "Withdraw manuscript" }
+                            }
                         }
                     }
                 }
 
                 @if !cats.is_empty() {
                     div.bx-sidebar-block {
-                        h3 { "Subject areas" }
-                        ul.bx-cat-list {
-                            @for (cat, n) in cats {
-                                li.on[*cat == m.category] {
-                                    a href={ "/browse/" (cat) } { (cat) }
-                                    span.n { "(" (n) ")" }
+                        details.bx-sidebar-fold {
+                            summary { "Browse subject areas" }
+                            ul.bx-cat-list {
+                                @for (cat, n) in cats {
+                                    li.on[*cat == m.category] {
+                                        a href={ "/browse/" (cat) } { (cat) }
+                                        span.n { "(" (n) ")" }
+                                    }
                                 }
                             }
                         }

@@ -2231,6 +2231,66 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .bx-sidebar-btn:active { transform: translateY(0); }
 .bx-stats .val { font-weight: 700; }
 
+.bx-sidebar-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+.bx-sidebar-inline .bx-sidebar-btn {
+  margin: 0;
+  padding: 7px 8px;
+  font-size: 12.5px;
+}
+
+.bx-subject-compact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 9px;
+  margin-bottom: 9px;
+}
+.bx-subject-compact .profile-vbadge {
+  font-size: 10.5px;
+  padding: 2px 7px;
+}
+
+.bx-sidebar-fold {
+  margin-top: 8px;
+  border-top: 1px solid var(--rule);
+  padding-top: 7px;
+}
+.bx-sidebar-block > .bx-sidebar-fold:first-child {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+.bx-sidebar-fold summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--brand);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.bx-sidebar-fold summary::-webkit-details-marker { display: none; }
+.bx-sidebar-fold summary::before {
+  content: "›";
+  display: inline-block;
+  margin-right: 5px;
+  color: var(--muted);
+  transform: translateY(-1px);
+}
+.bx-sidebar-fold[open] summary::before {
+  transform: rotate(90deg) translateX(1px);
+}
+.bx-sidebar-fold > :not(summary):first-of-type {
+  margin-top: 7px;
+}
+.bx-sidebar-fold-danger summary {
+  color: #9f3212;
+}
+
 .trust-badges {
   display: flex;
   flex-wrap: wrap;
