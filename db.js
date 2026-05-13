@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS manuscripts (
   pdf_text           TEXT,
   external_url       TEXT,
 
-  -- 'human-ai' (named human conductor + AI co-author) or 'ai-agent' (AI alone, autonomous)
+  -- 'human-ai' (named human conductor + disclosed AI tool) or 'ai-agent' (authorized autonomous agent)
   conductor_type     TEXT NOT NULL DEFAULT 'human-ai'
                      CHECK (conductor_type IN ('human-ai', 'ai-agent')),
   conductor_ai_model TEXT NOT NULL,

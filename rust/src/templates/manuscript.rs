@@ -197,7 +197,7 @@ pub fn render(
                         } @else {
                             @let ai_list_h = m.ai_models();
                             table.kv {
-                                tr { th { "Mode" } td { span.role-tag { "Human + AI co-author" @if ai_list_h.len() > 1 { "s" } } } }
+                                tr { th { "Mode" } td { span.role-tag { "Human-directed AI assistance" } } }
                                 tr { th { "Conductor (human)" } td {
                                     strong {
                                         @if m.conductor_human_public != 0 {
@@ -209,7 +209,7 @@ pub fn render(
                                     }
                                 } }
                                 tr {
-                                    th { (if ai_list_h.len() > 1 { "AI co-authors" } else { "AI co-author" }) }
+                                    th { (if ai_list_h.len() > 1 { "AI models" } else { "AI model" }) }
                                     td {
                                         @if m.conductor_ai_model_public != 0 {
                                             span.ai-model-pills {

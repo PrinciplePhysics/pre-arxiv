@@ -1,4 +1,4 @@
-//! /admin — flag queue + audit log. Gated by RequireAdmin.
+//! /admin — operational dashboard, flag queue, and audit log. Gated by RequireAdmin.
 
 use axum::extract::{Form, Path, Query, State};
 use axum::response::{Html, IntoResponse, Redirect, Response};
@@ -11,6 +11,75 @@ use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
 use crate::state::AppState;
 use crate::templates;
+
+pub struct AdminStats {
+    pub total_manuscripts: i64,
+    pub live_manuscripts: i64,
+    pub withdrawn_manuscripts: i64,
+    pub manuscripts_24h: i64,
+    pub manuscripts_7d: i64,
+    pub audited_manuscripts: i64,
+    pub hidden_human_manuscripts: i64,
+    pub hidden_ai_manuscripts: i64,
+    pub stored_pdfs: i64,
+    pub stored_sources: i64,
+    pub total_users: i64,
+    pub email_verified_users: i64,
+    pub admin_users: i64,
+    pub verified_scholar_users: i64,
+    pub orcid_oauth_users: i64,
+    pub institutional_verified_users: i64,
+    pub new_users_7d: i64,
+    pub total_comments: i64,
+    pub comments_24h: i64,
+    pub comments_7d: i64,
+    pub total_votes: i64,
+    pub votes_7d: i64,
+    pub open_flags: i64,
+    pub flags_24h: i64,
+    pub oldest_open_flag_at: Option<NaiveDateTime>,
+    pub active_tokens: i64,
+    pub tokens_used_7d: i64,
+}
+
+pub struct CategoryStatRow {
+    pub category: String,
+    pub total: i64,
+    pub live: i64,
+    pub latest_at: Option<NaiveDateTime>,
+}
+
+pub struct RecentSubmissionRow {
+    pub slug: Option<String>,
+    pub title: String,
+    pub category: String,
+    pub submitter_username: String,
+    pub created_at: Option<NaiveDateTime>,
+    pub score: i64,
+    pub comment_count: i64,
+    pub withdrawn: bool,
+    pub has_auditor: bool,
+    pub current_version: i64,
+    pub has_stored_artifact: bool,
+}
+
+pub struct RecentUserRow {
+    pub username: String,
+    pub display_name: Option<String>,
+    pub email_verified: bool,
+    pub is_admin: bool,
+    pub orcid_oauth_verified: bool,
+    pub institutional_email: bool,
+    pub created_at: Option<NaiveDateTime>,
+}
+
+pub struct AdminDashboard {
+    pub stats: AdminStats,
+    pub category_stats: Vec<CategoryStatRow>,
+    pub recent_submissions: Vec<RecentSubmissionRow>,
+    pub recent_users: Vec<RecentUserRow>,
+    pub recent_audit: Vec<AuditRow>,
+}
 
 pub struct FlagRow {
     pub id: i64,
@@ -31,6 +100,7 @@ pub async fn queue(
     maybe_user: MaybeUser,
     RequireAdmin(_admin): RequireAdmin,
 ) -> AppResult<Html<String>> {
+    let dashboard = load_dashboard(&state).await?;
     let raw: Vec<(i64, String, i64, String, String, Option<NaiveDateTime>)> = sqlx::query_as(
         r#"SELECT f.id, f.target_type, f.target_id, f.reason,
                   u.username AS reporter_username, f.created_at
@@ -83,14 +153,23 @@ pub async fn queue(
             _ => (None, None, false),
         };
         flags.push(FlagRow {
-            id, target_type, target_id, reason, reporter_username, created_at,
-            target_label, target_url, target_withdrawn,
+            id,
+            target_type,
+            target_id,
+            reason,
+            reporter_username,
+            created_at,
+            target_label,
+            target_url,
+            target_withdrawn,
         });
     }
 
     let mut ctx = build_ctx(&session, maybe_user, "/admin").await;
     ctx.no_index = true;
-    Ok(Html(templates::admin::render_queue(&ctx, &flags).into_string()))
+    Ok(Html(
+        templates::admin::render_queue(&ctx, &dashboard, &flags).into_string(),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -112,7 +191,11 @@ pub async fn resolve(
         return Ok(Redirect::to("/admin").into_response());
     }
     let note = form.note.trim();
-    let note_opt = if note.is_empty() { None } else { Some(note.to_string()) };
+    let note_opt = if note.is_empty() {
+        None
+    } else {
+        Some(note.to_string())
+    };
     sqlx::query(
         r#"UPDATE flag_reports
            SET resolved = 1, resolved_by_id = ?, resolved_at = CURRENT_TIMESTAMP, resolution_note = ?
@@ -140,7 +223,8 @@ pub async fn resolve(
 
 #[derive(Deserialize)]
 pub struct AuditQuery {
-    #[serde(default)] pub page: Option<i64>,
+    #[serde(default)]
+    pub page: Option<i64>,
 }
 
 pub struct AuditRow {
@@ -154,6 +238,312 @@ pub struct AuditRow {
     pub created_at: Option<NaiveDateTime>,
 }
 
+async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
+    let (
+        total_manuscripts,
+        live_manuscripts,
+        withdrawn_manuscripts,
+        manuscripts_24h,
+        manuscripts_7d,
+        audited_manuscripts,
+        hidden_human_manuscripts,
+        hidden_ai_manuscripts,
+        stored_pdfs,
+        stored_sources,
+    ): (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
+        r#"SELECT
+              COUNT(*),
+              COALESCE(SUM(CASE WHEN withdrawn = 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN withdrawn != 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN has_auditor != 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN conductor_type = 'human-ai' AND conductor_human_public = 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN conductor_ai_model_public = 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN pdf_path IS NOT NULL AND pdf_path <> '' THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN source_path IS NOT NULL AND source_path <> '' THEN 1 ELSE 0 END), 0)
+           FROM manuscripts"#,
+    )
+    .fetch_one(&state.pool)
+    .await?;
+
+    let (
+        total_users,
+        email_verified_users,
+        admin_users,
+        verified_scholar_users,
+        orcid_oauth_users,
+        institutional_verified_users,
+        new_users_7d,
+    ): (i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
+        r#"SELECT
+              COUNT(*),
+              COALESCE(SUM(CASE WHEN email_verified != 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN is_admin != 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE
+                  WHEN orcid_oauth_verified != 0
+                    OR (email_verified != 0 AND institutional_email != 0)
+                  THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN orcid_oauth_verified != 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN email_verified != 0 AND institutional_email != 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0)
+           FROM users"#,
+    )
+    .fetch_one(&state.pool)
+    .await?;
+
+    let (total_comments, comments_24h, comments_7d): (i64, i64, i64) = sqlx::query_as(
+        r#"SELECT
+              COUNT(*),
+              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0)
+           FROM comments"#,
+    )
+    .fetch_one(&state.pool)
+    .await?;
+
+    let (total_votes, votes_7d): (i64, i64) = sqlx::query_as(
+        r#"SELECT
+              COUNT(*),
+              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0)
+           FROM votes"#,
+    )
+    .fetch_one(&state.pool)
+    .await?;
+
+    let (open_flags, flags_24h, oldest_open_flag_at): (i64, i64, Option<NaiveDateTime>) =
+        sqlx::query_as(
+            r#"SELECT
+                  COUNT(*),
+                  COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
+                  MIN(created_at)
+               FROM flag_reports
+               WHERE resolved = 0"#,
+        )
+        .fetch_one(&state.pool)
+        .await?;
+
+    let (active_tokens, tokens_used_7d): (i64, i64) = sqlx::query_as(
+        r#"SELECT
+              COUNT(*),
+              COALESCE(SUM(CASE WHEN last_used_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0)
+           FROM api_tokens
+           WHERE expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP"#,
+    )
+    .fetch_one(&state.pool)
+    .await?;
+
+    let category_raw: Vec<(String, i64, i64, Option<NaiveDateTime>)> = sqlx::query_as(
+        r#"SELECT
+              category,
+              COUNT(*) AS total,
+              COALESCE(SUM(CASE WHEN withdrawn = 0 THEN 1 ELSE 0 END), 0) AS live,
+              MAX(created_at) AS latest_at
+           FROM manuscripts
+           GROUP BY category
+           ORDER BY total DESC, category ASC
+           LIMIT 10"#,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let category_stats = category_raw
+        .into_iter()
+        .map(|(category, total, live, latest_at)| CategoryStatRow {
+            category,
+            total,
+            live,
+            latest_at,
+        })
+        .collect();
+
+    let recent_submission_raw: Vec<(
+        Option<String>,
+        String,
+        String,
+        String,
+        Option<NaiveDateTime>,
+        i64,
+        i64,
+        i64,
+        i64,
+        i64,
+        i64,
+    )> = sqlx::query_as(
+        r#"SELECT
+              m.arxiv_like_id,
+              m.title,
+              m.category,
+              u.username,
+              m.created_at,
+              COALESCE(m.score, 0),
+              COALESCE(m.comment_count, 0),
+              m.withdrawn,
+              m.has_auditor,
+              COALESCE(m.current_version, 1),
+              CASE
+                WHEN (m.pdf_path IS NOT NULL AND m.pdf_path <> '')
+                  OR (m.source_path IS NOT NULL AND m.source_path <> '')
+                THEN 1 ELSE 0
+              END
+           FROM manuscripts m
+           JOIN users u ON u.id = m.submitter_id
+           ORDER BY m.created_at DESC
+           LIMIT 8"#,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let recent_submissions = recent_submission_raw
+        .into_iter()
+        .map(
+            |(
+                slug,
+                title,
+                category,
+                submitter_username,
+                created_at,
+                score,
+                comment_count,
+                withdrawn,
+                has_auditor,
+                current_version,
+                has_stored_artifact,
+            )| RecentSubmissionRow {
+                slug,
+                title,
+                category,
+                submitter_username,
+                created_at,
+                score,
+                comment_count,
+                withdrawn: withdrawn != 0,
+                has_auditor: has_auditor != 0,
+                current_version,
+                has_stored_artifact: has_stored_artifact != 0,
+            },
+        )
+        .collect();
+
+    let recent_user_raw: Vec<(
+        String,
+        Option<String>,
+        i64,
+        i64,
+        i64,
+        i64,
+        Option<NaiveDateTime>,
+    )> = sqlx::query_as(
+        r#"SELECT username, display_name, email_verified, is_admin,
+                  orcid_oauth_verified, institutional_email, created_at
+           FROM users
+           ORDER BY id DESC
+           LIMIT 8"#,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let recent_users = recent_user_raw
+        .into_iter()
+        .map(
+            |(
+                username,
+                display_name,
+                email_verified,
+                is_admin,
+                orcid_oauth_verified,
+                institutional_email,
+                created_at,
+            )| RecentUserRow {
+                username,
+                display_name,
+                email_verified: email_verified != 0,
+                is_admin: is_admin != 0,
+                orcid_oauth_verified: orcid_oauth_verified != 0,
+                institutional_email: institutional_email != 0,
+                created_at,
+            },
+        )
+        .collect();
+
+    let recent_audit = load_audit_rows(state, 8, 0).await?;
+
+    Ok(AdminDashboard {
+        stats: AdminStats {
+            total_manuscripts,
+            live_manuscripts,
+            withdrawn_manuscripts,
+            manuscripts_24h,
+            manuscripts_7d,
+            audited_manuscripts,
+            hidden_human_manuscripts,
+            hidden_ai_manuscripts,
+            stored_pdfs,
+            stored_sources,
+            total_users,
+            email_verified_users,
+            admin_users,
+            verified_scholar_users,
+            orcid_oauth_users,
+            institutional_verified_users,
+            new_users_7d,
+            total_comments,
+            comments_24h,
+            comments_7d,
+            total_votes,
+            votes_7d,
+            open_flags,
+            flags_24h,
+            oldest_open_flag_at,
+            active_tokens,
+            tokens_used_7d,
+        },
+        category_stats,
+        recent_submissions,
+        recent_users,
+        recent_audit,
+    })
+}
+
+async fn load_audit_rows(state: &AppState, per: i64, offset: i64) -> AppResult<Vec<AuditRow>> {
+    let raw: Vec<(
+        i64,
+        Option<i64>,
+        String,
+        Option<String>,
+        Option<i64>,
+        Option<String>,
+        Option<String>,
+        Option<NaiveDateTime>,
+        Option<String>,
+    )> = sqlx::query_as(
+        r#"SELECT a.id, a.actor_user_id, a.action, a.target_type, a.target_id,
+                      a.detail, a.ip, a.created_at, u.username
+               FROM audit_log a
+               LEFT JOIN users u ON u.id = a.actor_user_id
+               ORDER BY a.id DESC LIMIT ? OFFSET ?"#,
+    )
+    .bind(per)
+    .bind(offset)
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(raw
+        .into_iter()
+        .map(
+            |(id, _actor_id, action, target_type, target_id, detail, ip, created_at, username)| {
+                AuditRow {
+                    id,
+                    actor_username: username,
+                    action,
+                    target_type,
+                    target_id,
+                    detail,
+                    ip,
+                    created_at,
+                }
+            },
+        )
+        .collect())
+}
+
 pub async fn audit(
     State(state): State<AppState>,
     session: Session,
@@ -165,30 +555,15 @@ pub async fn audit(
     let page = q.page.unwrap_or(1).max(1);
     let offset = (page - 1) * per;
 
-    let raw: Vec<(i64, Option<i64>, String, Option<String>, Option<i64>, Option<String>, Option<String>, Option<NaiveDateTime>, Option<String>)> =
-        sqlx::query_as(
-            r#"SELECT a.id, a.actor_user_id, a.action, a.target_type, a.target_id,
-                      a.detail, a.ip, a.created_at, u.username
-               FROM audit_log a
-               LEFT JOIN users u ON u.id = a.actor_user_id
-               ORDER BY a.id DESC LIMIT ? OFFSET ?"#,
-        )
-        .bind(per)
-        .bind(offset)
-        .fetch_all(&state.pool)
-        .await?;
-
-    let entries: Vec<AuditRow> = raw
-        .into_iter()
-        .map(|(id, _actor_id, action, target_type, target_id, detail, ip, created_at, username)| AuditRow {
-            id, actor_username: username, action, target_type, target_id, detail, ip, created_at,
-        })
-        .collect();
+    let entries = load_audit_rows(&state, per, offset).await?;
 
     let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM audit_log")
-        .fetch_one(&state.pool).await?;
+        .fetch_one(&state.pool)
+        .await?;
 
     let mut ctx = build_ctx(&session, maybe_user, "/admin").await;
     ctx.no_index = true;
-    Ok(Html(templates::admin::render_audit(&ctx, &entries, page, per, total.0).into_string()))
+    Ok(Html(
+        templates::admin::render_audit(&ctx, &entries, page, per, total.0).into_string(),
+    ))
 }

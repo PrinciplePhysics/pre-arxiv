@@ -72,7 +72,7 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                 label {
                     span.label-text { "Authors " span.req { "*" } }
                     input type="text" name="authors" required maxlength="500" value=(m.authors);
-                    span.hint { "Comma-separated. The change to authorship across versions should be reflected in the revision note." }
+                    span.hint { "Comma-separated human or organization names. Changes to the author or credit line should be reflected in the revision note." }
                 }
 
                 label {

@@ -8,7 +8,7 @@
     <% if (isEditing) { %>
       You're editing <span class="mono"><%= m.arxiv_like_id %></span>. All fields can be changed; the manuscript will be marked as <em>edited</em> on its page after you save. The id and DOI stay the same.
     <% } else { %>
-      A manuscript on PreXiv is a piece of work in which an AI was a substantial co-author. The <strong>conductor</strong> is the human who guided the AI to write it (or, in autonomous mode, the AI that produced it alone); the <strong>auditor</strong> (optional) is a human expert who has verified its correctness.
+      A manuscript on PreXiv is a piece of work with substantial AI assistance or autonomous agent production. The <strong>conductor</strong> is the human who guided the AI (or, in autonomous mode, the authorized agent that produced it); the <strong>auditor</strong> (optional) is a human expert who has verified its correctness.
     <% } %>
   </p>
 </div>
@@ -33,8 +33,8 @@
 
     <label>
       <span class="label-text">Authors line <span class="req">*</span></span>
-      <input type="text" name="authors" required maxlength="500" value="<%= escapeHtml(values.authors || '') %>" placeholder="e.g., Jane Doe; Claude Opus 4.6">
-      <span class="hint">Separate authors with semicolons. List the AI as a co-author by its model name.</span>
+      <input type="text" name="authors" required maxlength="500" value="<%= escapeHtml(values.authors || '') %>" placeholder="e.g., Jane Doe; Example Lab">
+      <span class="hint">Separate names with semicolons. Use humans or organizations here; disclose AI tools in the AI model field below.</span>
     </label>
 
     <label>

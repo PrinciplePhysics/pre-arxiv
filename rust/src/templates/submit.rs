@@ -44,7 +44,7 @@ const AI_MODELS: &[&str] = &[
     "Qwen 3.5",
     "GLM-5",
     "Mistral Large 3",
-    // Multi-model authorship
+    // Multi-model provenance
     "Multiple (see notes)",
 ];
 
@@ -72,9 +72,9 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
         div.page-header {
             h1 { "Submit a manuscript" }
             p.muted {
-                "A manuscript on PreXiv is a piece of work in which an AI was a substantial co-author. The "
+                "A manuscript on PreXiv is a piece of work with substantial AI assistance or autonomous agent production. The "
                 strong { "conductor" }
-                " is the human who guided the AI to write it (or, in autonomous mode, the AI that produced it alone); the "
+                " is the human who guided the AI (or, in autonomous mode, the authorized agent that produced it); the "
                 strong { "auditor" }
                 " (optional) is a human expert who has verified its correctness."
             }
@@ -114,8 +114,8 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 label {
                     span.label-text { "Authors line " span.req { "*" } }
                     input type="text" name="authors" required maxlength="500"
-                          placeholder="e.g., Jane Doe; Claude Opus 4.7";
-                    span.hint.no-katex { "Separate authors with semicolons. List the AI as a co-author by its model name." }
+                          placeholder="e.g., Jane Doe; Example Lab";
+                    span.hint.no-katex { "Separate names with semicolons. Use humans or organizations here; disclose AI tools in the AI model field below." }
                 }
 
                 label {

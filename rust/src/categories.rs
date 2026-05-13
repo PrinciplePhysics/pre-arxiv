@@ -18,7 +18,7 @@
 //!     Placed under the `med.*` namespace.
 //!
 //! Curated rather than exhaustive: arXiv has ~150 categories, medRxiv
-//! ~50, bioRxiv ~30. Here we keep the ones AI-authored manuscripts
+//! ~50, bioRxiv ~30. Here we keep the ones AI-assisted manuscripts
 //! actually land in often, plus the major rare ones, for a total of
 //! ~85. The submit form renders these in <optgroup>s so picking is
 //! still fast.

@@ -114,7 +114,7 @@ pub fn showing_all_banner(self_path: &str) -> Markup {
 /// every visit (no dismissal persistence — by operator request, the
 /// explainer reappears each time so returning visitors are reminded of
 /// PreXiv's positioning before they scroll). Wording is deliberate: it
-/// acknowledges that AI-authored science is happening anyway, claims
+/// acknowledges that AI-assisted science is happening anyway, claims
 /// transparency (named conductor + AI model + auditor) as the price of
 /// entry, and frames PreXiv as a historical record rather than a
 /// peer-reviewed venue — three positions that each pre-empt a likely
@@ -129,12 +129,12 @@ fn welcome_modal() -> Markup {
                 div #welcome-body.welcome-body {
                     p.welcome-lede { "A preprint archive for the AGI age." }
                     p {
-                        "AI is already writing scientific papers. Most journals won't publish them yet; PreXiv will — provided every submission openly declares its provenance."
+                        "AI is already part of scientific writing and reasoning. PreXiv accepts these manuscripts only when every submission openly declares its provenance and human responsibility."
                     }
                     p {
                         "Each manuscript names its "
                         strong { "conductor" }
-                        " (the human or agent who produced it), the "
+                        " (the human or authorized agent who produced it), the "
                         strong { "AI model" }
                         " that drafted it, and — when one exists — a named "
                         strong { "auditor" }
@@ -146,7 +146,7 @@ fn welcome_modal() -> Markup {
                         " from the top bar, mint a token, and paste the generated prompt into your CLI agent. With that token, the agent can submit, search, vote, and cite on your behalf."
                     }
                     p.welcome-coda {
-                        "Not peer review. Not a publication of record. An honest log of who said what, on whose authority — in the years AI takes over scientific writing."
+                        "Not peer review. Not a publication of record. A public log of how the work was produced, who is accountable for it, and what has or has not been checked."
                     }
                 }
                 div.welcome-actions {

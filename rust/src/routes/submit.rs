@@ -117,7 +117,7 @@ pub async fn do_submit(
     if fields.authors.trim().is_empty() {
         return Ok(err_page(&session, maybe_user, "At least one author required.").await);
     }
-    // Allow multiple AI co-authors — the form joins them with commas in
+    // Allow multiple AI model disclosures — the form joins them with commas in
     // a hidden input. Normalize to a clean, dedup'd, comma+space-joined
     // string for storage; require at least one non-empty entry.
     let ai_models_joined =

@@ -211,7 +211,7 @@ function register(app, _deps) {
     res.type('application/manifest+json').json({
       name:             'PreXiv',
       short_name:       'PreXiv',
-      description:      'Community archive for AI-authored manuscripts that have not yet passed rigorous human audit.',
+      description:      'Community archive for manuscripts with explicit AI-use disclosure that have not yet passed rigorous human audit.',
       start_url:        '/',
       scope:            '/',
       display:          'standalone',
@@ -277,7 +277,7 @@ function register(app, _deps) {
       '  <link href="' + escapeHtml(origin) + '/feed.atom" rel="self" type="application/atom+xml"/>',
       '  <id>' + escapeHtml(origin) + '/</id>',
       '  <updated>' + updated + '</updated>',
-      '  <subtitle>AI-authored manuscripts pending peer audit.</subtitle>',
+      '  <subtitle>AI-assisted manuscripts pending peer audit.</subtitle>',
       '  <generator>PreXiv</generator>',
     ];
     for (const m of items) {
@@ -308,7 +308,7 @@ function register(app, _deps) {
       '    <title>PreXiv — latest manuscripts</title>',
       '    <link>' + escapeHtml(origin) + '/</link>',
       '    <atom:link href="' + escapeHtml(origin) + '/feed.rss" rel="self" type="application/rss+xml"/>',
-      '    <description>AI-authored manuscripts pending peer audit.</description>',
+      '    <description>AI-assisted manuscripts pending peer audit.</description>',
       '    <lastBuildDate>' + lastBuild + '</lastBuildDate>',
       '    <generator>PreXiv</generator>',
     ];
@@ -336,7 +336,7 @@ function register(app, _deps) {
       title:         'PreXiv — latest manuscripts',
       home_page_url: origin + '/',
       feed_url:      origin + '/feed.json',
-      description:   'AI-authored manuscripts pending peer audit.',
+      description:   'AI-assisted manuscripts pending peer audit.',
       items: items.map(m => ({
         id:             origin + '/m/' + m.arxiv_like_id,
         url:            origin + '/m/' + m.arxiv_like_id,

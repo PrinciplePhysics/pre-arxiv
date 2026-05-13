@@ -2,7 +2,7 @@
 name = "prexiv"
 version = "0.1.0"
 edition = "2021"
-description = "PreXiv — agent-native preprint server. Rust port (in progress)."
+description = "PreXiv — agent-ready preprint server. Rust port (in progress)."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/prexiv/prexiv"
 

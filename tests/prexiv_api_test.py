@@ -216,7 +216,7 @@ section("6. Submit manuscripts (every conductor variant)")
 ms1, s = req("POST", "/manuscripts", token=agent_token, body={
     "title": "Test 1: ai-agent unaudited",
     "abstract": "An autonomously-produced manuscript for testing the ai-agent variant of submission. It exists only to exercise the validator and the resulting row.",
-    "authors": "Claude Opus 4.7", "category": "cs.AI",
+    "authors": "No human author declared", "category": "cs.AI",
     "external_url": "https://example.com/t1.pdf",
     "conductor_type": "ai-agent", "conductor_ai_model": "Claude Opus 4.7",
     "agent_framework": "test harness", "ai_agent_ack": True,
@@ -230,7 +230,7 @@ check("ai-agent has null conductor_human", isinstance(ms1, dict) and ms1.get("co
 ms2, s = req("POST", "/manuscripts", token=agent_token, body={
     "title": "Test 2: human-ai unaudited (with no_auditor_ack)",
     "abstract": "A human-conducted manuscript without an auditor. Submitter explicitly disclaims responsibility for correctness via no_auditor_ack.",
-    "authors": "Test Author; Claude Opus 4.7", "category": "math.NT",
+    "authors": "Test Author", "category": "math.NT",
     "external_url": "https://example.com/t2.pdf",
     "conductor_type": "human-ai", "conductor_ai_model": "Claude Opus 4.7",
     "conductor_human": "Test Author", "conductor_role": "graduate-student",
@@ -243,7 +243,7 @@ ms2_num = ms2.get("id") if isinstance(ms2, dict) else None
 ms3, s = req("POST", "/manuscripts", token=agent_token, body={
     "title": "Test 3: human-ai with auditor",
     "abstract": "A human-conducted manuscript with an auditor who has signed a correctness statement of substantial length and detail.",
-    "authors": "Test Author; Claude Opus 4.7", "category": "stat.ML",
+    "authors": "Test Author", "category": "stat.ML",
     "external_url": "https://example.com/t3.pdf",
     "conductor_type": "human-ai", "conductor_ai_model": "Claude Opus 4.7",
     "conductor_human": "Test Author", "conductor_role": "postdoc",
@@ -397,7 +397,7 @@ section("13. Privacy flags")
 ms4, s = req("POST", "/manuscripts", token=agent_token, body={
     "title": "Test 4: with privacy flags",
     "abstract": "Manuscript with conductor_*_private flags set so the public view should report them as not-public; the API still returns them with their public flag.",
-    "authors": "Test Author; Claude Opus 4.7", "category": "cs.AI",
+    "authors": "Test Author", "category": "cs.AI",
     "external_url": "https://example.com/t4.pdf",
     "conductor_type": "human-ai", "conductor_ai_model": "Claude Opus 4.7",
     "conductor_human": "Test Author", "conductor_role": "postdoc",

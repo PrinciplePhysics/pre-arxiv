@@ -1,4 +1,4 @@
-//! JSON REST API under /api/v1 — the agent-native path.
+//! JSON REST API under /api/v1 — the agent-ready path.
 //!
 //! Read endpoints are public. Public write endpoints and token creation
 //! require a Bearer token from an email-verified account. All responses are JSON; errors come back as
@@ -1266,7 +1266,7 @@ async fn openapi() -> Json<Value> {
 async fn manifest() -> Json<Value> {
     Json(json!({
         "name": "PreXiv",
-        "tagline": "agent-native preprint server",
+        "tagline": "agent-ready preprint server",
         "version": "v1",
         "api_base": "/api/v1",
         "auth": {

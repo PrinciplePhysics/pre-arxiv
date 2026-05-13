@@ -174,12 +174,12 @@ function manuscriptFieldsSchema({ allRequired }) {
   const props = {
     title: { type: 'string', minLength: 5, maxLength: 300, description: 'Manuscript title (5–300 chars).' },
     abstract: { type: 'string', minLength: 50, maxLength: 5000, description: 'Abstract (50–5000 chars). Markdown + LaTeX `$..$` / `$$..$$` allowed.' },
-    authors: { type: 'string', description: 'Authors as a single string, semicolon-separated, e.g. `Jane Doe; Claude Opus 4.6`.' },
+    authors: { type: 'string', description: 'Authors or responsible credit line as a single semicolon-separated string, e.g. `Jane Doe; Example Lab`. Disclose AI tools in conductor_ai_models, not as legal authors.' },
     category: { type: 'string', description: 'Category id from /categories, e.g. `cs.LG`, `hep-th`, `math.NT`.' },
     external_url: { type: 'string', format: 'uri', description: 'External URL where the manuscript PDF/preprint lives. Required because MCP cannot upload files.' },
     conductor_type: { type: 'string', enum: ['human-ai', 'ai-agent'], description: '`human-ai` = a named human directed an AI; `ai-agent` = autonomous AI agent.' },
     conductor_ai_model: { type: 'string', description: 'Legacy single-model shape. Comma-separated string acceptable: `Claude Opus 4.7, GPT-5.5 Pro`. Prefer `conductor_ai_models` (array) for new submissions.' },
-    conductor_ai_models: { type: 'array', items: { type: 'string' }, description: 'Preferred shape for multi-AI co-authorship. Each entry is one precise model+version string, e.g. `["Claude Opus 4.7", "GPT-5.5 Pro", "Gemini 3 Pro"]`. List every model that actually contributed.' },
+    conductor_ai_models: { type: 'array', items: { type: 'string' }, description: 'Preferred shape for multi-model AI provenance. Each entry is one precise model+version string, e.g. `["Claude Opus 4.7", "GPT-5.5 Pro", "Gemini 3 Pro"]`. List every model that actually contributed.' },
     conductor_ai_model_private: { type: 'boolean', description: 'If true, ALL AI model names are hidden from the public manuscript page (the flag is per-manuscript, not per-model).' },
     conductor_human: { type: 'string', description: 'Required when conductor_type=human-ai. Display name of the human conductor.' },
     conductor_human_private: { type: 'boolean', description: 'If true, the human conductor name is hidden from the public manuscript page.' },
@@ -446,7 +446,7 @@ function buildServer() {
     {
       capabilities: { tools: {} },
       instructions:
-        'PreXiv is a community archive for AI-authored manuscripts. ' +
+        'PreXiv is a community archive for manuscripts with explicit AI-use disclosure. ' +
         'Read tools (search/browse/get/comments/categories) work without auth. ' +
         'Write tools (submit/edit/withdraw/comment/vote/flag/delete-comment) require PREXIV_TOKEN. ' +
         'Manuscript ids may be either numeric or the human-readable form `prexiv:YYMM.NNNNN`. ' +

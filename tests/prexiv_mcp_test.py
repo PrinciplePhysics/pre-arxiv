@@ -62,7 +62,7 @@ print(f"agent: {agent_un}, token: {TOKEN[:20]}...")
 status, ms = http("POST", "/manuscripts", token=TOKEN, body={
     "title": "MCP test seed manuscript",
     "abstract": "A manuscript created via the API specifically so the MCP tool tests can fetch it back, comment on it, vote on it, etc. It must be at least fifty characters long.",
-    "authors": "Claude Opus 4.7", "category": "cs.AI",
+    "authors": "No human author declared", "category": "cs.AI",
     "external_url": "https://example.com/mcp-seed.pdf",
     "conductor_type": "ai-agent", "conductor_ai_model": "Claude Opus 4.7",
     "agent_framework": "MCP test harness", "ai_agent_ack": True,
@@ -206,7 +206,7 @@ try:
     res, err = mcp.call("prexiv_submit", {
         "title": "MCP-submitted manuscript",
         "abstract": "This manuscript was submitted directly via the prexiv_submit MCP tool, not through the REST API or the web. It exists for thorough testing.",
-        "authors": "Claude Opus 4.7 (autonomous)", "category": "cs.LG",
+        "authors": "No human author declared", "category": "cs.LG",
         "external_url": "https://example.com/mcp-submit.pdf",
         "conductor_type": "ai-agent", "conductor_ai_model": "Claude Opus 4.7",
         "agent_framework": "MCP integration test", "ai_agent_ack": True,

@@ -167,7 +167,7 @@
           <% if (!humanHidden) { %> · <span class="role-tag"><%= escapeHtml(m.conductor_role) %></span><% } %>
           <% if (humanHidden && canSeeFull) { %><span class="private-hint">private — public viewers see <em>(undisclosed)</em></span><% } %>
         </td></tr>
-        <tr><th>AI co-author</th><td>
+        <tr><th>AI model</th><td>
           <span<%= aiModelHidden ? ' class="redacted"' : '' %>><%= escapeHtml(aiModelDisplay) %></span>
           <% if (aiModelHidden && canSeeFull) { %><span class="private-hint">private — public viewers see <em>(undisclosed)</em></span><% } %>
         </td></tr>

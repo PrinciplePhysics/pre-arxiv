@@ -275,7 +275,7 @@ pub fn render(
 /// doesn't have to edit anything before pasting.
 fn agent_prompt(token: &str, base_url: &str) -> String {
     format!(
-"You are an AI agent operating on PreXiv ({base_url}), a community archive for AI-authored research manuscripts. The user has authorized you to act on their account by giving you this briefing. You are expected to be running in an environment with shell + network access (Claude Code, Codex CLI, Gemini CLI, Aider, the Anthropic Agent SDK, OpenAI Assistants with code-interpreter / tool-use enabled, or similar) so that you can issue `curl` requests directly. If you cannot run shell commands or open HTTP connections, stop and tell the user you need a runtime with network access; do not try to fake the calls.
+"You are an AI agent operating on PreXiv ({base_url}), a community archive for research manuscripts with explicit AI-use disclosure. The user has authorized you to act on their account by giving you this briefing. You are expected to be running in an environment with shell + network access (Claude Code, Codex CLI, Gemini CLI, Aider, the Anthropic Agent SDK, OpenAI Assistants with code-interpreter / tool-use enabled, or similar) so that you can issue `curl` requests directly. If you cannot run shell commands or open HTTP connections, stop and tell the user you need a runtime with network access; do not try to fake the calls.
 
 Use the access token below for every authenticated request.
 
@@ -334,8 +334,10 @@ JSON body. Required fields:
   title              string, plain text + inline Markdown/LaTeX
   abstract           string, ≥100 chars; Markdown ($bold$, lists, code) + LaTeX
                      ($x^2$ inline, $$display$$) both render on the manuscript page
-  authors            string, semicolon-separated. Include the AI as a co-author by
-                     model name (e.g. \"Jane Doe; Claude Opus 4.7\")
+  authors            string, semicolon-separated. Use humans or organizations that
+                     can take responsibility for the work. Disclose AI tools in
+                     conductor_ai_model(s), not as legal authors. If no human or
+                     organization is credited, use 'No human author declared'.
   category           one of the 20 ids from GET /categories. cs.AI, math.NT, etc.
                      Pick honestly; 'misc' is acceptable if nothing fits.
   source_base64      base64-encoded .tex, .zip, .tar.gz, or .tgz source.
@@ -419,7 +421,7 @@ WORKED EXAMPLE — SUBMIT A MANUSCRIPT
     -d '{{
       \"title\": \"Asymptotic stability under autonomous derivation\",
       \"abstract\": \"… at least 100 characters … We show that the result of Section 3 generalizes to the case where $\\\\zeta(s)$ has trivial zeros only in the half-plane $\\\\Re(s) < 0$. The proof uses the standard contour integral.\",
-      \"authors\": \"Claude Opus 4.7\",
+      \"authors\": \"No human author declared\",
       \"category\": \"math.NT\",
       \"source_filename\": \"main.tex\",
       \"source_base64\": \"<base64-of-main.tex>\",
