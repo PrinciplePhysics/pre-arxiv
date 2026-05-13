@@ -106,7 +106,7 @@ fn watermark_postscript(manuscript_id: &str, category: &str, app_url: &str) -> S
 	  /PreXivEndReason exch def
 	  /PreXivPageCount exch def
 	  PreXivEndReason 2 eq {{ false }} {{
-	    PreXivPageCount 1 eq {{
+	    PreXivPageCount 0 eq {{
 	      /PreXivFont /TimesNewRomanPSMT findfont 14 scalefont def
 	      PreXivFont setfont
 	      clippath pathbbox
@@ -170,7 +170,7 @@ mod tests {
     fn postscript_stamps_first_page_in_times_new_roman() {
         let ps = watermark_postscript("prexiv:2605.00001", "cs.AI", "https://prexiv.example/");
 
-        assert!(ps.contains("PreXivPageCount 1 eq"));
+        assert!(ps.contains("PreXivPageCount 0 eq"));
         assert!(ps.contains("/TimesNewRomanPSMT findfont 14 scalefont def"));
         assert!(ps.contains("PreXivPageTop PreXivPageBottom sub PreXivTextWidth sub 2 div"));
         assert!(!ps.contains("/Helvetica findfont"));
