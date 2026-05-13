@@ -10,8 +10,10 @@ pub fn render(
     heading: &str,
     subheading: &str,
     rows: &[ManuscriptListItem],
-    _self_path: &str,
+    self_path: &str,
     widened: bool,
+    show_all: bool,
+    show_mode_toggle: bool,
 ) -> Markup {
     let logged_in = ctx.user.is_some();
     let body = html! {
@@ -19,7 +21,12 @@ pub fn render(
             h1 { (heading) }
             p.muted { (subheading) }
         }
-        @if widened {
+        @if show_mode_toggle {
+            (super::home::mode_toggle(self_path, show_all))
+        }
+        @if show_all && show_mode_toggle {
+            (super::home::showing_all_banner(self_path))
+        } @else if widened {
             (super::home::verified_widen_banner())
         }
         @if rows.is_empty() {

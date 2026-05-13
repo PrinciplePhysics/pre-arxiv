@@ -67,5 +67,5 @@ pub async fn index(
     }
 
     let ctx = build_ctx(&session, maybe_user, "/").await;
-    Ok(Html(templates::home::render(&ctx, &rows, widened).into_string()))
+    Ok(Html(templates::home::render(&ctx, &rows, widened, !want_filter).into_string()))
 }

@@ -10,11 +10,15 @@ pub fn render(
     ctx: &PageCtx,
     manuscripts: &[ManuscriptListItem],
     widened: bool,
+    show_all: bool,
 ) -> Markup {
     let logged_in = ctx.user.is_some();
     let body = html! {
         (welcome_modal())
-        @if widened {
+        (mode_toggle("/", show_all))
+        @if show_all {
+            (showing_all_banner("/"))
+        } @else if widened {
             (verified_widen_banner())
         }
         @if manuscripts.is_empty() {
@@ -33,10 +37,38 @@ pub fn render(
     layout("Ranked", ctx, body)
 }
 
-/// Cold-start banner — rendered at the top of any default listing
-/// that auto-widened because the verified-scholar pool was empty.
-/// Tells the visitor what they're looking at and how to get on the
-/// "real" front page once verification scales up.
+/// Two-pill segmented control: **Standard** (verified-scholar only)
+/// vs **All submissions** (firehose, includes unverified authors and
+/// restricted categories). The standard link points at the bare path;
+/// the all-submissions link tacks on `?show_all=1`. The active mode
+/// is bolded and underlined.
+pub fn mode_toggle(self_path: &str, show_all: bool) -> Markup {
+    let all_href = format!("{self_path}?show_all=1");
+    html! {
+        nav.mode-toggle role="tablist" aria-label="Listing mode" {
+            a.mode-pill.is-active[!show_all]
+              href=(self_path)
+              role="tab"
+              aria-selected=(if !show_all { "true" } else { "false" })
+              title="Only show submissions from verified scholars (ORCID iD or institutional email)." {
+                span.mode-pill-dot.is-standard aria-hidden="true" {}
+                "Standard"
+            }
+            a.mode-pill.is-active[show_all]
+              href=(all_href)
+              role="tab"
+              aria-selected=(if show_all { "true" } else { "false" })
+              title="Show everything — including unverified authors and restricted (gen-ph / general-econ) categories." {
+                span.mode-pill-dot.is-all aria-hidden="true" {}
+                "All submissions"
+            }
+        }
+    }
+}
+
+/// Cold-start banner — appears when the verified-scholar filter
+/// was applied (Standard mode) but came up empty. Auto-widens to
+/// everything until the first verified scholar shows up.
 pub fn verified_widen_banner() -> Markup {
     html! {
         div.advisory-banner role="note" {
@@ -47,6 +79,22 @@ pub fn verified_widen_banner() -> Markup {
                 ". The verified-only filter switches back on as soon as one verified scholar submits — "
                 a href="/me/edit" { "verify your ORCID or use an institutional email" }
                 " to be that scholar."
+            }
+        }
+    }
+}
+
+/// Banner shown when the visitor explicitly chose "All submissions".
+/// Different copy from the cold-start auto-widen — this is an opt-in.
+pub fn showing_all_banner(self_path: &str) -> Markup {
+    html! {
+        div.advisory-banner role="note" {
+            span {
+                span.advisory-title { "All submissions." }
+                " Showing everything, including unverified authors and the restricted "
+                code { "physics.gen-ph" } " · " code { "econ.GN" } " · " code { "q-fin.GN" }
+                " categories. "
+                a href=(self_path) { "← Switch back to Standard" }
             }
         }
     }

@@ -2665,3 +2665,58 @@ a.profile-name-badge { cursor: pointer; }
 }
 .profile-name-badge.is-orcid:hover svg { filter: drop-shadow(0 0 0.5px #A6CE39); }
 .profile-name-badge.is-inst:hover  svg { filter: drop-shadow(0 0 0.5px #3a6f9c); }
+
+/* ─── Standard / All-submissions mode toggle ─────────────────────
+   Two-pill segmented control at the top of /, /new, /top. Sits in
+   a thin pill-rail with a single moving "active" background so the
+   user can tell which mode they're in at a glance. The two pills
+   are plain <a> links — bookmarkable, no JS — pointing at the bare
+   path and `?show_all=1` respectively. */
+.mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  margin: 4px 0 14px;
+  font-family: var(--sans);
+}
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: color 0.14s var(--ease-out, ease),
+              background 0.14s var(--ease-out, ease);
+}
+.mode-pill:hover {
+  color: var(--ink);
+  background: rgba(20, 16, 8, 0.04);
+}
+.mode-pill.is-active {
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(184, 67, 10, 0.18);
+}
+.mode-pill.is-active:hover {
+  background: var(--brand);
+  color: #fff;
+}
+.mode-pill-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.mode-pill-dot.is-standard { background: #2e9a47; }
+.mode-pill-dot.is-all { background: var(--muted); }
+.mode-pill.is-active .mode-pill-dot { background: #fff; }

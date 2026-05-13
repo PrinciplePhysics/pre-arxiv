@@ -86,7 +86,10 @@ pub async fn new_listing(
         rows = fetch(&state.pool, &fallback).await?;
     }
     let ctx = build_ctx(&session, maybe_user, "/new").await;
-    Ok(Html(templates::listing::render(&ctx, "Newest", "Most recent manuscripts.", &rows, "/new", widened).into_string()))
+    Ok(Html(templates::listing::render(
+        &ctx, "Newest", "Most recent manuscripts.", &rows, "/new",
+        widened, filters.show_all(), true,
+    ).into_string()))
 }
 
 pub async fn top_listing(
@@ -111,7 +114,10 @@ pub async fn top_listing(
         rows = fetch(&state.pool, &fallback).await?;
     }
     let ctx = build_ctx(&session, maybe_user, "/top").await;
-    Ok(Html(templates::listing::render(&ctx, "Top", "Highest-scoring manuscripts.", &rows, "/top", widened).into_string()))
+    Ok(Html(templates::listing::render(
+        &ctx, "Top", "Highest-scoring manuscripts.", &rows, "/top",
+        widened, filters.show_all(), true,
+    ).into_string()))
 }
 
 pub async fn audited_listing(
@@ -137,7 +143,9 @@ pub async fn audited_listing(
         "Only manuscripts with a named human auditor who has signed a correctness statement.",
         &rows,
         "/audited",
-        false,
+        false,    // widened — never auto-widen on /audited
+        false,    // show_all — not meaningful here
+        false,    // show_mode_toggle — auditor presence is the only gate
     )
     .into_string()))
 }
@@ -231,5 +239,8 @@ pub async fn browse_category(
     let ctx = build_ctx(&session, maybe_user, "/browse").await;
     let heading = format!("Browse · {cat}");
     let sub = format!("All manuscripts categorized as {cat}, newest first.");
-    Ok(Html(templates::listing::render(&ctx, &heading, &sub, &rows, &format!("/browse/{cat}"), false).into_string()))
+    Ok(Html(templates::listing::render(
+        &ctx, &heading, &sub, &rows, &format!("/browse/{cat}"),
+        false, false, false,
+    ).into_string()))
 }
