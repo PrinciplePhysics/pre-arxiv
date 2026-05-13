@@ -71,7 +71,7 @@ rust/
 
 - Public listings: ranked, new, top, audited, browse, search.
 - Manuscript pages with conductor/auditor provenance, comments, votes, license cards, citation tools, and version controls.
-- Submission via LaTeX source (`.tex`, `.zip`, `.tar.gz`/`.tgz`), direct PDF, or external URL.
+- Submission via a PreXiv-hosted LaTeX source (`.tex`, `.zip`, `.tar.gz`/`.tgz`) or direct PDF. External URLs are supplemental links, not replacements for the hosted artifact.
 - Server-side LaTeX compile with shell escape disabled and timeouts.
 - Redaction of private human conductor and/or AI model fields in the public source before compilation.
 - First-page PDF watermarking for compiled PDFs and direct PDFs; raw direct PDFs are not persisted.
@@ -80,8 +80,9 @@ rust/
 - Account flows: register, login, logout, password reset, email verification, email change, profile edit, TOTP 2FA, data export, account deletion.
 - Social/moderation flows: comments, voting, flags, admin queue, audit log, follows, feed, notifications.
 - Agent API at `/api/v1`: public reads; verified-user bearer token for writes; token revoke remains available for account safety.
-- Static policy pages: about, guidelines, ToS, privacy, DMCA, moderation policies, licenses, permissions.
+- Static policy and help pages: about, how it works, agent support, guidelines, ToS, privacy, DMCA, moderation policies, licenses, permissions.
 - Indexer surfaces: sitemap, RSS/Atom/JSON feeds, OAI-PMH Dublin Core.
+- Operations: `/healthz`, `/readyz`, optional structured logs with `PREXIV_LOG_FORMAT=json`, and an admin dashboard with moderation, growth, storage, category, and operational-gap panels.
 
 ## Permission Model
 
@@ -100,7 +101,7 @@ Routes live under `/api/v1`. The API supports:
 - `GET /me`
 - token list/create/revoke
 - categories, listing, manuscript read, search
-- manuscript submit by JSON with `external_url`
+- manuscript submit by JSON with exactly one hosted artifact: `source_base64` + `source_filename`, or `pdf_base64` + `pdf_filename`; `external_url` is supplemental
 - comment and vote writes
 - version list/read/create
 - OpenAPI and manifest endpoints
@@ -122,7 +123,7 @@ The OpenAPI output is intentionally compact and may be less detailed than the ro
 ## Known Gaps
 
 - Automatic extraction of text from newly uploaded/compiled PDFs into `pdf_text` is not wired yet.
-- API multipart upload is not implemented; JSON submissions need `external_url`.
+- API multipart upload is not implemented; JSON submissions use base64 source/PDF artifacts.
 - Tokens are single-scope credentials tied to the owner, not per-action scoped.
-- SSO is not implemented.
+- ORCID OAuth/OpenID binding is implemented; GitHub/Google SSO are not.
 - OpenAPI is compact and should be expanded as the API settles.

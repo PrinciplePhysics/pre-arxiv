@@ -11,7 +11,9 @@ use crate::helpers::set_flash;
 use crate::state::AppState;
 
 #[derive(Deserialize)]
-pub struct FollowForm { pub csrf_token: String }
+pub struct FollowForm {
+    pub csrf_token: String,
+}
 
 pub async fn follow(
     State(state): State<AppState>,
@@ -57,7 +59,8 @@ pub async fn follow(
             Some("user"),
             Some(target_id),
             None,
-        ).await;
+        )
+        .await;
     }
     set_flash(&session, format!("Following @{username}.")).await;
     Ok(Redirect::to(&format!("/u/{username}")).into_response())

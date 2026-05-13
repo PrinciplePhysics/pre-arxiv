@@ -1317,7 +1317,7 @@ select:focus-visible {
 }
 .browse-overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
   margin: 14px 0 12px;
   border-top: 1px solid var(--rule);
@@ -1502,6 +1502,109 @@ select:focus-visible {
 .form-section h2 .muted, .form-section h2 .req {
   text-transform: none;
   letter-spacing: 0;
+}
+.submit-stepper {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 18px;
+  font-family: var(--sans);
+}
+.submit-stepper-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm, 4px);
+  background: var(--bg-card);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.submit-stepper-item:hover,
+.submit-stepper-item:focus-visible {
+  border-color: rgba(184, 67, 10, 0.45);
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+.stepper-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 800;
+}
+.submit-stepper-item:hover .stepper-index,
+.submit-stepper-item:focus-visible .stepper-index {
+  background: var(--brand);
+  color: #fff;
+}
+.stepper-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.submit-step {
+  scroll-margin-top: 18px;
+}
+.submit-step h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.submit-step .step-eyebrow {
+  color: var(--brand);
+}
+.submit-step .step-title {
+  color: var(--muted);
+}
+.review-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.review-card {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm, 4px);
+  background: var(--bg-card-alt);
+  padding: 14px 15px;
+  min-width: 0;
+}
+.review-card h3 {
+  margin: 0 0 9px;
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+.review-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.48;
+}
+.review-list li {
+  margin: 0 0 7px;
+}
+.review-list li:last-child {
+  margin-bottom: 0;
+}
+.review-list strong {
+  color: var(--ink);
 }
 
 /* ── H2. Auth pages — compact form + useful account context ─────── */
@@ -2090,6 +2193,53 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 .bx-sidebar-btn:active { transform: translateY(0); }
 .bx-stats .val { font-weight: 700; }
+
+.trust-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.trust-badge {
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm, 4px);
+  background: var(--bg-card-alt);
+  color: var(--ink);
+}
+.trust-badge[open] {
+  flex-basis: 100%;
+}
+.trust-badge summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 5px 8px;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--brand);
+}
+.trust-badge summary::-webkit-details-marker {
+  display: none;
+}
+.trust-badge summary::before {
+  content: "i";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-right: 5px;
+  border: 1px solid rgba(184, 67, 10, 0.35);
+  border-radius: 50%;
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 700;
+}
+.trust-badge p {
+  margin: 0;
+  padding: 0 8px 8px 28px;
+}
 .bx-actions a {
   font-size: 12.5px;
   font-weight: 500;
@@ -2954,6 +3104,24 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 
 @media (max-width: 560px) {
+  .submit-stepper {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .submit-stepper-item {
+    padding: 8px 10px;
+  }
+  .stepper-label {
+    white-space: normal;
+  }
+  .submit-step h2 {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .review-summary {
+    grid-template-columns: 1fr;
+  }
   .upload-target { flex-wrap: wrap; padding: 14px 14px; gap: 12px; }
   .upload-button { width: 100%; justify-content: center; }
   .upload-hint-list { grid-template-columns: 1fr; row-gap: 8px; }

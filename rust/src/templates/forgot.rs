@@ -84,12 +84,7 @@ pub fn render_sent(ctx: &PageCtx) -> Markup {
 }
 
 /// /reset-password/{token}
-pub fn render_reset(
-    ctx: &PageCtx,
-    token: &str,
-    token_valid: bool,
-    error: Option<&str>,
-) -> Markup {
+pub fn render_reset(ctx: &PageCtx, token: &str, token_valid: bool, error: Option<&str>) -> Markup {
     if !token_valid {
         let body = html! {
             div.page-header {

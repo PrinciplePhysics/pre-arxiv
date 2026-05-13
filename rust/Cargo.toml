@@ -22,7 +22,7 @@ maud = { version = "0.26", features = ["axum"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["fs", "trace", "compression-gzip", "set-header"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
 anyhow = "1"
 thiserror = "2"

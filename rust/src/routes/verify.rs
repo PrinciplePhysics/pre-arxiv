@@ -112,7 +112,11 @@ pub async fn resend(
     // can render the inline "Verify my email →" button while outbound
     // mail provider activation is still pending.
     let pending_token = verify::mint_and_send(
-        &state.pool, user.id, &user.email, &user.username, state.app_url.as_deref(),
+        &state.pool,
+        user.id,
+        &user.email,
+        &user.username,
+        state.app_url.as_deref(),
     )
     .await
     .ok();

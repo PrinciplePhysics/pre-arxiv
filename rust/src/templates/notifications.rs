@@ -57,7 +57,9 @@ pub fn render(ctx: &PageCtx, rows: &[NotificationRow]) -> Markup {
 }
 
 fn notification_text(n: &NotificationRow) -> Markup {
-    let actor = n.actor_display.as_deref()
+    let actor = n
+        .actor_display
+        .as_deref()
         .or(n.actor_username.as_deref())
         .unwrap_or("Someone");
     let actor_link = match &n.actor_username {
@@ -69,8 +71,9 @@ fn notification_text(n: &NotificationRow) -> Markup {
 
     let target_url = match n.target_type.as_deref() {
         Some("manuscript") if !target_slug.is_empty() => Some(format!("/m/{target_slug}")),
-        Some("comment")    if !target_slug.is_empty() && n.target_id.is_some() =>
-            Some(format!("/m/{target_slug}#comment-{}", n.target_id.unwrap())),
+        Some("comment") if !target_slug.is_empty() && n.target_id.is_some() => {
+            Some(format!("/m/{target_slug}#comment-{}", n.target_id.unwrap()))
+        }
         Some("user") => actor_link.clone(),
         _ => None,
     };

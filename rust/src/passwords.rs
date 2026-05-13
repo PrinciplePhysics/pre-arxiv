@@ -51,8 +51,7 @@ pub async fn mint_token(pool: &SqlitePool, user_id: i64) -> Result<String> {
 
     let plain = generate_token();
     let hash = hash_token(&plain);
-    let expires_at: NaiveDateTime =
-        (Utc::now() + Duration::minutes(TOKEN_TTL_MINUTES)).naive_utc();
+    let expires_at: NaiveDateTime = (Utc::now() + Duration::minutes(TOKEN_TTL_MINUTES)).naive_utc();
 
     sqlx::query(
         "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
@@ -192,8 +191,7 @@ pub async fn find_user_by_email_or_username(
         return Ok(None);
     };
     let email = match enc.as_deref() {
-        Some(b) => crate::crypto::open_email(b)
-            .unwrap_or_else(|_| plain.unwrap_or_default()),
+        Some(b) => crate::crypto::open_email(b).unwrap_or_else(|_| plain.unwrap_or_default()),
         None => plain.unwrap_or_default(),
     };
     Ok(Some((id, username, email)))

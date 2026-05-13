@@ -29,6 +29,7 @@ pub struct AdminStats {
     pub verified_scholar_users: i64,
     pub orcid_oauth_users: i64,
     pub institutional_verified_users: i64,
+    pub new_users_24h: i64,
     pub new_users_7d: i64,
     pub total_comments: i64,
     pub comments_24h: i64,
@@ -37,6 +38,8 @@ pub struct AdminStats {
     pub votes_7d: i64,
     pub open_flags: i64,
     pub flags_24h: i64,
+    pub resolved_flags_7d: i64,
+    pub open_flags_over_24h: i64,
     pub oldest_open_flag_at: Option<NaiveDateTime>,
     pub active_tokens: i64,
     pub tokens_used_7d: i64,
@@ -47,6 +50,22 @@ pub struct CategoryStatRow {
     pub total: i64,
     pub live: i64,
     pub latest_at: Option<NaiveDateTime>,
+}
+
+pub struct DailyTrendRow {
+    pub day: String,
+    pub primary_count: i64,
+    pub secondary_count: i64,
+}
+
+pub struct UnverifiedHighActivityUserRow {
+    pub username: String,
+    pub display_name: Option<String>,
+    pub created_at: Option<NaiveDateTime>,
+    pub manuscript_count: i64,
+    pub comment_count: i64,
+    pub vote_count: i64,
+    pub token_count: i64,
 }
 
 pub struct RecentSubmissionRow {
@@ -75,7 +94,10 @@ pub struct RecentUserRow {
 
 pub struct AdminDashboard {
     pub stats: AdminStats,
+    pub moderation_trend: Vec<DailyTrendRow>,
+    pub user_growth: Vec<DailyTrendRow>,
     pub category_stats: Vec<CategoryStatRow>,
+    pub unverified_high_activity_users: Vec<UnverifiedHighActivityUserRow>,
     pub recent_submissions: Vec<RecentSubmissionRow>,
     pub recent_users: Vec<RecentUserRow>,
     pub recent_audit: Vec<AuditRow>,
@@ -275,7 +297,8 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         orcid_oauth_users,
         institutional_verified_users,
         new_users_7d,
-    ): (i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
+        new_users_24h,
+    ): (i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
         r#"SELECT
               COUNT(*),
               COALESCE(SUM(CASE WHEN email_verified != 0 THEN 1 ELSE 0 END), 0),
@@ -286,7 +309,8 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
                   THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN orcid_oauth_verified != 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN email_verified != 0 AND institutional_email != 0 THEN 1 ELSE 0 END), 0),
-              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0)
+              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0)
            FROM users"#,
     )
     .fetch_one(&state.pool)
@@ -311,14 +335,21 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
     .fetch_one(&state.pool)
     .await?;
 
-    let (open_flags, flags_24h, oldest_open_flag_at): (i64, i64, Option<NaiveDateTime>) =
+    let (
+        open_flags,
+        flags_24h,
+        resolved_flags_7d,
+        open_flags_over_24h,
+        oldest_open_flag_at,
+    ): (i64, i64, i64, i64, Option<NaiveDateTime>) =
         sqlx::query_as(
             r#"SELECT
-                  COUNT(*),
-                  COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
-                  MIN(created_at)
-               FROM flag_reports
-               WHERE resolved = 0"#,
+                  COALESCE(SUM(CASE WHEN resolved = 0 THEN 1 ELSE 0 END), 0),
+                  COALESCE(SUM(CASE WHEN resolved = 0 AND created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
+                  COALESCE(SUM(CASE WHEN resolved != 0 AND resolved_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0),
+                  COALESCE(SUM(CASE WHEN resolved = 0 AND created_at < datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
+                  MIN(CASE WHEN resolved = 0 THEN created_at ELSE NULL END)
+               FROM flag_reports"#,
         )
         .fetch_one(&state.pool)
         .await?;
@@ -332,6 +363,54 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
     )
     .fetch_one(&state.pool)
     .await?;
+
+    let moderation_trend_raw: Vec<(String, i64, i64)> = sqlx::query_as(
+        r#"WITH RECURSIVE days(day) AS (
+              SELECT date('now', '-6 days')
+              UNION ALL
+              SELECT date(day, '+1 day') FROM days WHERE day < date('now')
+           )
+           SELECT
+              d.day,
+              COALESCE((SELECT COUNT(*) FROM flag_reports f WHERE date(f.created_at) = d.day), 0),
+              COALESCE((SELECT COUNT(*) FROM flag_reports f WHERE f.resolved != 0 AND date(f.resolved_at) = d.day), 0)
+           FROM days d
+           ORDER BY d.day ASC"#,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let moderation_trend = moderation_trend_raw
+        .into_iter()
+        .map(|(day, primary_count, secondary_count)| DailyTrendRow {
+            day,
+            primary_count,
+            secondary_count,
+        })
+        .collect();
+
+    let user_growth_raw: Vec<(String, i64, i64)> = sqlx::query_as(
+        r#"WITH RECURSIVE days(day) AS (
+              SELECT date('now', '-6 days')
+              UNION ALL
+              SELECT date(day, '+1 day') FROM days WHERE day < date('now')
+           )
+           SELECT
+              d.day,
+              COALESCE((SELECT COUNT(*) FROM users u WHERE date(u.created_at) = d.day), 0),
+              COALESCE((SELECT COUNT(*) FROM users u WHERE u.email_verified != 0 AND date(u.created_at) = d.day), 0)
+           FROM days d
+           ORDER BY d.day ASC"#,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let user_growth = user_growth_raw
+        .into_iter()
+        .map(|(day, primary_count, secondary_count)| DailyTrendRow {
+            day,
+            primary_count,
+            secondary_count,
+        })
+        .collect();
 
     let category_raw: Vec<(String, i64, i64, Option<NaiveDateTime>)> = sqlx::query_as(
         r#"SELECT
@@ -354,6 +433,83 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
             live,
             latest_at,
         })
+        .collect();
+
+    let high_activity_raw: Vec<(
+        String,
+        Option<String>,
+        Option<NaiveDateTime>,
+        i64,
+        i64,
+        i64,
+        i64,
+    )> = sqlx::query_as(
+        r#"SELECT
+              u.username,
+              u.display_name,
+              u.created_at,
+              COALESCE(m.manuscript_count, 0),
+              COALESCE(c.comment_count, 0),
+              COALESCE(v.vote_count, 0),
+              COALESCE(t.token_count, 0)
+           FROM users u
+           LEFT JOIN (
+              SELECT submitter_id, COUNT(*) AS manuscript_count
+              FROM manuscripts
+              GROUP BY submitter_id
+           ) m ON m.submitter_id = u.id
+           LEFT JOIN (
+              SELECT author_id, COUNT(*) AS comment_count
+              FROM comments
+              GROUP BY author_id
+           ) c ON c.author_id = u.id
+           LEFT JOIN (
+              SELECT user_id, COUNT(*) AS vote_count
+              FROM votes
+              GROUP BY user_id
+           ) v ON v.user_id = u.id
+           LEFT JOIN (
+              SELECT user_id, COUNT(*) AS token_count
+              FROM api_tokens
+              WHERE expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP
+              GROUP BY user_id
+           ) t ON t.user_id = u.id
+           WHERE u.email_verified = 0
+             AND (COALESCE(m.manuscript_count, 0)
+                + COALESCE(c.comment_count, 0)
+                + COALESCE(v.vote_count, 0)
+                + COALESCE(t.token_count, 0)) > 0
+           ORDER BY
+              (COALESCE(m.manuscript_count, 0) * 5
+               + COALESCE(c.comment_count, 0) * 2
+               + COALESCE(v.vote_count, 0)
+               + COALESCE(t.token_count, 0) * 3) DESC,
+              u.id DESC
+           LIMIT 8"#,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let unverified_high_activity_users = high_activity_raw
+        .into_iter()
+        .map(
+            |(
+                username,
+                display_name,
+                created_at,
+                manuscript_count,
+                comment_count,
+                vote_count,
+                token_count,
+            )| UnverifiedHighActivityUserRow {
+                username,
+                display_name,
+                created_at,
+                manuscript_count,
+                comment_count,
+                vote_count,
+                token_count,
+            },
+        )
         .collect();
 
     let recent_submission_raw: Vec<(
@@ -483,6 +639,7 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
             verified_scholar_users,
             orcid_oauth_users,
             institutional_verified_users,
+            new_users_24h,
             new_users_7d,
             total_comments,
             comments_24h,
@@ -491,11 +648,16 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
             votes_7d,
             open_flags,
             flags_24h,
+            resolved_flags_7d,
+            open_flags_over_24h,
             oldest_open_flag_at,
             active_tokens,
             tokens_used_7d,
         },
+        moderation_trend,
+        user_growth,
         category_stats,
+        unverified_high_activity_users,
         recent_submissions,
         recent_users,
         recent_audit,

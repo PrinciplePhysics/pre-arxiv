@@ -42,7 +42,7 @@ pub async fn mint_token(pool: &SqlitePool, user_id: i64) -> Result<String> {
     let expires_at: NaiveDateTime = (Utc::now() + Duration::hours(TOKEN_TTL_HOURS)).naive_utc();
 
     sqlx::query(
-        "INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)"
+        "INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
     )
     .bind(user_id)
     .bind(&hash)
@@ -91,8 +91,7 @@ pub async fn mint_and_send(
     let username_owned = username.to_string();
     let link_for_send = link.clone();
     tokio::spawn(async move {
-        let send_fut =
-            crate::email::send_verification_email(&to, &username_owned, &link_for_send);
+        let send_fut = crate::email::send_verification_email(&to, &username_owned, &link_for_send);
         match tokio::time::timeout(StdDuration::from_secs(12), send_fut).await {
             Ok(Ok(())) => {}
             Ok(Err(e)) => {
@@ -115,7 +114,7 @@ pub async fn mint_and_send(
 pub async fn resolve_token(pool: &SqlitePool, plain: &str) -> Result<Option<(i64, i64)>> {
     let hash = hash_token(plain);
     let row: Option<(i64, i64, NaiveDateTime)> = sqlx::query_as(
-        "SELECT id, user_id, expires_at FROM email_verification_tokens WHERE token_hash = ?"
+        "SELECT id, user_id, expires_at FROM email_verification_tokens WHERE token_hash = ?",
     )
     .bind(&hash)
     .fetch_optional(pool)

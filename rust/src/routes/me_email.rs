@@ -37,11 +37,20 @@ pub async fn show(
     maybe_user: MaybeUser,
     RequireUser(user): RequireUser,
 ) -> AppResult<Html<String>> {
-    let pending = email_change::pending_for_user(&state.pool, user.id).await.ok().flatten();
+    let pending = email_change::pending_for_user(&state.pool, user.id)
+        .await
+        .ok()
+        .flatten();
     let mut ctx = build_ctx(&session, maybe_user, "/me/email").await;
     ctx.no_index = true;
     Ok(Html(
-        templates::me_email::render(&ctx, &user.email, pending.as_ref().map(|(e, _)| e.as_str()), None).into_string(),
+        templates::me_email::render(
+            &ctx,
+            &user.email,
+            pending.as_ref().map(|(e, _)| e.as_str()),
+            None,
+        )
+        .into_string(),
     ))
 }
 
@@ -62,7 +71,10 @@ pub async fn submit(
     Form(form): Form<ChangeForm>,
 ) -> AppResult<Response> {
     let render_err = async |msg: &str, maybe_user: MaybeUser| -> Response {
-        let pending = email_change::pending_for_user(&state.pool, user.id).await.ok().flatten();
+        let pending = email_change::pending_for_user(&state.pool, user.id)
+            .await
+            .ok()
+            .flatten();
         let mut ctx = build_ctx(&session, maybe_user, "/me/email").await;
         ctx.no_index = true;
         Html(
@@ -91,11 +103,10 @@ pub async fn submit(
 
     // Verify current password (fetch fresh hash — RequireUser's snapshot
     // omits it). Use the timing-safe wrapper just like /me/password.
-    let row: Option<(String,)> =
-        sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
-            .bind(user.id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let row: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
+        .bind(user.id)
+        .fetch_optional(&state.pool)
+        .await?;
     let current_hash = row.map(|(h,)| h);
     if !verify_password_timing_safe(&form.current_password, current_hash.as_deref()) {
         return Ok(render_err("Current password is incorrect.", maybe_user).await);
@@ -113,11 +124,16 @@ pub async fn submit(
         return Ok(render_err(
             "That email address is already in use on another account.",
             maybe_user,
-        ).await);
+        )
+        .await);
     }
 
     let token = email_change::mint_and_send(
-        &state.pool, user.id, &new_email, &user.username, state.app_url.as_deref(),
+        &state.pool,
+        user.id,
+        &new_email,
+        &user.username,
+        state.app_url.as_deref(),
     )
     .await
     .ok();
@@ -127,7 +143,9 @@ pub async fn submit(
     // pending. Persistent until the user confirms (the confirm handler
     // clears it).
     if let Some(t) = &token {
-        let _ = session.insert("pending_email_change_token", t.clone()).await;
+        let _ = session
+            .insert("pending_email_change_token", t.clone())
+            .await;
     }
 
     set_flash(

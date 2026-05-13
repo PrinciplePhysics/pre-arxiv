@@ -94,8 +94,34 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
         form.submit-form method="post" action="/submit" enctype="multipart/form-data" {
             input type="hidden" name="csrf_token" value=(ctx.csrf_token);
 
-            section.form-section {
-                h2 { "1 — The manuscript" }
+            nav.submit-stepper aria-label="Submission sections" {
+                a.submit-stepper-item href="#step-manuscript" {
+                    span.stepper-index { "1" }
+                    span.stepper-label { "Manuscript" }
+                }
+                a.submit-stepper-item href="#step-provenance" {
+                    span.stepper-index { "2" }
+                    span.stepper-label { "Provenance" }
+                }
+                a.submit-stepper-item href="#step-audit" {
+                    span.stepper-index { "3" }
+                    span.stepper-label { "Audit" }
+                }
+                a.submit-stepper-item href="#step-license" {
+                    span.stepper-index { "4" }
+                    span.stepper-label { "License" }
+                }
+                a.submit-stepper-item href="#step-review" {
+                    span.stepper-index { "5" }
+                    span.stepper-label { "Review & submit" }
+                }
+            }
+
+            section.form-section.submit-step id="step-manuscript" aria-labelledby="step-manuscript-title" {
+                h2 id="step-manuscript-title" {
+                    span.step-eyebrow { "Step 1" }
+                    span.step-title { "Manuscript" }
+                }
 
                 label {
                     span.label-text { "Title " span.req { "*" } }
@@ -266,8 +292,11 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 }
             }
 
-            section.form-section {
-                h2 { "2 — Conductor " span.muted { "(required)" } }
+            section.form-section.submit-step id="step-provenance" aria-labelledby="step-provenance-title" {
+                h2 id="step-provenance-title" {
+                    span.step-eyebrow { "Step 2" }
+                    span.step-title { "Provenance " span.muted { "(required)" } }
+                }
                 p.muted.small {
                     "How was this manuscript produced? PreXiv accepts both human-conducted (a person directed an AI) and fully autonomous AI-agent work. Pick one."
                 }
@@ -377,8 +406,11 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 }
             }
 
-            section.form-section.audit-section {
-                h2 { "3 — Auditor " span.muted { "(optional but encouraged)" } }
+            section.form-section.submit-step.audit-section id="step-audit" aria-labelledby="step-audit-title" {
+                h2 id="step-audit-title" {
+                    span.step-eyebrow { "Step 3" }
+                    span.step-title { "Audit " span.muted { "(optional but encouraged)" } }
+                }
                 p.muted.small.no-katex {
                     "A human auditor is someone who has read the manuscript line by line and is willing to attach their professional reputation to a scoped correctness statement. This is "
                     em { "not" }
@@ -475,8 +507,11 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 }
             }
 
-            section.form-section {
-                h2 { "4 — Licensing" }
+            section.form-section.submit-step id="step-license" aria-labelledby="step-license-title" {
+                h2 id="step-license-title" {
+                    span.step-eyebrow { "Step 4" }
+                    span.step-title { "License" }
+                }
                 p.muted.small {
                     "Two orthogonal choices: what readers may do with the manuscript, and whether AI systems may train on it. Read "
                     a href="/licenses" target="_blank" rel="noopener" { "the full licensing page" }
@@ -514,6 +549,52 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         "Separate from the reader license — a CC BY 4.0 submission can still opt out of AI training. Enforcement of "
                         em { "Disallow" }
                         " depends on trainers honoring the signal (surfaced in HTTP headers and the OpenAPI manifest)."
+                    }
+                }
+            }
+
+            section.form-section.submit-step.review-step id="step-review" aria-labelledby="step-review-title" {
+                h2 id="step-review-title" {
+                    span.step-eyebrow { "Step 5" }
+                    span.step-title { "Review & submit" }
+                }
+                p.muted.small {
+                    "Before posting, check the public record and hosted downloads PreXiv will create from this form."
+                }
+
+                div.review-summary aria-live="polite" {
+                    div.review-card {
+                        h3 { "Public on the manuscript page" }
+                        ul.review-list {
+                            li { strong { "Title, authors, category, abstract: " } span id="review-public-core" { "shown publicly." } }
+                            li { strong { "Production mode: " } span id="review-production-mode" { "Human + AI co-conductor." } }
+                            li { strong { "AI model(s): " } span id="review-ai-models" { "shown publicly unless marked private." } }
+                            li { strong { "Human conductor: " } span id="review-human-conductor" { "shown publicly unless marked private." } }
+                            li { strong { "Audit status: " } span id="review-audit-status" { "No auditor; the page will show an unaudited warning." } }
+                        }
+                    }
+                    div.review-card {
+                        h3 { "Hidden from public viewers" }
+                        ul.review-list {
+                            li id="review-hidden-models" { "AI model details are public by default." }
+                            li id="review-hidden-conductor" { "Human conductor name is public by default for Human + AI submissions." }
+                            li { "Private values remain visible to you and PreXiv administrators." }
+                        }
+                    }
+                    div.review-card {
+                        h3 { "PreXiv-hosted downloads" }
+                        ul.review-list {
+                            li id="review-hosted-primary" { "LaTeX source upload: PreXiv will compile and host a PDF." }
+                            li id="review-hosted-source" { "A source download will be hosted; private provenance fields require redaction before public release." }
+                            li id="review-hosted-external" { "External URL is optional and supplemental." }
+                        }
+                    }
+                    div.review-card {
+                        h3 { "License and training signal" }
+                        ul.review-list {
+                            li { strong { "Reader license: " } span id="review-license" { "CC BY 4.0." } }
+                            li { strong { "AI training: " } span id="review-training" { "Allowed under the selected reader-license terms." } }
+                        }
                     }
                 }
             }
@@ -616,6 +697,90 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
   // Initial render: in case the server re-served the form with
   // existing values after a validation error.
   syncFromList(parseModels());
+
+  // ─── Review summary ────────────────────────────────────────────
+  var reviewRoot = document.getElementById('step-review');
+  if(!reviewRoot) return;
+  var submitForm = reviewRoot.closest('form');
+  function checkedValue(name){
+    var el = submitForm && submitForm.querySelector('input[name="' + name + '"]:checked');
+    return el ? el.value : '';
+  }
+  function field(name){
+    return submitForm && submitForm.querySelector('[name="' + name + '"]');
+  }
+  function setText(id, text){
+    var el = document.getElementById(id);
+    if(el) el.textContent = text;
+  }
+  function labelTextForChecked(name){
+    var el = submitForm && submitForm.querySelector('input[name="' + name + '"]:checked');
+    var card = el && el.closest('label');
+    var strong = card && card.querySelector('strong');
+    return strong ? strong.textContent.replace(/\s+/g, ' ').trim() : '';
+  }
+  function selectedOptionText(name){
+    var el = field(name);
+    if(!el || !el.options || el.selectedIndex < 0) return '';
+    return el.options[el.selectedIndex].textContent.replace(/\s+/g, ' ').trim();
+  }
+  function updateReview(){
+    var sourceType = checkedValue('source_type') || 'tex';
+    var conductorType = checkedValue('conductor_type') || 'human-ai';
+    var auditStatus = checkedValue('audit_status') || 'none';
+    var modelsPrivate = !!(field('conductor_ai_model_public') && field('conductor_ai_model_public').checked);
+    var humanPrivate = !!(field('conductor_human_public') && field('conductor_human_public').checked);
+    var hasExternal = !!(field('external_url') && field('external_url').value.trim());
+    var modelText = hidden && hidden.value.trim() ? hidden.value.trim() : 'not entered yet';
+    var humanText = field('conductor_human') && field('conductor_human').value.trim()
+      ? field('conductor_human').value.trim()
+      : 'not entered yet';
+
+    setText('review-production-mode', conductorType === 'ai-agent'
+      ? 'Autonomous AI-agent workflow; the submitter remains responsible for lawful posting and accurate disclosure.'
+      : 'Human + AI co-conductor workflow.');
+    setText('review-ai-models', modelsPrivate
+      ? 'hidden from public viewers as (undisclosed); saved for you and admins.'
+      : 'public: ' + modelText + '.');
+    setText('review-human-conductor', conductorType === 'ai-agent'
+      ? 'not used for autonomous AI-agent submissions.'
+      : (humanPrivate ? 'hidden from public viewers as (undisclosed).' : 'public: ' + humanText + '.'));
+    setText('review-audit-status', auditStatus === 'self'
+      ? 'Self-audit statement will be published with the manuscript.'
+      : (auditStatus === 'other'
+        ? 'Third-party auditor details and statement will be published with the manuscript.'
+        : 'No auditor; the page will show an unaudited warning.'));
+
+    setText('review-hidden-models', modelsPrivate
+      ? 'AI model details will be hidden from public viewers and displayed as (undisclosed).'
+      : 'AI model details are public by default.');
+    setText('review-hidden-conductor', conductorType === 'ai-agent'
+      ? 'No human conductor field is published for the autonomous agent option.'
+      : (humanPrivate
+        ? 'Human conductor name will be hidden from public viewers and displayed as (undisclosed).'
+        : 'Human conductor name is public by default for Human + AI submissions.'));
+
+    setText('review-hosted-primary', sourceType === 'pdf'
+      ? 'PDF direct upload: PreXiv will host the uploaded PDF.'
+      : 'LaTeX source upload: PreXiv will compile and host a PDF.');
+    setText('review-hosted-source', sourceType === 'pdf'
+      ? 'No PreXiv source download is created for direct PDF uploads.'
+      : ((modelsPrivate || humanPrivate)
+        ? 'A public source download will exist after private provenance fields are redacted.'
+        : 'A source download will be hosted alongside the compiled PDF.'));
+    setText('review-hosted-external', hasExternal
+      ? 'External URL will be shown as a supplemental link, not as the hosted copy.'
+      : 'No external URL entered; hosted PreXiv files will be the canonical downloads.');
+
+    setText('review-license', (selectedOptionText('license') || 'CC BY 4.0') + '.');
+    setText('review-training', (labelTextForChecked('ai_training') || 'Allow AI training') + '.');
+  }
+  submitForm.querySelectorAll('input, select, textarea').forEach(function(el){
+    el.addEventListener('input', updateReview);
+    el.addEventListener('change', updateReview);
+  });
+  submitForm.addEventListener('submit', updateReview);
+  updateReview();
 })();
 "#)) }
     };

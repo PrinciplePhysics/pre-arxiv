@@ -49,7 +49,11 @@ pub async fn withdraw(
         return Ok(Redirect::to(&format!("/m/{slug}")).into_response());
     }
     if submitter_id != user.id && !user.is_admin() {
-        set_flash(&session, "Only the submitter (or an admin) may withdraw a manuscript.").await;
+        set_flash(
+            &session,
+            "Only the submitter (or an admin) may withdraw a manuscript.",
+        )
+        .await;
         return Ok(Redirect::to(&format!("/m/{slug}")).into_response());
     }
 
@@ -85,6 +89,10 @@ pub async fn withdraw(
     .execute(&state.pool)
     .await;
 
-    set_flash(&session, "Manuscript withdrawn. The page now shows a tombstone.").await;
+    set_flash(
+        &session,
+        "Manuscript withdrawn. The page now shows a tombstone.",
+    )
+    .await;
     Ok(Redirect::to(&format!("/m/{slug}")).into_response())
 }

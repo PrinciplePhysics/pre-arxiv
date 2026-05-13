@@ -51,6 +51,7 @@ npm run seed
 | `APP_URL` | derived/local | Absolute public base URL used in citations, OpenAPI/agent prompts, and PDF watermark links. |
 | `NODE_ENV=production` | unset | Enables secure cookies and HSTS behavior behind HTTPS. |
 | `RUST_LOG` | `info,sqlx=warn,tower_http=debug` | Rust tracing filter. |
+| `PREXIV_LOG_FORMAT=json` | unset | Emits structured JSON logs for production log collectors; unset keeps human-readable logs. |
 | `PREXIV_GHOSTSCRIPT_BIN` | `gs` | Override Ghostscript binary path. |
 | `ADMIN_USERNAMES` | unset | Comma-separated usernames promoted to admin at startup where supported. |
 | `ZENODO_TOKEN` | unset | Optional real DOI deposit integration; without it PreXiv uses synthetic `10.99999/...` identifiers. |
@@ -79,6 +80,8 @@ npm run seed
 - **Identity:** verified-scholar status comes from an authenticated ORCID OAuth/OpenID binding or a verified institutional email domain. The ORCID callback verifies state, nonce, issuer, audience, expiry, and the signed `id_token`; pasted ORCID iDs are not accepted as verification.
 - **Licensing:** reader license and AI-training policy are separate. Supported reader licenses include CC0, CC BY 4.0, CC BY-SA 4.0, CC BY-NC variants, and PreXiv Standard License 1.0. AI-training flags are `allow`, `allow-with-attribution`, and `disallow`.
 - **Harvesting:** sitemap, RSS/Atom/JSON feeds, and OAI-PMH Dublin Core (`/oai`) are exposed for indexers.
+- **Onboarding/documentation:** `/how-it-works` explains the new-user workflow; `/agent-support` explains token-based agent operation, examples, token rotation, rate limits, and safety expectations.
+- **Operations:** `/healthz` checks the process; `/readyz` checks process plus database readiness. The admin dashboard shows moderation/user/submission/storage signals and labels uninstrumented operational gaps instead of pretending they exist.
 
 ## Permissions
 

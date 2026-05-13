@@ -53,7 +53,9 @@ pub async fn list_versions(
         .await
         .map_err(|e| AppError::Other(anyhow::anyhow!("{e}")))?;
     let ctx = build_ctx(&session, maybe_user, "/m").await;
-    Ok(Html(templates::versions::render_list(&ctx, &m, &vs).into_string()))
+    Ok(Html(
+        templates::versions::render_list(&ctx, &m, &vs).into_string(),
+    ))
 }
 
 // ─── GET /m/{id}/v/{n} ────────────────────────────────────────────────────

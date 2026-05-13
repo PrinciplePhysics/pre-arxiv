@@ -3,8 +3,8 @@
 //! ported from the JS app in a later milestone.
 
 use axum::response::Html;
-use tower_sessions::Session;
 use maud::html;
+use tower_sessions::Session;
 
 use crate::auth::{MaybeUser, RequireUser};
 use crate::error::AppResult;
@@ -35,25 +35,51 @@ async fn stub(
 }
 
 pub async fn me_edit(
-    session: Session, maybe_user: MaybeUser, RequireUser(_): RequireUser,
+    session: Session,
+    maybe_user: MaybeUser,
+    RequireUser(_): RequireUser,
 ) -> AppResult<Html<String>> {
-    stub(session, maybe_user, "/me/edit", "Edit profile",
-         "Profile editing is being ported. For now, edit your profile through the Node.js app.").await
+    stub(
+        session,
+        maybe_user,
+        "/me/edit",
+        "Edit profile",
+        "Profile editing is being ported. For now, edit your profile through the Node.js app.",
+    )
+    .await
 }
 
 pub async fn me_tokens(
-    session: Session, maybe_user: MaybeUser, RequireUser(_): RequireUser,
+    session: Session,
+    maybe_user: MaybeUser,
+    RequireUser(_): RequireUser,
 ) -> AppResult<Html<String>> {
-    stub(session, maybe_user, "/me/tokens", "API tokens",
-         "API token management is being ported. For now, manage tokens through the Node.js app.").await
+    stub(
+        session,
+        maybe_user,
+        "/me/tokens",
+        "API tokens",
+        "API token management is being ported. For now, manage tokens through the Node.js app.",
+    )
+    .await
 }
 
 pub async fn feed(
-    session: Session, maybe_user: MaybeUser, RequireUser(_): RequireUser,
+    session: Session,
+    maybe_user: MaybeUser,
+    RequireUser(_): RequireUser,
 ) -> AppResult<Html<String>> {
-    stub(session, maybe_user, "/feed", "Your feed",
-         "The personalised feed is being ported. For now, browse the home page.").await
+    stub(
+        session,
+        maybe_user,
+        "/feed",
+        "Your feed",
+        "The personalised feed is being ported. For now, browse the home page.",
+    )
+    .await
 }
 
 #[allow(dead_code)]
-fn _ctx_unused() -> Option<PageCtx> { None }
+fn _ctx_unused() -> Option<PageCtx> {
+    None
+}

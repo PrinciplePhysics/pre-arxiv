@@ -18,7 +18,9 @@ use axum::response::{Html, IntoResponse, Redirect, Response};
 use serde::Deserialize;
 use tower_sessions::Session;
 
-use crate::auth::{login_session, verify_csrf, verify_password_timing_safe, MaybeUser, RequireUser};
+use crate::auth::{
+    login_session, verify_csrf, verify_password_timing_safe, MaybeUser, RequireUser,
+};
 use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
 use crate::state::AppState;
@@ -54,7 +56,9 @@ pub async fn show(
 // ── /me/2fa/enable POST (start enrollment) ──────────────────────────
 
 #[derive(Deserialize)]
-pub struct CsrfOnly { pub csrf_token: String }
+pub struct CsrfOnly {
+    pub csrf_token: String,
+}
 
 pub async fn start_enroll(
     State(state): State<AppState>,
@@ -68,7 +72,11 @@ pub async fn start_enroll(
         return Ok(Redirect::to("/me/2fa").into_response());
     }
     let _ = totp::start_enrollment(&state.pool, user.id).await;
-    set_flash(&session, "Scan the QR with your authenticator app, then submit the first 6-digit code below.").await;
+    set_flash(
+        &session,
+        "Scan the QR with your authenticator app, then submit the first 6-digit code below.",
+    )
+    .await;
     let _ = maybe_user; // silence unused-warning; render uses session-derived ctx via show GET
     Ok(Redirect::to("/me/2fa").into_response())
 }
@@ -97,7 +105,11 @@ pub async fn confirm(
     let row = match totp::get_for(&state.pool, user.id).await.ok().flatten() {
         Some(r) if r.enabled_at.is_none() => r,
         _ => {
-            set_flash(&session, "No pending 2FA enrollment. Click Enable to start.").await;
+            set_flash(
+                &session,
+                "No pending 2FA enrollment. Click Enable to start.",
+            )
+            .await;
             return Ok(Redirect::to("/me/2fa").into_response());
         }
     };
@@ -114,7 +126,11 @@ pub async fn confirm(
         return Ok(Html(body).into_response());
     }
     let _ = totp::confirm_enrollment(&state.pool, user.id).await;
-    set_flash(&session, "Two-factor authentication enabled. Next time you sign in we'll ask for a code.").await;
+    set_flash(
+        &session,
+        "Two-factor authentication enabled. Next time you sign in we'll ask for a code.",
+    )
+    .await;
     Ok(Redirect::to("/me/2fa").into_response())
 }
 
@@ -139,11 +155,10 @@ pub async fn disable(
         set_flash(&session, "Form expired — please try again.").await;
         return Ok(Redirect::to("/me/2fa").into_response());
     }
-    let hash: Option<(String,)> =
-        sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
-            .bind(user.id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let hash: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
+        .bind(user.id)
+        .fetch_optional(&state.pool)
+        .await?;
     if !verify_password_timing_safe(&form.current_password, hash.as_ref().map(|(h,)| h.as_str())) {
         let body = templates::two_factor::render_status(
             &ctx,
@@ -207,7 +222,12 @@ pub async fn submit_login_2fa(
 
     if !verify_csrf(&session, &form.csrf_token).await {
         return Ok(Html(
-            templates::two_factor::render_login_step(&ctx, form.next.as_deref(), Some("Form expired — start the sign-in again.")).into_string(),
+            templates::two_factor::render_login_step(
+                &ctx,
+                form.next.as_deref(),
+                Some("Form expired — start the sign-in again."),
+            )
+            .into_string(),
         )
         .into_response());
     }
@@ -233,7 +253,12 @@ pub async fn submit_login_2fa(
     };
     if !totp::verify(secret, &form.code) {
         return Ok(Html(
-            templates::two_factor::render_login_step(&ctx, form.next.as_deref(), Some("Incorrect code. Try the current 6-digit code from your authenticator app.")).into_string(),
+            templates::two_factor::render_login_step(
+                &ctx,
+                form.next.as_deref(),
+                Some("Incorrect code. Try the current 6-digit code from your authenticator app."),
+            )
+            .into_string(),
         )
         .into_response());
     }

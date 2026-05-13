@@ -14,7 +14,8 @@ use crate::templates;
 
 #[derive(Deserialize)]
 pub struct FeedQuery {
-    #[serde(default)] pub page: Option<i64>,
+    #[serde(default)]
+    pub page: Option<i64>,
 }
 
 pub async fn show(
@@ -52,5 +53,7 @@ pub async fn show(
 
     let mut ctx = build_ctx(&session, maybe_user, "/feed").await;
     ctx.no_index = true;
-    Ok(Html(templates::feed::render(&ctx, &rows, page, per, following.0).into_string()))
+    Ok(Html(
+        templates::feed::render(&ctx, &rows, page, per, following.0).into_string(),
+    ))
 }

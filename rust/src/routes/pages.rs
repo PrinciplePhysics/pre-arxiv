@@ -15,11 +15,43 @@ macro_rules! static_page {
     };
 }
 
-static_page!(about,      "About",       "/about",      templates::pages::ABOUT);
-static_page!(guidelines, "Guidelines",  "/guidelines", templates::pages::GUIDELINES);
-static_page!(tos,        "Terms",       "/tos",        templates::pages::TOS);
-static_page!(privacy,    "Privacy",     "/privacy",    templates::pages::PRIVACY);
-static_page!(dmca,       "DMCA",        "/dmca",       templates::pages::DMCA);
-static_page!(policies,   "Policies",    "/policies",   templates::pages::POLICIES);
-static_page!(licenses,   "Licenses",    "/licenses",   templates::pages::LICENSES);
-static_page!(permissions, "Permissions", "/permissions", templates::pages::PERMISSIONS);
+static_page!(about, "About", "/about", templates::pages::ABOUT);
+static_page!(
+    guidelines,
+    "Guidelines",
+    "/guidelines",
+    templates::pages::GUIDELINES
+);
+static_page!(tos, "Terms", "/tos", templates::pages::TOS);
+static_page!(privacy, "Privacy", "/privacy", templates::pages::PRIVACY);
+static_page!(dmca, "DMCA", "/dmca", templates::pages::DMCA);
+static_page!(
+    policies,
+    "Policies",
+    "/policies",
+    templates::pages::POLICIES
+);
+static_page!(
+    licenses,
+    "Licenses",
+    "/licenses",
+    templates::pages::LICENSES
+);
+static_page!(
+    permissions,
+    "Permissions",
+    "/permissions",
+    templates::pages::PERMISSIONS
+);
+static_page!(
+    how_it_works,
+    "How it works",
+    "/how-it-works",
+    templates::pages::HOW_IT_WORKS
+);
+static_page!(
+    agent_support,
+    "Agent support",
+    "/agent-support",
+    templates::pages::AGENT_SUPPORT
+);

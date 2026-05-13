@@ -48,7 +48,9 @@ pub async fn search(
     .fetch_all(&state.pool)
     .await?;
 
-    Ok(Html(templates::search::render(&ctx, q, &rows).into_string()))
+    Ok(Html(
+        templates::search::render(&ctx, q, &rows).into_string(),
+    ))
 }
 
 fn build_fts_query(q: &str) -> String {

@@ -1,6 +1,6 @@
-use maud::{Markup, html};
+use maud::{html, Markup};
 
-use super::layout::{PageCtx, layout};
+use super::layout::{layout, PageCtx};
 use crate::routes::me_tokens::TokenRow;
 
 pub fn render(

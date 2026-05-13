@@ -15,6 +15,22 @@ fn md_inline(s: &str) -> PreEscaped<String> {
     PreEscaped(markdown::render_inline(s))
 }
 
+fn trust_badge(label: &str, detail: &str) -> Markup {
+    html! {
+        details.trust-badge {
+            summary title="Click for details" { (label) }
+            p.muted.small { (detail) }
+        }
+    }
+}
+
+fn is_self_audited(m: &Manuscript) -> bool {
+    match (&m.auditor_name, &m.conductor_human) {
+        (Some(an), Some(ch)) => an.trim() == ch.trim() && !ch.trim().is_empty(),
+        _ => false,
+    }
+}
+
 pub fn render(
     ctx: &PageCtx,
     m: &Manuscript,
@@ -29,6 +45,26 @@ pub fn render(
         .map(|(_, _, ev, ie, oo)| *oo != 0 || (*ev != 0 && *ie != 0))
         .unwrap_or(false);
     let cat_restricted = crate::categories::is_restricted(&m.category);
+    let submitter_email_verified = submitter.map(|(_, _, ev, _, _)| *ev != 0).unwrap_or(false);
+    let submitter_institutional_email = submitter.map(|(_, _, _, ie, _)| *ie != 0).unwrap_or(false);
+    let submitter_orcid_authenticated = submitter.map(|(_, _, _, _, oo)| *oo != 0).unwrap_or(false);
+    let self_audited = is_self_audited(m);
+    let hosted_source = m
+        .source_path
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .is_some();
+    let hosted_pdf = m
+        .pdf_path
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .is_some();
+    let source_redacted = m
+        .source_path
+        .as_deref()
+        .map(|s| s.contains("redacted"))
+        .unwrap_or(false)
+        || ((m.conductor_human_public == 0 || m.conductor_ai_model_public == 0) && hosted_source);
 
     let body = html! {
         div.bx-grid {
@@ -312,25 +348,107 @@ pub fn render(
             // ─── right sidebar ──────────────────────────────────────────
             aside.bx-sidebar aria-label="manuscript actions and metadata" {
                 div.bx-sidebar-block {
+                    h3 { "Record" }
+                    ul.bx-stats {
+                        li {
+                            span.lbl { "PreXiv id" }
+                            span.val.mono { (slug) }
+                        }
+                        li {
+                            span.lbl { "Version" }
+                            span.val {
+                                a href={ "/m/" (slug) "/versions" } { "v" (m.current_version) }
+                            }
+                        }
+                        @if let Some(doi) = &m.doi {
+                            li {
+                                span.lbl { "DOI" }
+                                span.val.mono { (doi) }
+                            }
+                        }
+                        @if let Some(ts) = &m.created_at {
+                            li {
+                                span.lbl { "Posted" }
+                                span.val { (ts.format("%b %-d, %Y")) }
+                            }
+                        }
+                        @if let Some(ts) = &m.updated_at {
+                            li {
+                                span.lbl { "Updated" }
+                                span.val { (time_ago(ts)) }
+                            }
+                        }
+                    }
                     @if let Some(ts) = &m.created_at {
-                        h3 { "Posted" }
-                        p style="margin:0" { (ts.format("%B %-d, %Y")) }
-                        p.muted.small style="margin:4px 0 10px" { (time_ago(ts)) }
+                        p.muted.small style="margin:6px 0 0" { "Posted " (time_ago(ts)) "." }
+                    }
+                }
+
+                div.bx-sidebar-block {
+                    h3 { "Trust signals" }
+                    div.trust-badges aria-label="Trust and provenance badges" {
+                        @if submitter_email_verified {
+                            (trust_badge("Email verified", "The submitter confirmed control of their account email address."))
+                        }
+                        @if submitter_orcid_authenticated {
+                            (trust_badge("ORCID authenticated", "The submitter connected ORCID through OAuth."))
+                        }
+                        @if submitter_institutional_email {
+                            (trust_badge("Institutional email", "The submitter's verified email appears to be from an institution rather than a disposable or public mailbox."))
+                        }
+                        @if m.conductor_type == "ai-agent" {
+                            (trust_badge("Autonomous agent", "The manuscript was produced by an AI agent acting autonomously; the submitter is still responsible for lawful posting and accurate disclosure."))
+                        } @else {
+                            (trust_badge("Human-conducted", "A named or disclosed human conductor directed the AI-assisted production workflow."))
+                        }
+                        @if m.has_auditor != 0 {
+                            @if self_audited {
+                                (trust_badge("Self-audit", "The conductor and auditor appear to be the same person. This is a disclosed line-by-line review, not an independent audit."))
+                            } @else {
+                                (trust_badge("Third-party audit", "A named auditor distinct from the conductor signed an audit statement for this manuscript."))
+                            }
+                        }
+                        @if hosted_pdf || hosted_source {
+                            (trust_badge("Source hosted by PreXiv", "PreXiv stores and serves a public PDF or source artifact for this record."))
+                        }
+                        @if source_redacted {
+                            (trust_badge("Redacted artifact", "The public source artifact has private conductor or model details blacked out before serving."))
+                        }
+                    }
+                    @if !submitter_email_verified && !submitter_orcid_authenticated && !submitter_institutional_email && m.has_auditor == 0 {
+                        p.muted.small style="margin:8px 0 0" {
+                            "No submitter identity or audit badge is available for this record."
+                        }
+                    }
+                }
+
+                div.bx-sidebar-block {
+                    h3 { "Access and citation" }
+                    @if let Some(ts) = &m.created_at {
+                        p.muted.small style="margin:0 0 8px" { "Latest public record posted " (ts.format("%B %-d, %Y")) "." }
                     }
                     @if let Some(path) = &m.pdf_path {
                         a.bx-sidebar-btn href={ "/static/uploads/" (path) } target="_blank" rel="noopener" {
-                            "↓ Download PDF"
+                            "Download hosted PDF"
                         }
                     }
                     @if let Some(src) = &m.source_path {
                         a.bx-sidebar-btn.secondary href={ "/static/uploads/" (src) } target="_blank" rel="noopener" title="Compiled from this LaTeX source" {
-                            "↓ LaTeX source"
+                            "Download hosted source"
                         }
                     }
                     @if let Some(url) = &m.external_url {
                         (sidebar_external(url))
                     }
-                    a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite" } { "Citation Tools" }
+                    a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite" } { "Citation tools" }
+                    div style="display:flex;gap:6px;margin-top:6px" {
+                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite.bib" } style="flex:1;margin:0" { "BibTeX" }
+                        a.bx-sidebar-btn.secondary href={ "/m/" (slug) "/cite.ris" } style="flex:1;margin:0" { "RIS" }
+                    }
+                }
+
+                div.bx-sidebar-block {
+                    h3 { "Reader actions" }
                     @if !m.is_withdrawn() && logged_in {
                         form action="/vote" method="post" style="margin-top:8px;display:flex;gap:4px" {
                             input type="hidden" name="csrf_token" value=(ctx.csrf_token);
@@ -362,7 +480,7 @@ pub fn render(
                     @let viewer_is_submitter_for_flag = ctx.user.as_ref().map(|u| u.id == m.submitter_id).unwrap_or(false);
                     @if logged_in && !m.is_withdrawn() && !viewer_is_submitter_for_flag {
                         details.flag-disclosure style="margin-top:10px" {
-                            summary.linklike.small.muted { "🚩 Flag for moderator review" }
+                            summary.linklike.small.muted { "Report or flag for moderator review" }
                             form action={"/m/" (slug) "/flag"} method="post" class="flag-form" {
                                 input type="hidden" name="csrf_token" value=(ctx.csrf_token);
                                 label.small.muted style="display:block;margin:6px 0 4px" { "Optional reason" }
@@ -370,6 +488,11 @@ pub fn render(
                                          placeholder="What looks wrong? Spam, plagiarism, manifest hate, etc." {}
                                 button.btn-secondary.btn-small type="submit" style="margin-top:6px" { "Submit report" }
                             }
+                        }
+                    } @else if !logged_in && !m.is_withdrawn() {
+                        p.muted.small style="margin:10px 0 0;text-align:center" {
+                            a href={ "/login?next=/m/" (slug) } { "Sign in" }
+                            " to report issues."
                         }
                     }
                 }

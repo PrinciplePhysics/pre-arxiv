@@ -41,6 +41,15 @@ fn status_pill(label: &str, class_name: &str) -> Markup {
     html! { span class=(format!("admin-pill {class_name}")) { (label) } }
 }
 
+fn gap_card(title: &str, body: &str) -> Markup {
+    html! {
+        div.admin-empty {
+            strong { (title) }
+            span { (body) }
+        }
+    }
+}
+
 pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]) -> Markup {
     let s = &dashboard.stats;
     let body = html! {
@@ -63,6 +72,14 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                     " · oldest " (time_ago(ts))
                 }
             }))
+            (stat_card("Moderation SLA", s.open_flags_over_24h, html! {
+                "open longer than 24h · "
+                (fmt_int(s.resolved_flags_7d)) " resolved in 7d"
+            }))
+            (stat_card("User growth", s.total_users, html! {
+                (fmt_int(s.new_users_24h)) " new in 24h · "
+                (fmt_int(s.new_users_7d)) " new in 7d"
+            }))
             (stat_card("Verified users", s.email_verified_users, html! {
                 (percent(s.email_verified_users, s.total_users)) " of "
                 (fmt_int(s.total_users)) " accounts"
@@ -83,6 +100,58 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
         }
 
         div.admin-panel-grid {
+            section.admin-panel.admin-panel-wide {
+                div.admin-panel-head {
+                    div {
+                        h2 { "Abuse and moderation trend" }
+                        p.muted { "Reports opened and resolved over the last seven calendar days." }
+                    }
+                    span.admin-mini-stat { (fmt_int(s.open_flags)) " open now" }
+                }
+                @if dashboard.moderation_trend.is_empty() {
+                    div.admin-empty { strong { "No moderation events yet" } }
+                } @else {
+                    table.admin-table.admin-table-compact {
+                        thead { tr { th { "Day" } th { "Opened" } th { "Resolved" } } }
+                        tbody {
+                            @for row in &dashboard.moderation_trend {
+                                tr {
+                                    td.mono { (row.day) }
+                                    td { (fmt_int(row.primary_count)) }
+                                    td { (fmt_int(row.secondary_count)) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            section.admin-panel {
+                div.admin-panel-head {
+                    div {
+                        h2 { "Auth and rate limits" }
+                        p.muted { "Visibility for blocked or failed access attempts." }
+                    }
+                }
+                (gap_card(
+                    "Not yet instrumented",
+                    "Failed login attempts and rate-limit rejections are enforced in middleware but are not persisted to a queryable table."
+                ))
+            }
+
+            section.admin-panel {
+                div.admin-panel-head {
+                    div {
+                        h2 { "Legal request queue" }
+                        p.muted { "Operational tracking for takedown or records requests." }
+                    }
+                }
+                (gap_card(
+                    "No persisted queue",
+                    "The database schema does not currently include legal request records, deadlines, custodians, or status transitions."
+                ))
+            }
+
             section.admin-panel.admin-panel-wide {
                 div.admin-panel-head {
                     div {
@@ -138,8 +207,40 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
             section.admin-panel {
                 div.admin-panel-head {
                     div {
-                        h2 { "Provenance" }
-                        p.muted { "Privacy and hosted-artifact posture." }
+                        h2 { "Storage and backup" }
+                        p.muted { "Hosted artifact coverage and backup observability." }
+                    }
+                }
+                dl.admin-kv {
+                    div { dt { "Hosted PDFs" } dd { (fmt_int(s.stored_pdfs)) } }
+                    div { dt { "Hosted sources" } dd { (fmt_int(s.stored_sources)) } }
+                    div { dt { "Total manuscripts" } dd { (fmt_int(s.total_manuscripts)) } }
+                    div { dt { "PDF coverage" } dd { (percent(s.stored_pdfs, s.total_manuscripts)) } }
+                }
+                (gap_card(
+                    "Backup status not persisted",
+                    "No backup run table, object checksum inventory, restore-test result, or retention status is available to show here."
+                ))
+            }
+
+            section.admin-panel {
+                div.admin-panel-head {
+                    div {
+                        h2 { "LaTeX compile failures" }
+                        p.muted { "Diagnostics for source-upload processing." }
+                    }
+                }
+                (gap_card(
+                    "Compile logs are not persisted",
+                    "The submit path returns compile errors to the requester, but failed compile logs are not saved for admin review."
+                ))
+            }
+
+            section.admin-panel {
+                div.admin-panel-head {
+                    div {
+                        h2 { "Provenance and privacy" }
+                        p.muted { "Submission disclosure and admin posture." }
                     }
                 }
                 dl.admin-kv {
@@ -147,10 +248,34 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                     div { dt { "Withdrawn manuscripts" } dd { (fmt_int(s.withdrawn_manuscripts)) } }
                     div { dt { "Human name hidden" } dd { (fmt_int(s.hidden_human_manuscripts)) } }
                     div { dt { "AI model hidden" } dd { (fmt_int(s.hidden_ai_manuscripts)) } }
-                    div { dt { "Hosted PDFs" } dd { (fmt_int(s.stored_pdfs)) } }
-                    div { dt { "Hosted sources" } dd { (fmt_int(s.stored_sources)) } }
                     div { dt { "Admins" } dd { (fmt_int(s.admin_users)) } }
                     div { dt { "New users, 7d" } dd { (fmt_int(s.new_users_7d)) } }
+                }
+            }
+
+            section.admin-panel.admin-panel-wide {
+                div.admin-panel-head {
+                    div {
+                        h2 { "User growth" }
+                        p.muted { "New accounts by creation day; verified column reflects accounts already email-verified." }
+                    }
+                    span.admin-mini-stat { (fmt_int(s.total_users)) " total" }
+                }
+                @if dashboard.user_growth.is_empty() {
+                    div.admin-empty { strong { "No user events yet" } }
+                } @else {
+                    table.admin-table.admin-table-compact {
+                        thead { tr { th { "Day" } th { "New accounts" } th { "Email verified" } } }
+                        tbody {
+                            @for row in &dashboard.user_growth {
+                                tr {
+                                    td.mono { (row.day) }
+                                    td { (fmt_int(row.primary_count)) }
+                                    td { (fmt_int(row.secondary_count)) }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -237,6 +362,43 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                                     td { (fmt_int(c.live)) }
                                     td.muted.small {
                                         @if let Some(ts) = &c.latest_at { (time_ago(ts)) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            section.admin-panel {
+                div.admin-panel-head {
+                    div {
+                        h2 { "Unverified high-activity users" }
+                        p.muted { "Unverified accounts with submissions, comments, votes, or active API tokens." }
+                    }
+                }
+                @if dashboard.unverified_high_activity_users.is_empty() {
+                    div.admin-empty { strong { "No unverified activity found" } }
+                } @else {
+                    table.admin-table.admin-table-compact {
+                        thead { tr { th { "User" } th { "Activity" } th { "Joined" } } }
+                        tbody {
+                            @for u in &dashboard.unverified_high_activity_users {
+                                tr {
+                                    td {
+                                        a href={ "/u/" (u.username) } { (u.username) }
+                                        @if let Some(name) = &u.display_name {
+                                            div.muted.small { (name) }
+                                        }
+                                    }
+                                    td.muted.small {
+                                        (fmt_int(u.manuscript_count)) " manuscripts · "
+                                        (fmt_int(u.comment_count)) " comments · "
+                                        (fmt_int(u.vote_count)) " votes · "
+                                        (fmt_int(u.token_count)) " tokens"
+                                    }
+                                    td.muted.small {
+                                        @if let Some(ts) = &u.created_at { (time_ago(ts)) }
                                     }
                                 }
                             }

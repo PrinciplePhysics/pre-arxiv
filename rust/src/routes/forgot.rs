@@ -24,9 +24,7 @@ use axum::response::{Html, IntoResponse, Redirect, Response};
 use serde::Deserialize;
 use tower_sessions::Session;
 
-use crate::auth::{
-    hash_password, is_password_pwned, login_session, verify_csrf, MaybeUser,
-};
+use crate::auth::{hash_password, is_password_pwned, login_session, verify_csrf, MaybeUser};
 use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
 use crate::passwords;
@@ -35,17 +33,16 @@ use crate::templates;
 
 // ─── GET /forgot-password ──────────────────────────────────────────────────
 
-pub async fn show_forgot(
-    session: Session,
-    maybe_user: MaybeUser,
-) -> AppResult<Html<String>> {
+pub async fn show_forgot(session: Session, maybe_user: MaybeUser) -> AppResult<Html<String>> {
     // A logged-in user shouldn't be using forgot-password — bounce them.
     if maybe_user.0.is_some() {
         return Ok(Html(redirect_html("/me/password")));
     }
     let mut ctx = build_ctx(&session, maybe_user, "/forgot-password").await;
     ctx.no_index = true;
-    Ok(Html(templates::forgot::render_forgot(&ctx, None).into_string()))
+    Ok(Html(
+        templates::forgot::render_forgot(&ctx, None).into_string(),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -63,7 +60,8 @@ pub async fn submit_forgot(
     if !verify_csrf(&session, &form.csrf_token).await {
         let mut ctx = build_ctx(&session, maybe_user, "/forgot-password").await;
         ctx.no_index = true;
-        let body = templates::forgot::render_forgot(&ctx, Some("Form expired — please try again.")).into_string();
+        let body = templates::forgot::render_forgot(&ctx, Some("Form expired — please try again."))
+            .into_string();
         return Ok(Html(body).into_response());
     }
 
@@ -71,7 +69,8 @@ pub async fn submit_forgot(
     if needle.is_empty() {
         let mut ctx = build_ctx(&session, maybe_user, "/forgot-password").await;
         ctx.no_index = true;
-        let body = templates::forgot::render_forgot(&ctx, Some("Enter your email or username.")).into_string();
+        let body = templates::forgot::render_forgot(&ctx, Some("Enter your email or username."))
+            .into_string();
         return Ok(Html(body).into_response());
     }
 
@@ -82,8 +81,13 @@ pub async fn submit_forgot(
         Ok(Some((user_id, username, email))) => {
             // Best-effort: send the email; log the link either way.
             let _ = passwords::mint_and_send(
-                &state.pool, user_id, &email, &username, state.app_url.as_deref(),
-            ).await;
+                &state.pool,
+                user_id,
+                &email,
+                &username,
+                state.app_url.as_deref(),
+            )
+            .await;
         }
         Ok(None) => {
             tracing::info!(
@@ -106,10 +110,7 @@ pub async fn submit_forgot(
     Ok(Redirect::to("/forgot-password/sent").into_response())
 }
 
-pub async fn show_sent(
-    session: Session,
-    maybe_user: MaybeUser,
-) -> AppResult<Html<String>> {
+pub async fn show_sent(session: Session, maybe_user: MaybeUser) -> AppResult<Html<String>> {
     let mut ctx = build_ctx(&session, maybe_user, "/forgot-password/sent").await;
     ctx.no_index = true;
     Ok(Html(templates::forgot::render_sent(&ctx).into_string()))
@@ -151,14 +152,17 @@ pub async fn submit_reset(
     let render_err = async |msg: &str, token_valid: bool, maybe_user: MaybeUser| -> Response {
         let mut ctx = build_ctx(&session, maybe_user, "/reset-password").await;
         ctx.no_index = true;
-        Html(
-            templates::forgot::render_reset(&ctx, &token, token_valid, Some(msg)).into_string(),
-        )
-        .into_response()
+        Html(templates::forgot::render_reset(&ctx, &token, token_valid, Some(msg)).into_string())
+            .into_response()
     };
 
     if !verify_csrf(&session, &form.csrf_token).await {
-        return Ok(render_err("Form expired — request a fresh reset link.", false, maybe_user).await);
+        return Ok(render_err(
+            "Form expired — request a fresh reset link.",
+            false,
+            maybe_user,
+        )
+        .await);
     }
 
     // Re-resolve the token at POST time — it might have expired or been
@@ -168,28 +172,39 @@ pub async fn submit_reset(
             "This reset link is invalid or has expired. Request a new one from /forgot-password.",
             false,
             maybe_user,
-        ).await);
+        )
+        .await);
     };
 
     if form.new_password.len() < 8 {
-        return Ok(render_err("New password must be at least 8 characters.", true, maybe_user).await);
+        return Ok(render_err(
+            "New password must be at least 8 characters.",
+            true,
+            maybe_user,
+        )
+        .await);
     }
     if form.new_password != form.new_password_confirm {
         return Ok(render_err(
             "The two new-password fields don't match. Re-type the confirmation.",
-            true, maybe_user,
-        ).await);
+            true,
+            maybe_user,
+        )
+        .await);
     }
     if is_password_pwned(&form.new_password).await {
         return Ok(render_err(
             "That password appears in a known data breach. Please pick another.",
-            true, maybe_user,
-        ).await);
+            true,
+            maybe_user,
+        )
+        .await);
     }
 
     let new_hash = hash_password(&form.new_password)
         .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("bcrypt: {e}")))?;
-    passwords::consume_and_set(&state.pool, token_id, user_id, &new_hash).await
+    passwords::consume_and_set(&state.pool, token_id, user_id, &new_hash)
+        .await
         .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("{e}")))?;
 
     // Log the user in immediately. login_session calls cycle_id, so
@@ -201,7 +216,8 @@ pub async fn submit_reset(
     set_flash(
         &session,
         "Password updated and you're signed in. Welcome back.",
-    ).await;
+    )
+    .await;
     Ok(Redirect::to("/").into_response())
 }
 

@@ -45,8 +45,7 @@ pub async fn mint_token(pool: &SqlitePool, user_id: i64, new_email: &str) -> Res
 
     let plain = generate_token();
     let hash = hash_token(&plain);
-    let expires_at: NaiveDateTime =
-        (Utc::now() + Duration::hours(TOKEN_TTL_HOURS)).naive_utc();
+    let expires_at: NaiveDateTime = (Utc::now() + Duration::hours(TOKEN_TTL_HOURS)).naive_utc();
     sqlx::query(
         "INSERT INTO pending_email_changes (user_id, new_email, token_hash, expires_at) VALUES (?, ?, ?, ?)",
     )
@@ -70,7 +69,11 @@ pub async fn mint_and_send(
 ) -> Result<String> {
     let token = mint_token(pool, user_id, new_email).await?;
     let base = app_url.unwrap_or("http://localhost:3001");
-    let link = format!("{}/confirm-email-change/{}", base.trim_end_matches('/'), token);
+    let link = format!(
+        "{}/confirm-email-change/{}",
+        base.trim_end_matches('/'),
+        token
+    );
 
     // Log so the operator can pluck the link while Brevo activation is
     // still pending. Same fallback strategy as forgot-password.
@@ -84,9 +87,8 @@ pub async fn mint_and_send(
     let username_owned = username.to_string();
     let link_for_send = link.clone();
     tokio::spawn(async move {
-        let send_fut = crate::email::send_email_change_confirmation(
-            &to, &username_owned, &link_for_send,
-        );
+        let send_fut =
+            crate::email::send_email_change_confirmation(&to, &username_owned, &link_for_send);
         match tokio::time::timeout(StdDuration::from_secs(12), send_fut).await {
             Ok(Ok(())) => {}
             Ok(Err(e)) => {
@@ -103,10 +105,7 @@ pub async fn mint_and_send(
 
 /// Resolve a plaintext token, honouring expiry. Returns (token_row_id,
 /// user_id, new_email) on hit.
-pub async fn resolve_token(
-    pool: &SqlitePool,
-    plain: &str,
-) -> Result<Option<(i64, i64, String)>> {
+pub async fn resolve_token(pool: &SqlitePool, plain: &str) -> Result<Option<(i64, i64, String)>> {
     let hash = hash_token(plain);
     let row: Option<(i64, i64, String, NaiveDateTime)> = sqlx::query_as(
         "SELECT id, user_id, new_email, expires_at FROM pending_email_changes WHERE token_hash = ?",
@@ -142,17 +141,16 @@ pub async fn consume_and_apply(
 ) -> Result<bool> {
     let mut tx = pool.begin().await?;
 
-    let (hash_arr, enc) = crate::crypto::seal_email(new_email)
-        .context("sealing new email for change")?;
+    let (hash_arr, enc) =
+        crate::crypto::seal_email(new_email).context("sealing new email for change")?;
     let new_hash = hash_arr.to_vec();
-    let conflict: Option<(i64,)> = sqlx::query_as(
-        "SELECT id FROM users WHERE email_hash = ? AND id != ? LIMIT 1",
-    )
-    .bind(&new_hash)
-    .bind(user_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .context("checking email uniqueness at consume time")?;
+    let conflict: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM users WHERE email_hash = ? AND id != ? LIMIT 1")
+            .bind(&new_hash)
+            .bind(user_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .context("checking email uniqueness at consume time")?;
     if conflict.is_some() {
         // Drop the pending row and bail; caller renders an error page.
         let _ = sqlx::query("DELETE FROM pending_email_changes WHERE id = ?")
@@ -163,21 +161,25 @@ pub async fn consume_and_apply(
         return Ok(false);
     }
 
-    let inst_email: i64 = if crate::email::is_institutional(new_email) { 1 } else { 0 };
+    let inst_email: i64 = if crate::email::is_institutional(new_email) {
+        1
+    } else {
+        0
+    };
     sqlx::query(
         "UPDATE users
            SET email = ?, email_hash = ?, email_enc = ?,
                email_verified = 1, institutional_email = ?
          WHERE id = ?",
     )
-        .bind(new_email)
-        .bind(&new_hash)
-        .bind(&enc)
-        .bind(inst_email)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await
-        .context("updating users.email + crypto fields")?;
+    .bind(new_email)
+    .bind(&new_hash)
+    .bind(&enc)
+    .bind(inst_email)
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .context("updating users.email + crypto fields")?;
     sqlx::query("DELETE FROM pending_email_changes WHERE id = ?")
         .bind(token_id)
         .execute(&mut *tx)

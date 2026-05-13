@@ -25,11 +25,11 @@ mod crockford;
 mod crypto;
 mod db;
 mod email;
+mod email_change;
 mod error;
 mod helpers;
 mod licenses;
 mod markdown;
-mod email_change;
 mod models;
 mod notifications;
 mod orcid;
@@ -46,10 +46,19 @@ use crate::state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::new("info,sqlx=warn,tower_http=debug")))
-        .init();
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,sqlx=warn,tower_http=debug"));
+    let structured_logs = std::env::var("PREXIV_LOG_FORMAT")
+        .map(|value| value.eq_ignore_ascii_case("json"))
+        .unwrap_or(false);
+    if structured_logs {
+        tracing_subscriber::fmt()
+            .json()
+            .with_env_filter(env_filter)
+            .init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(env_filter).init();
+    }
 
     let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -179,12 +188,12 @@ async fn main() -> anyhow::Result<()> {
     );
     let write_governor = Arc::new(
         GovernorConfigBuilder::default()
-            .per_second(2)  // 30/min average
+            .per_second(2) // 30/min average
             .burst_size(30)
             .finish()
             .expect("write GovernorConfig"),
     );
-    let auth_layer  = GovernorLayer::new(auth_governor);
+    let auth_layer = GovernorLayer::new(auth_governor);
     let write_layer = GovernorLayer::new(write_governor);
 
     let app = Router::new()
@@ -267,11 +276,10 @@ async fn backfill_institutional_email(pool: &sqlx::SqlitePool) -> anyhow::Result
 }
 
 async fn backfill_user_emails(pool: &sqlx::SqlitePool) -> anyhow::Result<usize> {
-    let rows: Vec<(i64, Option<String>)> = sqlx::query_as(
-        "SELECT id, email FROM users WHERE email_hash IS NULL",
-    )
-    .fetch_all(pool)
-    .await?;
+    let rows: Vec<(i64, Option<String>)> =
+        sqlx::query_as("SELECT id, email FROM users WHERE email_hash IS NULL")
+            .fetch_all(pool)
+            .await?;
     let mut n = 0usize;
     for (id, email_opt) in rows {
         let email = email_opt.unwrap_or_default();
@@ -280,14 +288,12 @@ async fn backfill_user_emails(pool: &sqlx::SqlitePool) -> anyhow::Result<usize> 
         }
         let (hash, enc) = crypto::seal_email(&email)?;
         let hash_vec = hash.to_vec();
-        sqlx::query(
-            "UPDATE users SET email_hash = ?, email_enc = ? WHERE id = ?",
-        )
-        .bind(&hash_vec)
-        .bind(&enc)
-        .bind(id)
-        .execute(pool)
-        .await?;
+        sqlx::query("UPDATE users SET email_hash = ?, email_enc = ? WHERE id = ?")
+            .bind(&hash_vec)
+            .bind(&enc)
+            .bind(id)
+            .execute(pool)
+            .await?;
         n += 1;
     }
     Ok(n)

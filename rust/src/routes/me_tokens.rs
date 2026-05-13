@@ -48,13 +48,16 @@ pub async fn show(
         .ok()
         .flatten();
     let base = state.app_url.as_deref().unwrap_or("http://localhost:3001");
-    Ok(Html(templates::me_tokens::render(
-        &ctx,
-        &rows,
-        just_minted.as_ref(),
-        base,
-        user.is_verified_or_admin(),
-    ).into_string()))
+    Ok(Html(
+        templates::me_tokens::render(
+            &ctx,
+            &rows,
+            just_minted.as_ref(),
+            base,
+            user.is_verified_or_admin(),
+        )
+        .into_string(),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -81,26 +84,39 @@ pub async fn create(
         return Ok(Redirect::to("/me/tokens").into_response());
     }
     let name = form.name.trim();
-    let name = if name.is_empty() { None } else { Some(name.to_string()) };
-    let days = form.expires_in_days.trim().parse::<i64>().ok().filter(|d| *d > 0);
+    let name = if name.is_empty() {
+        None
+    } else {
+        Some(name.to_string())
+    };
+    let days = form
+        .expires_in_days
+        .trim()
+        .parse::<i64>()
+        .ok()
+        .filter(|d| *d > 0);
     let expires_at = days.map(|d| (chrono::Utc::now() + chrono::Duration::days(d)).naive_utc());
 
     let plain = generate_token();
     let hash = hash_token(&plain);
-    sqlx::query("INSERT INTO api_tokens (user_id, token_hash, name, expires_at) VALUES (?, ?, ?, ?)")
-        .bind(user.id)
-        .bind(&hash)
-        .bind(name.as_deref())
-        .bind(expires_at)
-        .execute(&state.pool)
-        .await?;
+    sqlx::query(
+        "INSERT INTO api_tokens (user_id, token_hash, name, expires_at) VALUES (?, ?, ?, ?)",
+    )
+    .bind(user.id)
+    .bind(&hash)
+    .bind(name.as_deref())
+    .bind(expires_at)
+    .execute(&state.pool)
+    .await?;
 
     let _ = session.insert("just_minted_token", (plain, name)).await;
     Ok(Redirect::to("/me/tokens").into_response())
 }
 
 #[derive(Deserialize)]
-pub struct RevokeForm { pub csrf_token: String }
+pub struct RevokeForm {
+    pub csrf_token: String,
+}
 
 pub async fn revoke(
     State(state): State<AppState>,

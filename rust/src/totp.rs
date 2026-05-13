@@ -21,8 +21,8 @@ use totp_rs::{Algorithm, Secret, TOTP};
 /// JS app); SECURITY.md S-7 tracks the column-level encryption fix.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct UserTotp {
-    pub user_id:    i64,
-    pub secret:     String,
+    pub user_id: i64,
+    pub secret: String,
     pub enabled_at: Option<chrono::NaiveDateTime>,
 }
 
@@ -62,7 +62,9 @@ pub fn provisioning_url(secret_b32: &str, account: &str) -> Result<String> {
 /// provisioning URL. Falls back to a plain `<pre>` showing the URL on
 /// any error so the user still has a path forward.
 pub fn qr_svg(secret_b32: &str, account: &str) -> String {
-    match build_totp(secret_b32, account).and_then(|t| t.get_qr_png().map_err(|e| anyhow::anyhow!("{e}"))) {
+    match build_totp(secret_b32, account)
+        .and_then(|t| t.get_qr_png().map_err(|e| anyhow::anyhow!("{e}")))
+    {
         Ok(png_bytes) => {
             // Embed PNG as a data URL — simpler than installing an SVG
             // QR encoder + serving as <svg>.
@@ -71,7 +73,10 @@ pub fn qr_svg(secret_b32: &str, account: &str) -> String {
                 r#"<img alt="TOTP enrollment QR code" width="220" height="220" src="data:image/png;base64,{b64}">"#
             )
         }
-        Err(_) => format!("<pre class=\"copy-pre\">{}</pre>", provisioning_url(secret_b32, account).unwrap_or_default()),
+        Err(_) => format!(
+            "<pre class=\"copy-pre\">{}</pre>",
+            provisioning_url(secret_b32, account).unwrap_or_default()
+        ),
     }
 }
 

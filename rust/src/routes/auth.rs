@@ -50,7 +50,13 @@ pub async fn do_login(
     Form(form): Form<LoginForm>,
 ) -> AppResult<Response> {
     if !verify_csrf(&session, &form.csrf_token).await {
-        return Ok(error_response(&session, maybe_user, "Form expired — please try again.", form.next.as_deref()).await);
+        return Ok(error_response(
+            &session,
+            maybe_user,
+            "Form expired — please try again.",
+            form.next.as_deref(),
+        )
+        .await);
     }
     // Identifier may be a username or an email. Look it up via the
     // blind index (`email_hash`) so we never need to scan plaintext.
@@ -73,10 +79,12 @@ pub async fn do_login(
 
     if !password_ok {
         return Ok(error_response(
-            &session, maybe_user,
+            &session,
+            maybe_user,
             "Incorrect username/email or password.",
             form.next.as_deref(),
-        ).await);
+        )
+        .await);
     }
     let user_id = row.expect("password_ok implies row is Some").0;
 
@@ -92,7 +100,9 @@ pub async fn do_login(
         return Ok(Redirect::to(&target).into_response());
     }
 
-    login_session(&session, user_id).await.map_err(crate::error::AppError::Other)?;
+    login_session(&session, user_id)
+        .await
+        .map_err(crate::error::AppError::Other)?;
     let dest = sanitize_next(form.next.as_deref());
     Ok(Redirect::to(&dest).into_response())
 }
@@ -109,10 +119,7 @@ async fn error_response(
     Html(markup.into_string()).into_response()
 }
 
-pub async fn show_register(
-    session: Session,
-    maybe_user: MaybeUser,
-) -> AppResult<Html<String>> {
+pub async fn show_register(session: Session, maybe_user: MaybeUser) -> AppResult<Html<String>> {
     if maybe_user.0.is_some() {
         return Ok(Html(redirect_html("/")));
     }
@@ -157,10 +164,18 @@ pub async fn do_register(
     }
     let username = form.username.trim();
     let email = form.email.trim().to_ascii_lowercase();
-    if username.len() < 3 || username.len() > 32
-        || !username.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    if username.len() < 3
+        || username.len() > 32
+        || !username
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
     {
-        return Ok(mk_err("Username must be 3–32 chars, letters/digits/underscore/hyphen only.", &form, maybe_user).await);
+        return Ok(mk_err(
+            "Username must be 3–32 chars, letters/digits/underscore/hyphen only.",
+            &form,
+            maybe_user,
+        )
+        .await);
     }
     if !email.contains('@') || email.len() < 5 || email.len() > 254 {
         return Ok(mk_err("Email looks invalid.", &form, maybe_user).await);
@@ -169,10 +184,20 @@ pub async fn do_register(
         return Ok(mk_err("Password must be at least 8 characters.", &form, maybe_user).await);
     }
     if form.password != form.password_confirm {
-        return Ok(mk_err("The two passwords don't match. Re-type the confirmation.", &form, maybe_user).await);
+        return Ok(mk_err(
+            "The two passwords don't match. Re-type the confirmation.",
+            &form,
+            maybe_user,
+        )
+        .await);
     }
     if is_password_pwned(&form.password).await {
-        return Ok(mk_err("That password appears in a known data breach. Please pick another.", &form, maybe_user).await);
+        return Ok(mk_err(
+            "That password appears in a known data breach. Please pick another.",
+            &form,
+            maybe_user,
+        )
+        .await);
     }
     let (email_hash, email_enc) = crate::crypto::seal_email(&email)
         .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("seal_email: {e}")))?;
@@ -185,7 +210,12 @@ pub async fn do_register(
     .fetch_optional(&state.pool)
     .await?;
     if existing.is_some() {
-        return Ok(mk_err("That username or email is already taken.", &form, maybe_user).await);
+        return Ok(mk_err(
+            "That username or email is already taken.",
+            &form,
+            maybe_user,
+        )
+        .await);
     }
     let hash = hash_password(&form.password)
         .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("bcrypt: {e}")))?;
@@ -207,7 +237,11 @@ pub async fn do_register(
     // is *still* 0 until they click the verification link, so this
     // alone doesn't grant them the verified-scholar badge — the badge
     // gating logic AND-s the two.
-    let inst_email: i64 = if crate::email::is_institutional(&email) { 1 } else { 0 };
+    let inst_email: i64 = if crate::email::is_institutional(&email) {
+        1
+    } else {
+        0
+    };
     let result = sqlx::query(
         r#"INSERT INTO users
               (username, email, email_hash, email_enc, password_hash, display_name,
@@ -235,7 +269,11 @@ pub async fn do_register(
     // working, the same token also arrives by email; whichever the
     // user clicks works.
     let pending_token = verify::mint_and_send(
-        &state.pool, user_id, &email, username, state.app_url.as_deref(),
+        &state.pool,
+        user_id,
+        &email,
+        username,
+        state.app_url.as_deref(),
     )
     .await
     .ok();
@@ -263,10 +301,7 @@ pub struct LogoutForm {
     pub csrf_token: String,
 }
 
-pub async fn do_logout(
-    session: Session,
-    Form(form): Form<LogoutForm>,
-) -> AppResult<Response> {
+pub async fn do_logout(session: Session, Form(form): Form<LogoutForm>) -> AppResult<Response> {
     if verify_csrf(&session, &form.csrf_token).await {
         let _ = logout_session(&session).await;
     }

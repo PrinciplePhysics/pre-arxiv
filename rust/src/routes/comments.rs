@@ -54,7 +54,11 @@ pub async fn post_comment(
     // form for withdrawn rows, but a hand-crafted POST would otherwise
     // succeed and leave new commentary attached to a tombstoned record.
     if withdrawn != 0 {
-        set_flash(&session, "This manuscript has been withdrawn; new comments are disabled.").await;
+        set_flash(
+            &session,
+            "This manuscript has been withdrawn; new comments are disabled.",
+        )
+        .await;
         return Ok(Redirect::to(&format!("/m/{slug}")).into_response());
     }
 
@@ -68,26 +72,29 @@ pub async fn post_comment(
     .bind(content)
     .execute(&mut *tx)
     .await?;
-    sqlx::query("UPDATE manuscripts SET comment_count = COALESCE(comment_count, 0) + 1 WHERE id = ?")
-        .bind(manuscript_id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "UPDATE manuscripts SET comment_count = COALESCE(comment_count, 0) + 1 WHERE id = ?",
+    )
+    .bind(manuscript_id)
+    .execute(&mut *tx)
+    .await?;
     let cid = res.last_insert_rowid();
 
     // Look up the manuscript submitter and (if reply) the parent comment
     // author, so we can fire notifications. notify() short-circuits if
     // recipient == actor.
-    let submitter: Option<(i64,)> = sqlx::query_as(
-        "SELECT submitter_id FROM manuscripts WHERE id = ?",
-    )
-    .bind(manuscript_id)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let parent_author: Option<(i64,)> = match form.parent_id {
-        Some(pid) => sqlx::query_as("SELECT author_id FROM comments WHERE id = ?")
-            .bind(pid)
+    let submitter: Option<(i64,)> =
+        sqlx::query_as("SELECT submitter_id FROM manuscripts WHERE id = ?")
+            .bind(manuscript_id)
             .fetch_optional(&mut *tx)
-            .await?,
+            .await?;
+    let parent_author: Option<(i64,)> = match form.parent_id {
+        Some(pid) => {
+            sqlx::query_as("SELECT author_id FROM comments WHERE id = ?")
+                .bind(pid)
+                .fetch_optional(&mut *tx)
+                .await?
+        }
         None => None,
     };
     tx.commit().await?;
@@ -104,7 +111,8 @@ pub async fn post_comment(
             Some("comment"),
             Some(cid),
             Some(&snippet),
-        ).await;
+        )
+        .await;
     }
     if let Some((pid_author,)) = parent_author {
         let _ = crate::notifications::notify(
@@ -115,7 +123,8 @@ pub async fn post_comment(
             Some("comment"),
             Some(cid),
             Some(&snippet),
-        ).await;
+        )
+        .await;
     }
 
     Ok(Redirect::to(&format!("/m/{slug}#comment-{cid}")).into_response())

@@ -66,7 +66,11 @@ pub async fn vote(
             .fetch_optional(&state.pool)
             .await?;
         if matches!(w, Some((1,))) {
-            set_flash(&session, "This manuscript has been withdrawn and can no longer be voted on.").await;
+            set_flash(
+                &session,
+                "This manuscript has been withdrawn and can no longer be voted on.",
+            )
+            .await;
             return Ok(Redirect::to(&back).into_response());
         }
     }
@@ -139,13 +143,17 @@ pub async fn vote(
     match form.target_type.as_str() {
         "manuscript" => {
             sqlx::query("UPDATE manuscripts SET score = ? WHERE id = ?")
-                .bind(score).bind(form.target_id)
-                .execute(&mut *tx).await?;
+                .bind(score)
+                .bind(form.target_id)
+                .execute(&mut *tx)
+                .await?;
         }
         "comment" => {
             sqlx::query("UPDATE comments SET score = ? WHERE id = ?")
-                .bind(score).bind(form.target_id)
-                .execute(&mut *tx).await?;
+                .bind(score)
+                .bind(form.target_id)
+                .execute(&mut *tx)
+                .await?;
         }
         _ => unreachable!("target_type validated above"),
     }
@@ -162,7 +170,10 @@ pub async fn vote(
 /// prefix and keeps just the path so a Referer of
 /// `https://attacker.example/x` collapses to a safe default.
 fn safe_back_path(s: &str) -> Option<String> {
-    let path_part = if let Some(rest) = s.strip_prefix("https://").or_else(|| s.strip_prefix("http://")) {
+    let path_part = if let Some(rest) = s
+        .strip_prefix("https://")
+        .or_else(|| s.strip_prefix("http://"))
+    {
         // Drop scheme+authority — keep only path-and-query.
         match rest.find('/') {
             Some(i) => &rest[i..],

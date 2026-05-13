@@ -46,56 +46,109 @@ const ACADEMIC_SLDS: &[&str] = &[
 
 const INSTITUTIONAL_DOMAINS: &[&str] = &[
     // Multi-national / inter-governmental
-    "cern.ch", "esa.int", "iter.org",
+    "cern.ch",
+    "esa.int",
+    "iter.org",
     // US national labs & science agencies
-    "nasa.gov", "nist.gov", "nih.gov", "noaa.gov", "usgs.gov",
-    "anl.gov", "lanl.gov", "ornl.gov", "lbl.gov",
-    "llnl.gov", "pnnl.gov", "sandia.gov",
-    "fnal.gov", "bnl.gov", "jlab.org", "ameslab.gov",
+    "nasa.gov",
+    "nist.gov",
+    "nih.gov",
+    "noaa.gov",
+    "usgs.gov",
+    "anl.gov",
+    "lanl.gov",
+    "ornl.gov",
+    "lbl.gov",
+    "llnl.gov",
+    "pnnl.gov",
+    "sandia.gov",
+    "fnal.gov",
+    "bnl.gov",
+    "jlab.org",
+    "ameslab.gov",
     "slac.stanford.edu",
     // France
-    "cnrs.fr", "inria.fr", "inserm.fr", "cea.fr", "ihes.fr",
+    "cnrs.fr",
+    "inria.fr",
+    "inserm.fr",
+    "cea.fr",
+    "ihes.fr",
     // Germany
-    "mpg.de", "fz-juelich.de", "kit.edu", "desy.de", "hzdr.de", "helmholtz.de",
+    "mpg.de",
+    "fz-juelich.de",
+    "kit.edu",
+    "desy.de",
+    "hzdr.de",
+    "helmholtz.de",
     // UK extras
-    "stfc.ac.uk", "ukri.org", "sanger.ac.uk", "diamond.ac.uk",
+    "stfc.ac.uk",
+    "ukri.org",
+    "sanger.ac.uk",
+    "diamond.ac.uk",
     // Japan extras
-    "riken.jp", "kek.jp", "jaxa.jp", "aist.go.jp", "naoj.org",
+    "riken.jp",
+    "kek.jp",
+    "jaxa.jp",
+    "aist.go.jp",
+    "naoj.org",
     // China extras (in addition to .ac.cn / .edu.cn)
-    "cas.cn", "ihep.ac.cn", "ucas.ac.cn",
+    "cas.cn",
+    "ihep.ac.cn",
+    "ucas.ac.cn",
     // Switzerland
-    "ethz.ch", "epfl.ch", "psi.ch",
+    "ethz.ch",
+    "epfl.ch",
+    "psi.ch",
     // Italy
-    "infn.it", "ictp.it", "sissa.it",
+    "infn.it",
+    "ictp.it",
+    "sissa.it",
     // Spain
-    "csic.es", "ifae.es",
+    "csic.es",
+    "ifae.es",
     // Netherlands
-    "nikhef.nl", "cwi.nl", "knaw.nl",
+    "nikhef.nl",
+    "cwi.nl",
+    "knaw.nl",
     // Israel
-    "weizmann.ac.il", "technion.ac.il",
+    "weizmann.ac.il",
+    "technion.ac.il",
     // Korea
-    "kaist.ac.kr", "snu.ac.kr", "postech.ac.kr",
-    "kasi.re.kr", "kist.re.kr", "kisti.re.kr",
+    "kaist.ac.kr",
+    "snu.ac.kr",
+    "postech.ac.kr",
+    "kasi.re.kr",
+    "kist.re.kr",
+    "kisti.re.kr",
     // Russia / CIS
-    "jinr.ru", "ras.ru",
+    "jinr.ru",
+    "ras.ru",
     // Canada
     "triumf.ca",
     // Australia (in addition to .edu.au)
-    "csiro.au", "ansto.gov.au",
+    "csiro.au",
+    "ansto.gov.au",
     // India extras
     "tifr.res.in",
     // Industry R&D — coarse: ALL of @microsoft.com etc. pass, not just
     // research subdomains. The badge is "their org is large enough to
     // employ research staff," not "this specific person is a researcher."
-    "research.google.com", "deepmind.com",
-    "anthropic.com", "openai.com",
-    "microsoft.com", "research.microsoft.com",
-    "meta.com", "fb.com",
-    "ibm.com", "research.ibm.com",
-    "intel.com", "nvidia.com",
+    "research.google.com",
+    "deepmind.com",
+    "anthropic.com",
+    "openai.com",
+    "microsoft.com",
+    "research.microsoft.com",
+    "meta.com",
+    "fb.com",
+    "ibm.com",
+    "research.ibm.com",
+    "intel.com",
+    "nvidia.com",
     "amazon.science",
     "apple.com",
-    "bell-labs.com", "nokia-bell-labs.com",
+    "bell-labs.com",
+    "nokia-bell-labs.com",
     "huawei.com",
 ];
 
@@ -181,8 +234,9 @@ mod institutional_tests {
 
 fn from_pair() -> Result<(String, String)> {
     let name = env::var("MAIL_FROM_NAME").unwrap_or_else(|_| "PreXiv".to_string());
-    let addr = env::var("MAIL_FROM_ADDRESS")
-        .map_err(|_| anyhow!("MAIL_FROM_ADDRESS must be set (must match a verified Brevo sender)"))?;
+    let addr = env::var("MAIL_FROM_ADDRESS").map_err(|_| {
+        anyhow!("MAIL_FROM_ADDRESS must be set (must match a verified Brevo sender)")
+    })?;
     Ok((name, addr))
 }
 
@@ -249,7 +303,7 @@ pub async fn send_verification_email(to: &str, username: &str, verify_link: &str
         to,
         "Verify your email — PreXiv",
         &format!(
-"Hi {username},
+            "Hi {username},
 
 You registered an account at PreXiv. Click the link below to verify your email
 address — verification is required before you can submit manuscripts or mint
@@ -278,7 +332,7 @@ pub async fn send_email_change_confirmation(
         new_address,
         "Confirm your new email — PreXiv",
         &format!(
-"Hi {username},
+            "Hi {username},
 
 You asked us to change the email on your PreXiv account to this address. Click
 the link below to confirm — until you do, your account email stays unchanged
@@ -298,16 +352,12 @@ email; the request will simply expire and the account email won't be touched.
 
 /// Sends the password-reset email. Shorter TTL (1h) is reflected in
 /// the body copy so the user knows to act quickly.
-pub async fn send_password_reset_email(
-    to: &str,
-    username: &str,
-    reset_link: &str,
-) -> Result<()> {
+pub async fn send_password_reset_email(to: &str, username: &str, reset_link: &str) -> Result<()> {
     send_transactional(
         to,
         "Reset your PreXiv password",
         &format!(
-"Hi {username},
+            "Hi {username},
 
 We received a request to reset the password on your PreXiv account. Click the
 link below to set a new password — the link is good for 1 hour:

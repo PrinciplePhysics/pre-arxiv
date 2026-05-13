@@ -13,30 +13,30 @@ use chrono::NaiveDateTime;
 use sqlx::SqlitePool;
 
 pub const KIND_COMMENT_ON_MY_MANUSCRIPT: &str = "comment_on_my_manuscript";
-pub const KIND_REPLY_TO_MY_COMMENT:      &str = "reply_to_my_comment";
-pub const KIND_FOLLOWED:                 &str = "followed";
+pub const KIND_REPLY_TO_MY_COMMENT: &str = "reply_to_my_comment";
+pub const KIND_FOLLOWED: &str = "followed";
 
 /// Row shape for the listing page.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct NotificationRow {
-    pub id:             i64,
-    pub recipient_id:   i64,
-    pub actor_id:       Option<i64>,
-    pub kind:           String,
-    pub target_type:    Option<String>,
-    pub target_id:      Option<i64>,
-    pub detail:         Option<String>,
-    pub read_at:        Option<NaiveDateTime>,
-    pub created_at:     Option<NaiveDateTime>,
+    pub id: i64,
+    pub recipient_id: i64,
+    pub actor_id: Option<i64>,
+    pub kind: String,
+    pub target_type: Option<String>,
+    pub target_id: Option<i64>,
+    pub detail: Option<String>,
+    pub read_at: Option<NaiveDateTime>,
+    pub created_at: Option<NaiveDateTime>,
     // Joined columns
     #[sqlx(default)]
     pub actor_username: Option<String>,
     #[sqlx(default)]
-    pub actor_display:  Option<String>,
+    pub actor_display: Option<String>,
     #[sqlx(default)]
-    pub target_slug:    Option<String>,
+    pub target_slug: Option<String>,
     #[sqlx(default)]
-    pub target_title:   Option<String>,
+    pub target_title: Option<String>,
 }
 
 pub async fn notify(

@@ -117,3 +117,5 @@ pub const DMCA: &str = include_str!("pages_content/dmca.html");
 pub const POLICIES: &str = include_str!("pages_content/policies.html");
 pub const LICENSES: &str = include_str!("pages_content/licenses.html");
 pub const PERMISSIONS: &str = include_str!("pages_content/permissions.html");
+pub const HOW_IT_WORKS: &str = include_str!("pages_content/how_it_works.html");
+pub const AGENT_SUPPORT: &str = include_str!("pages_content/agent_support.html");

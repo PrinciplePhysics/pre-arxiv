@@ -10,7 +10,12 @@ fn slug_for(m: &Manuscript) -> String {
     m.arxiv_like_id.clone().unwrap_or_else(|| m.id.to_string())
 }
 
-pub fn render(ctx: &PageCtx, m: &Manuscript, left: &ManuscriptVersion, right: &ManuscriptVersion) -> Markup {
+pub fn render(
+    ctx: &PageCtx,
+    m: &Manuscript,
+    left: &ManuscriptVersion,
+    right: &ManuscriptVersion,
+) -> Markup {
     let slug = slug_for(m);
     let body = html! {
         div.page-header {
@@ -62,7 +67,14 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, left: &ManuscriptVersion, right: &M
             a.btn-secondary href={ "/m/" (slug) } { "Latest" }
         }
     };
-    layout(&format!("Diff v{}→v{} · {}", left.version_number, right.version_number, slug), ctx, body)
+    layout(
+        &format!(
+            "Diff v{}→v{} · {}",
+            left.version_number, right.version_number, slug
+        ),
+        ctx,
+        body,
+    )
 }
 
 fn field_diff(label: &str, left: &str, right: &str, prose: bool) -> Markup {
@@ -101,8 +113,8 @@ fn render_diff(left: &str, right: &str, prose: bool) -> String {
     for change in diff.iter_all_changes() {
         let (cls, prefix) = match change.tag() {
             ChangeTag::Delete => ("diff-removed", "-"),
-            ChangeTag::Insert => ("diff-added",   "+"),
-            ChangeTag::Equal  => ("diff-context", " "),
+            ChangeTag::Insert => ("diff-added", "+"),
+            ChangeTag::Equal => ("diff-context", " "),
         };
         out.push_str(&format!(
             "<span class=\"{cls}\">{prefix} {}</span>",

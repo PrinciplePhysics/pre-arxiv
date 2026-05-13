@@ -41,6 +41,7 @@ pub mod feeds;
 pub mod flags;
 pub mod follow;
 pub mod forgot;
+pub mod health;
 pub mod home;
 pub mod listings;
 pub mod manuscript;
@@ -69,6 +70,8 @@ pub fn router() -> Router<AppState> {
     Router::new()
         // Home + listings
         .route("/", get(home::index))
+        .route("/healthz", get(health::healthz))
+        .route("/readyz", get(health::readyz))
         .route("/new", get(listings::new_listing))
         .route("/top", get(listings::top_listing))
         .route("/audited", get(listings::audited_listing))
@@ -151,6 +154,8 @@ pub fn router() -> Router<AppState> {
         .nest("/api/v1", api::router())
         // Static content pages
         .route("/about", get(pages::about))
+        .route("/how-it-works", get(pages::how_it_works))
+        .route("/agent-support", get(pages::agent_support))
         .route("/guidelines", get(pages::guidelines))
         .route("/tos", get(pages::tos))
         .route("/privacy", get(pages::privacy))

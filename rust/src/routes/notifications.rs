@@ -23,11 +23,15 @@ pub async fn show(
         .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("{e}")))?;
     let mut ctx = build_ctx(&session, maybe_user, "/me/notifications").await;
     ctx.no_index = true;
-    Ok(Html(templates::notifications::render(&ctx, &rows).into_string()))
+    Ok(Html(
+        templates::notifications::render(&ctx, &rows).into_string(),
+    ))
 }
 
 #[derive(Deserialize)]
-pub struct CsrfOnly { pub csrf_token: String }
+pub struct CsrfOnly {
+    pub csrf_token: String,
+}
 
 pub async fn mark_read(
     State(state): State<AppState>,

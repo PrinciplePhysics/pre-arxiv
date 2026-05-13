@@ -12,8 +12,8 @@ use serde::Deserialize;
 use tower_sessions::Session;
 
 use crate::auth::{
-    hash_password, is_password_pwned, login_session, verify_csrf,
-    verify_password_timing_safe, MaybeUser, RequireUser,
+    hash_password, is_password_pwned, login_session, verify_csrf, verify_password_timing_safe,
+    MaybeUser, RequireUser,
 };
 use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
@@ -27,7 +27,9 @@ pub async fn show(
 ) -> AppResult<Html<String>> {
     let mut ctx = build_ctx(&session, maybe_user, "/me/password").await;
     ctx.no_index = true;
-    Ok(Html(templates::me_password::render(&ctx, None).into_string()))
+    Ok(Html(
+        templates::me_password::render(&ctx, None).into_string(),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -58,11 +60,10 @@ pub async fn submit(
 
     // Pull the current password_hash. We don't reuse `user` (it's the
     // RequireUser snapshot without password_hash); fetch fresh.
-    let row: Option<(String,)> =
-        sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
-            .bind(user.id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let row: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
+        .bind(user.id)
+        .fetch_optional(&state.pool)
+        .await?;
     let Some((current_hash,)) = row else {
         // Should be impossible — RequireUser implies the row exists. Fail
         // loud rather than silently rendering a form.
@@ -79,19 +80,18 @@ pub async fn submit(
         return Ok(render_err(
             "The two new-password fields don't match. Re-type the confirmation.",
             maybe_user,
-        ).await);
+        )
+        .await);
     }
     if form.new_password == form.current_password {
-        return Ok(render_err(
-            "New password must differ from the current one.",
-            maybe_user,
-        ).await);
+        return Ok(render_err("New password must differ from the current one.", maybe_user).await);
     }
     if is_password_pwned(&form.new_password).await {
         return Ok(render_err(
             "That password appears in a known data breach. Please pick another.",
             maybe_user,
-        ).await);
+        )
+        .await);
     }
 
     let new_hash = hash_password(&form.new_password)
@@ -110,6 +110,10 @@ pub async fn submit(
         .await
         .map_err(crate::error::AppError::Other)?;
 
-    set_flash(&session, "Password updated. You're still logged in on this browser.").await;
+    set_flash(
+        &session,
+        "Password updated. You're still logged in on this browser.",
+    )
+    .await;
     Ok(Redirect::to("/me/edit").into_response())
 }

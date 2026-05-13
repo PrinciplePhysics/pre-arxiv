@@ -57,21 +57,25 @@ pub async fn sitemap(State(state): State<AppState>) -> AppResult<impl IntoRespon
 
     // Static pages.
     for (path, prio) in &[
-        ("/",            "1.0"),
-        ("/new",         "0.9"),
-        ("/top",         "0.9"),
-        ("/audited",     "0.9"),
-        ("/browse",      "0.8"),
-        ("/about",       "0.5"),
-        ("/guidelines",  "0.4"),
-        ("/licenses",    "0.4"),
-        ("/policies",    "0.4"),
-        ("/tos",         "0.3"),
-        ("/privacy",     "0.3"),
-        ("/dmca",        "0.3"),
+        ("/", "1.0"),
+        ("/new", "0.9"),
+        ("/top", "0.9"),
+        ("/audited", "0.9"),
+        ("/browse", "0.8"),
+        ("/about", "0.5"),
+        ("/guidelines", "0.4"),
+        ("/licenses", "0.4"),
+        ("/policies", "0.4"),
+        ("/tos", "0.3"),
+        ("/privacy", "0.3"),
+        ("/dmca", "0.3"),
     ] {
         xml.push_str("<url>");
-        xml.push_str(&format!("<loc>{}{}</loc>", xml_escape(&base), xml_escape(path)));
+        xml.push_str(&format!(
+            "<loc>{}{}</loc>",
+            xml_escape(&base),
+            xml_escape(path)
+        ));
         xml.push_str(&format!("<priority>{prio}</priority>"));
         xml.push_str("</url>\n");
     }
@@ -79,7 +83,11 @@ pub async fn sitemap(State(state): State<AppState>) -> AppResult<impl IntoRespon
     // Categories.
     for cat in crate::categories::CATEGORIES.iter() {
         xml.push_str("<url>");
-        xml.push_str(&format!("<loc>{}/browse/{}</loc>", xml_escape(&base), xml_escape(cat.id)));
+        xml.push_str(&format!(
+            "<loc>{}/browse/{}</loc>",
+            xml_escape(&base),
+            xml_escape(cat.id)
+        ));
         xml.push_str("<priority>0.6</priority>");
         xml.push_str("</url>\n");
     }
@@ -92,9 +100,16 @@ pub async fn sitemap(State(state): State<AppState>) -> AppResult<impl IntoRespon
     .fetch_all(&state.pool)
     .await?;
     for (slug_opt, lm) in &ms {
-        let slug = match slug_opt { Some(s) => s.as_str(), None => continue };
+        let slug = match slug_opt {
+            Some(s) => s.as_str(),
+            None => continue,
+        };
         xml.push_str("<url>");
-        xml.push_str(&format!("<loc>{}/m/{}</loc>", xml_escape(&base), xml_escape(slug)));
+        xml.push_str(&format!(
+            "<loc>{}/m/{}</loc>",
+            xml_escape(&base),
+            xml_escape(slug)
+        ));
         if let Some(t) = lm {
             xml.push_str(&format!("<lastmod>{}</lastmod>", iso8601(t)));
         }
@@ -110,7 +125,11 @@ pub async fn sitemap(State(state): State<AppState>) -> AppResult<impl IntoRespon
     .await?;
     for (u,) in &users {
         xml.push_str("<url>");
-        xml.push_str(&format!("<loc>{}/u/{}</loc>", xml_escape(&base), xml_escape(u)));
+        xml.push_str(&format!(
+            "<loc>{}/u/{}</loc>",
+            xml_escape(&base),
+            xml_escape(u)
+        ));
         xml.push_str("<priority>0.4</priority>");
         xml.push_str("</url>\n");
     }

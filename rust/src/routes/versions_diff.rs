@@ -32,7 +32,8 @@ async fn load_manuscript(state: &AppState, id: &str) -> AppResult<Manuscript> {
            FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
            LIMIT 1"#,
     )
-    .bind(id).bind(id)
+    .bind(id)
+    .bind(id)
     .fetch_optional(&state.pool)
     .await?;
     m.ok_or(AppError::NotFound)
@@ -49,13 +50,17 @@ pub async fn show(
     // the left ("before") and the higher on the right ("after").
     let (left_n, right_n) = if a <= b { (a, b) } else { (b, a) };
 
-    let left = versions::get_version(&state.pool, m.id, left_n).await
+    let left = versions::get_version(&state.pool, m.id, left_n)
+        .await
         .map_err(|e| AppError::Other(anyhow::anyhow!("{e}")))?
         .ok_or(AppError::NotFound)?;
-    let right = versions::get_version(&state.pool, m.id, right_n).await
+    let right = versions::get_version(&state.pool, m.id, right_n)
+        .await
         .map_err(|e| AppError::Other(anyhow::anyhow!("{e}")))?
         .ok_or(AppError::NotFound)?;
 
     let ctx = build_ctx(&session, maybe_user, "/m").await;
-    Ok(Html(templates::versions_diff::render(&ctx, &m, &left, &right).into_string()))
+    Ok(Html(
+        templates::versions_diff::render(&ctx, &m, &left, &right).into_string(),
+    ))
 }

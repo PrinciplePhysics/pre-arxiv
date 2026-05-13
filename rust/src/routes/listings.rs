@@ -184,8 +184,13 @@ pub async fn browse_index(
     session: Session,
     maybe_user: MaybeUser,
 ) -> AppResult<Html<String>> {
-    let counts: Vec<(String, i64)> = sqlx::query_as::<_, (String, i64)>(
-        "SELECT category, COUNT(*) FROM manuscripts WHERE withdrawn = 0 GROUP BY category ORDER BY category"
+    let counts: Vec<BrowseCount> = sqlx::query_as::<_, BrowseCount>(
+        "SELECT category, COUNT(*) AS total,
+                COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0) AS new_this_week
+           FROM manuscripts
+          WHERE withdrawn = 0
+          GROUP BY category
+          ORDER BY category"
     )
     .fetch_all(&state.pool)
     .await?;
@@ -196,13 +201,14 @@ pub async fn browse_index(
 }
 
 /// Helper exposed for the template — keeps the grouping logic out of maud.
-pub fn browse_groups(counts: &[(String, i64)]) -> Vec<(&'static str, Vec<BrowseEntry>)> {
+pub fn browse_groups(counts: &[BrowseCount]) -> Vec<(&'static str, Vec<BrowseEntry>)> {
     use crate::categories;
     use std::collections::HashMap;
 
     // Build count map for O(1) lookup. Categories that aren't in our
     // canonical taxonomy (legacy data) bucket into "Other".
-    let count_map: HashMap<&str, i64> = counts.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+    let count_map: HashMap<&str, &BrowseCount> =
+        counts.iter().map(|c| (c.category.as_str(), c)).collect();
 
     let mut groups: Vec<(&'static str, Vec<BrowseEntry>)> = Vec::new();
     for &g in categories::GROUPS {
@@ -210,7 +216,8 @@ pub fn browse_groups(counts: &[(String, i64)]) -> Vec<(&'static str, Vec<BrowseE
             .map(|c| BrowseEntry {
                 id: c.id,
                 name: c.name,
-                count: *count_map.get(c.id).unwrap_or(&0),
+                count: count_map.get(c.id).map(|c| c.total).unwrap_or(0),
+                new_this_week: count_map.get(c.id).map(|c| c.new_this_week).unwrap_or(0),
             })
             .collect();
         // Sort by count desc, then by id asc (stable).
@@ -222,11 +229,12 @@ pub fn browse_groups(counts: &[(String, i64)]) -> Vec<(&'static str, Vec<BrowseE
         categories::CATEGORIES.iter().map(|c| c.id).collect();
     let legacy: Vec<BrowseEntry> = counts
         .iter()
-        .filter(|(k, _)| !canonical.contains(k.as_str()))
-        .map(|(k, n)| BrowseEntry {
-            id: leak(k.clone()),
+        .filter(|c| !canonical.contains(c.category.as_str()))
+        .map(|c| BrowseEntry {
+            id: leak(c.category.clone()),
             name: "(uncategorised in current taxonomy)",
-            count: *n,
+            count: c.total,
+            new_this_week: c.new_this_week,
         })
         .collect();
     if !legacy.is_empty() {
@@ -235,11 +243,19 @@ pub fn browse_groups(counts: &[(String, i64)]) -> Vec<(&'static str, Vec<BrowseE
     groups
 }
 
+#[derive(Debug, sqlx::FromRow)]
+pub struct BrowseCount {
+    pub category: String,
+    pub total: i64,
+    pub new_this_week: i64,
+}
+
 #[derive(Debug)]
 pub struct BrowseEntry {
     pub id: &'static str,
     pub name: &'static str,
     pub count: i64,
+    pub new_this_week: i64,
 }
 
 fn leak(s: String) -> &'static str {
@@ -271,8 +287,22 @@ pub async fn browse_category(
         .fetch_all(&state.pool)
         .await?;
     let ctx = build_ctx(&session, maybe_user, "/browse").await;
+    let (category_name, group_name) = category_label(&cat);
+    let audited = rows.iter().filter(|m| m.has_auditor != 0).count();
+    let autonomous = rows
+        .iter()
+        .filter(|m| m.conductor_type == "ai-agent")
+        .count();
     let heading = format!("Browse · {cat}");
-    let sub = format!("All manuscripts categorized as {cat}, newest first.");
+    let sub = format!(
+        "{} in {}. {} manuscript{}; {} audited; {} autonomous agent. Newest first.",
+        category_name,
+        group_name,
+        rows.len(),
+        if rows.len() == 1 { "" } else { "s" },
+        audited,
+        autonomous
+    );
     Ok(Html(
         templates::listing::render(
             &ctx,
@@ -286,4 +316,12 @@ pub async fn browse_category(
         )
         .into_string(),
     ))
+}
+
+fn category_label(cat: &str) -> (&'static str, &'static str) {
+    crate::categories::CATEGORIES
+        .iter()
+        .find(|c| c.id == cat)
+        .map(|c| (c.name, c.group))
+        .unwrap_or(("Uncatalogued category", "Legacy ids"))
 }
