@@ -2807,6 +2807,22 @@ a.profile-name-badge { cursor: pointer; }
   line-height: 1.5;
 }
 
+/* Small caption under the homepage explaining how "Ranked" sorts. */
+.sort-caption {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 4px 0 12px;
+  line-height: 1.55;
+}
+.sort-caption code {
+  background: rgba(20, 16, 8, 0.05);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11.5px;
+}
+.sort-caption a { color: var(--ink-soft); }
+.sort-caption a:hover { color: var(--brand); }
+
 /* ─── Inline link-styled buttons (comment delete + flag) ───────────
    Buttons that look like text-only links — used for the small
    "delete" / "flag" actions next to each comment so they don't take

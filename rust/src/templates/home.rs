@@ -15,6 +15,15 @@ pub fn render(
     let logged_in = ctx.user.is_some();
     let body = html! {
         (welcome_modal())
+        div.sort-caption.no-katex aria-label="How this listing is sorted" {
+            "Ranked by score over age — a Hacker-News-style decay: "
+            code { "(score + 1) / (age_hours + 2)\u{00b2}" }
+            ". For strict chronological order see "
+            a href="/new" { "/new" }
+            "; for all-time highest score see "
+            a href="/top" { "/top" }
+            "."
+        }
         (mode_toggle("/", show_all))
         @if show_all {
             (showing_all_banner("/"))

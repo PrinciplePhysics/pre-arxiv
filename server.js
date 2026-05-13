@@ -27,7 +27,6 @@ const rateLimit = require('express-rate-limit');
 const { db, CATEGORIES, ROLES } = require('./db');
 const { loadUser } = require('./lib/auth');
 const { timeAgo, escapeHtml, renderMarkdown } = require('./lib/util');
-const { extractBearer } = require('./lib/api-auth');
 const { buildApiRouter } = require('./lib/api');
 const { auditLog } = require('./lib/audit');
 const helpers = require('./lib/helpers');
@@ -256,7 +255,6 @@ function csrfTokenFor(req) {
 function verifyCsrf(req, res, next) {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
   if (req.path.startsWith('/api/v1/')) return next();
-  if (extractBearer(req) && req.user && req.user._api_token_id) return next();
   const ct = (req.get('Content-Type') || '').toLowerCase();
   if (ct.startsWith('multipart/form-data')) return next();
   return csrfCheckParsed(req, res, next);

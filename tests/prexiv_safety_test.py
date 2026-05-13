@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """Safety/security test of the agent surface (REST API)."""
-import hashlib, json, os, time, urllib.request, urllib.error
+import hashlib, json, os, time, urllib.request, urllib.parse, urllib.error
 
-BASE = "http://localhost:3000/api/v1"
-WEB  = "http://localhost:3000"
+BASE = os.environ.get("BASE", "http://localhost:3000/api/v1")
+WEB  = os.environ.get("WEB",  "http://localhost:3000")
 PASSWD = "PreXivTest-7yk5N2qWf3-nonbreach-passphrase"
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DB_PATH = os.path.join(REPO_ROOT, "data", "prearxiv.db")
 for k in ("http_proxy","HTTP_PROXY","https_proxy","HTTPS_PROXY","all_proxy","ALL_PROXY"):
     os.environ.pop(k, None)
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+web_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
 
 def req(method, path, body=None, token=None, raw_body=None, ctype=None):
     url = path if path.startswith("http") else BASE + path
@@ -28,6 +34,21 @@ def req(method, path, body=None, token=None, raw_body=None, ctype=None):
     except urllib.error.HTTPError as e:
         try:    return e.code, json.loads(e.read())
         except: return e.code, None
+
+def web_req(method, path, body=None, token=None):
+    url = path if path.startswith("http") else WEB + path
+    data = urllib.parse.urlencode(body).encode() if body is not None else None
+    headers = {"Accept":"text/html"}
+    if data is not None:
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, data=data, method=method, headers=headers)
+    try:
+        with web_opener.open(request, timeout=8) as r:
+            return r.status, dict(r.headers), r.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers), e.read().decode(errors="replace")
 
 passed, failed = [], []
 def check(n, c, d=""):
@@ -166,6 +187,21 @@ check("bob revoking alice's token → 403/404", s in (401, 403, 404))
 s, _ = req("GET", "/me", token=newt2["token"])
 check("alice's token still valid", s == 200)
 
+# API tokens must not authenticate HTML website routes. Agents should be
+# confined to /api/v1/*, while /me/* web pages continue to require a browser
+# session cookie plus CSRF.
+_, before_tokens = req("GET", "/me/tokens", token=ALICE)
+s, headers, _ = web_req("GET", "/me/tokens", token=ALICE)
+check("Bearer token cannot open /me/tokens web UI",
+      s in (301, 302, 303) and "/login" in headers.get("Location", ""),
+      f"got status={s}, location={headers.get('Location')!r}")
+s, _, _ = web_req("POST", "/me/tokens", token=ALICE, body={"name":"web-bypass-attempt"})
+check("Bearer token cannot POST to /me/tokens web UI", s in (401, 403), f"got status={s}")
+_, after_tokens = req("GET", "/me/tokens", token=ALICE)
+check("web token-bypass attempt did not mint a token",
+      isinstance(before_tokens, list) and isinstance(after_tokens, list) and len(before_tokens) == len(after_tokens),
+      f"before={len(before_tokens) if isinstance(before_tokens, list) else '?'} after={len(after_tokens) if isinstance(after_tokens, list) else '?'}")
+
 # garbage tokens
 for bad in ["", "not_a_token", "prexiv_too_short", "Bearer prexiv_x", "prexiv_" + "A"*100, "../../etc/passwd"]:
     s, _ = req("GET", "/me", token=bad)
@@ -250,7 +286,7 @@ check("cookie-auth POST without CSRF token → 403", csrf_status == 403)
 # ── 7. TOKEN STORAGE: tokens are hashed in DB (not plaintext) ──────────────
 section("7. Token storage hygiene")
 import sqlite3
-conn = sqlite3.connect("/Users/dbai/Documents/Research/pre-arxiv/data/prearxiv.db")
+conn = sqlite3.connect(DB_PATH)
 rows = conn.execute("SELECT token_hash FROM api_tokens LIMIT 5").fetchall()
 check("api_tokens.token_hash is SHA-256 hex (64 chars)", all(len(r[0]) == 64 and all(c in '0123456789abcdef' for c in r[0]) for r in rows), f"got {rows[:1]}")
 check("no token in DB starts with prexiv_ (i.e., plaintext leak)", all(not r[0].startswith("prexiv_") for r in rows))
@@ -260,7 +296,7 @@ check("no token in DB starts with prexiv_ (i.e., plaintext leak)", all(not r[0].
 section("8. Rate limit middleware exists on critical endpoints")
 import subprocess
 hits = subprocess.run(
-    ["grep", "-c", "Limiter", "/Users/dbai/Documents/Research/pre-arxiv/lib/api.js"],
+    ["grep", "-c", "Limiter", os.path.join(REPO_ROOT, "lib", "api.js")],
     capture_output=True, text=True).stdout.strip()
 check("limiter wired at >=4 places in api.js", int(hits or "0") >= 4, f"got {hits}")
 

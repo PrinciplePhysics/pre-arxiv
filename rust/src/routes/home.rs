@@ -43,9 +43,38 @@ pub async fn index(
                 conductor_human, conductor_human_public,
                 has_auditor, auditor_name,
                 score, comment_count, withdrawn, created_at"#;
+
+    // "Ranked" — Hacker-News-style hot list. Rank value is
+    //
+    //   (score + 1) / (age_hours + 2)^2
+    //
+    //   * `score + 1` keeps newly-submitted, zero-vote work visible
+    //     (instead of zeroing the numerator).
+    //   * `age_hours + 2` is the gravity offset so the denominator
+    //     doesn't approach 0 right after submission.
+    //   * Gravity 2 — we expand the square inline as
+    //     `(age_hours + 2) * (age_hours + 2)` so we don't need the
+    //     SQLite `pow()` function (which sqlx's bundled libsqlite
+    //     isn't compiled with). A power-of-2 decay is slightly more
+    //     aggressive than HN's 1.8; for preprints — where freshness
+    //     matters less than for news — this is still gentler than
+    //     a strict chronological sort and reads well in practice.
+    //
+    // `julianday('now') - julianday(created_at)` returns the age in
+    // days; we multiply by 24 to get hours. Withdrawn submissions are
+    // excluded; the verified-scholar / restricted-category filters
+    // above still apply.
+    let rank_order = r#"ORDER BY
+        (CAST(COALESCE(score, 0) AS REAL) + 1.0)
+        /
+        ( ((julianday('now') - julianday(created_at)) * 24.0 + 2.0)
+        * ((julianday('now') - julianday(created_at)) * 24.0 + 2.0) )
+        DESC,
+        created_at DESC"#;
+
     let sql = format!(
-        "SELECT {cols} FROM manuscripts WHERE 1=1{cat_sql}{author_sql}
-         ORDER BY created_at DESC LIMIT 50"
+        "SELECT {cols} FROM manuscripts WHERE withdrawn = 0{cat_sql}{author_sql}
+         {rank_order} LIMIT 50"
     );
     let mut rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(&sql)
         .fetch_all(&state.pool)
@@ -59,7 +88,7 @@ pub async fn index(
     let widened = rows.is_empty() && want_filter;
     if widened {
         let fallback_sql = format!(
-            "SELECT {cols} FROM manuscripts ORDER BY created_at DESC LIMIT 50"
+            "SELECT {cols} FROM manuscripts WHERE withdrawn = 0 {rank_order} LIMIT 50"
         );
         rows = sqlx::query_as::<_, ManuscriptListItem>(&fallback_sql)
             .fetch_all(&state.pool)

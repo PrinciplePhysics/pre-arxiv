@@ -2,7 +2,7 @@
 """End-to-end test of every MCP tool via stdio against the running local API."""
 import hashlib, json, os, subprocess, sys, time, urllib.request, urllib.error
 
-BASE = "http://localhost:3000/api/v1"
+BASE = os.environ.get("BASE", "http://localhost:3000/api/v1")
 PASSWD = "PreXivTest-7yk5N2qWf3-nonbreach-passphrase"
 
 # Locate the mcp/ directory relative to this test script, so the suite is
