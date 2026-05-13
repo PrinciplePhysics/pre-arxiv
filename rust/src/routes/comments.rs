@@ -116,3 +116,73 @@ pub async fn post_comment(
 
     Ok(Redirect::to(&format!("/m/{slug}#comment-{cid}")).into_response())
 }
+
+// ─── POST /c/{id}/delete ─────────────────────────────────────────────
+//
+// Hard-delete a comment + its reply subtree (`parent_id` has
+// `ON DELETE CASCADE` so children go with the parent automatically).
+// Allowed for the comment author and for admins. After the delete,
+// recompute `manuscripts.comment_count` from the table — the cascade
+// can remove more rows than the single one we DELETE'd, so a
+// decrement-by-one would understate.
+
+#[derive(Deserialize)]
+pub struct DeleteForm {
+    pub csrf_token: String,
+}
+
+pub async fn delete_comment(
+    State(state): State<AppState>,
+    session: Session,
+    RequireUser(user): RequireUser,
+    Path(comment_id): Path<i64>,
+    Form(form): Form<DeleteForm>,
+) -> AppResult<Response> {
+    let row: Option<(i64, i64, String)> = sqlx::query_as::<_, (i64, i64, String)>(
+        "SELECT c.author_id, c.manuscript_id,
+                COALESCE(m.arxiv_like_id, CAST(m.id AS TEXT)) AS slug
+           FROM comments c JOIN manuscripts m ON m.id = c.manuscript_id
+          WHERE c.id = ?",
+    )
+    .bind(comment_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    let Some((author_id, manuscript_id, slug)) = row else {
+        return Err(AppError::NotFound);
+    };
+
+    let back = format!("/m/{slug}#comments");
+
+    if !verify_csrf(&session, &form.csrf_token).await {
+        set_flash(&session, "Form expired — please try again.").await;
+        return Ok(Redirect::to(&back).into_response());
+    }
+
+    if author_id != user.id && !user.is_admin() {
+        set_flash(
+            &session,
+            "Only the author of a comment (or an administrator) can delete it.",
+        )
+        .await;
+        return Ok(Redirect::to(&back).into_response());
+    }
+
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("DELETE FROM comments WHERE id = ?")
+        .bind(comment_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        "UPDATE manuscripts
+            SET comment_count = (SELECT COUNT(*) FROM comments WHERE manuscript_id = ?)
+          WHERE id = ?",
+    )
+    .bind(manuscript_id)
+    .bind(manuscript_id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    set_flash(&session, "Comment deleted.").await;
+    Ok(Redirect::to(&back).into_response())
+}

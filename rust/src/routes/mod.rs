@@ -35,6 +35,7 @@ pub mod cite;
 pub mod comments;
 pub mod feed;
 pub mod feeds;
+pub mod flags;
 pub mod follow;
 pub mod forgot;
 pub mod home;
@@ -170,4 +171,7 @@ pub fn write_post_router() -> Router<AppState> {
         .route("/submit", post(submit::do_submit))
         .route("/vote", post(votes::vote))
         .route("/m/{id}/comment", post(comments::post_comment))
+        .route("/c/{id}/delete", post(comments::delete_comment))
+        .route("/m/{id}/flag", post(flags::flag_manuscript))
+        .route("/c/{id}/flag", post(flags::flag_comment))
 }

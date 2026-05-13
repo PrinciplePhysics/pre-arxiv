@@ -242,11 +242,36 @@ pub fn render(
                     } @else {
                         ul.comment-list {
                             @for c in comments {
+                                @let viewer_owns_comment = ctx.user.as_ref().map(|u| u.id == c.author_id).unwrap_or(false);
+                                @let viewer_is_admin = ctx.user.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+                                @let viewer_can_delete = viewer_owns_comment || viewer_is_admin;
+                                @let viewer_can_flag = ctx.user.is_some() && !viewer_owns_comment;
                                 li.comment id={"comment-" (c.id)} {
                                     div.comment-meta {
                                         strong { (c.author_username) }
                                         @if let Some(ts) = &c.created_at {
                                             " · " span.muted { (time_ago(ts)) }
+                                        }
+                                        @if viewer_can_delete || viewer_can_flag {
+                                            span.comment-actions {
+                                                @if viewer_can_delete {
+                                                    form.inline action={"/c/" (c.id) "/delete"} method="post"
+                                                        onsubmit="return confirm('Delete this comment? Replies under it will also be removed.');" {
+                                                        input type="hidden" name="csrf_token" value=(ctx.csrf_token);
+                                                        button.linklike.danger type="submit"
+                                                            title="Delete this comment" { "delete" }
+                                                    }
+                                                }
+                                                @if viewer_can_flag {
+                                                    @if viewer_can_delete { " · " }
+                                                    form.inline action={"/c/" (c.id) "/flag"} method="post"
+                                                        onsubmit="return confirm('Flag this comment for moderator review?');" {
+                                                        input type="hidden" name="csrf_token" value=(ctx.csrf_token);
+                                                        button.linklike type="submit"
+                                                            title="Flag this comment for moderator review" { "flag" }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                     div.comment-body.markdown { (md(&c.content)) }
@@ -302,6 +327,23 @@ pub fn render(
                         }
                     } @else if !m.is_withdrawn() {
                         a.bx-sidebar-btn.secondary href={ "/login?next=/m/" (slug) } style="margin-top:8px" { "Sign in to vote" }
+                    }
+
+                    // Flag-for-moderation. Hidden when the viewer is the
+                    // submitter (one can't flag one's own manuscript) and
+                    // when the manuscript is already withdrawn (no point).
+                    @let viewer_is_submitter_for_flag = ctx.user.as_ref().map(|u| u.id == m.submitter_id).unwrap_or(false);
+                    @if logged_in && !m.is_withdrawn() && !viewer_is_submitter_for_flag {
+                        details.flag-disclosure style="margin-top:10px" {
+                            summary.linklike.small.muted { "🚩 Flag for moderator review" }
+                            form action={"/m/" (slug) "/flag"} method="post" class="flag-form" {
+                                input type="hidden" name="csrf_token" value=(ctx.csrf_token);
+                                label.small.muted style="display:block;margin:6px 0 4px" { "Optional reason" }
+                                textarea name="reason" maxlength="500" rows="2"
+                                         placeholder="What looks wrong? Spam, plagiarism, manifest hate, etc." {}
+                                button.btn-secondary.btn-small type="submit" style="margin-top:6px" { "Submit report" }
+                            }
+                        }
                     }
                 }
 

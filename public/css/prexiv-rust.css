@@ -2720,3 +2720,59 @@ a.profile-name-badge { cursor: pointer; }
 .mode-pill-dot.is-standard { background: #2e9a47; }
 .mode-pill-dot.is-all { background: var(--muted); }
 .mode-pill.is-active .mode-pill-dot { background: #fff; }
+
+/* ─── Inline link-styled buttons (comment delete + flag) ───────────
+   Buttons that look like text-only links — used for the small
+   "delete" / "flag" actions next to each comment so they don't take
+   up button-sized real estate, but are still real <button>s inside
+   <form>s so we get CSRF protection by default. */
+.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  font-size: 12px;
+}
+.linklike:hover { color: var(--brand); }
+.linklike.danger:hover { color: #b54300; }
+.comment-actions {
+  margin-left: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.comment-actions form.inline {
+  display: inline;
+  margin: 0;
+}
+
+/* Flag disclosure on the manuscript sidebar — collapsed by default
+   so the action doesn't compete with primary affordances; expands
+   with a small textarea on click. */
+.flag-disclosure summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 6px 0;
+}
+.flag-disclosure summary::-webkit-details-marker { display: none; }
+.flag-disclosure[open] summary { color: var(--ink-soft); }
+.flag-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  padding: 6px 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-sm, 4px);
+  background: var(--bg-card);
+  resize: vertical;
+}
+.flag-form .btn-small {
+  font-size: 12px;
+  padding: 5px 12px;
+}
