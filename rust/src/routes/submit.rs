@@ -306,6 +306,9 @@ pub async fn do_submit(
         .map_err(|e| crate::error::AppError::Other(e.into()))?;
     let stamp = chrono::Utc::now().timestamp_millis();
     let rnd: u32 = rand::thread_rng().gen_range(100_000..1_000_000);
+    let arxiv_like_id = make_prexiv_id();
+    let synthetic_doi = format!("10.99999/{}", arxiv_like_id);
+    let app_url = state.app_url.as_deref().unwrap_or("http://localhost:3001");
 
     let mut pdf_path: Option<String> = None;
     let mut source_path: Option<String> = None;
@@ -319,13 +322,26 @@ pub async fn do_submit(
             )
             .await);
         };
-        // Direct-PDF path: no compilation.
+        let watermarked =
+            match crate::pdf_watermark::watermark_pdf(data, &arxiv_like_id, app_url).await {
+                Ok(pdf) => pdf,
+                Err(e) => {
+                    return Ok(err_page(
+                        &session,
+                        maybe_user,
+                        &format!("PDF watermarking failed: {e}"),
+                    )
+                    .await);
+                }
+            };
+        // Direct-PDF path: no compilation. Persist only the public,
+        // watermarked PDF; the original upload is never written to disk.
         let stored = format!("{stamp}-{rnd}-{safe}");
         let full = upload_dir.join(&stored);
         let mut f = fs::File::create(&full)
             .await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
-        f.write_all(data)
+        f.write_all(&watermarked)
             .await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
         pdf_path = Some(stored);
@@ -376,12 +392,31 @@ pub async fn do_submit(
         // Compile.
         match crate::compile::compile(&prepared.filename, &prepared.data).await {
             Ok(compiled) => {
+                let watermarked = match crate::pdf_watermark::watermark_pdf(
+                    &compiled.pdf,
+                    &arxiv_like_id,
+                    app_url,
+                )
+                .await
+                {
+                    Ok(pdf) => pdf,
+                    Err(e) => {
+                        let _ = fs::remove_file(upload_dir.join(source_path.as_deref().unwrap_or("")))
+                            .await;
+                        return Ok(err_page(
+                            &session,
+                            maybe_user,
+                            &format!("PDF watermarking failed: {e}"),
+                        )
+                        .await);
+                    }
+                };
                 let pdf_name = format!("{stamp}-{rnd}-compiled.pdf");
                 let pdf_full = upload_dir.join(&pdf_name);
                 let mut pf = fs::File::create(&pdf_full)
                     .await
                     .map_err(|e| crate::error::AppError::Other(e.into()))?;
-                pf.write_all(&compiled.pdf)
+                pf.write_all(&watermarked)
                     .await
                     .map_err(|e| crate::error::AppError::Other(e.into()))?;
                 pdf_path = Some(pdf_name);
@@ -404,18 +439,12 @@ pub async fn do_submit(
         }
     }
 
-    // Allocate id + INSERT, retrying once on UNIQUE collision (defends
-    // against the rare race where two submitters read the same MAX
-    // before either commits).
-    let mut last_unique_err: Option<sqlx::Error> = None;
-    let mut arxiv_like_id = String::new();
-    let mut synthetic_doi = String::new();
-    let mut result = None;
-    for _ in 0..5 {
-        arxiv_like_id = make_prexiv_id();
-        synthetic_doi = format!("10.99999/{}", arxiv_like_id);
-        let r = sqlx::query(
-            r#"INSERT INTO manuscripts (
+    // The PDF watermark contains the PreXiv id, so allocation happens before
+    // file persistence. Collisions are vanishingly rare with the 30-bit daily
+    // suffix; if one still happens, ask the user to retry rather than storing
+    // a PDF stamped with a different id.
+    let result = sqlx::query(
+        r#"INSERT INTO manuscripts (
                 arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
                 pdf_path, external_url, source_path,
                 conductor_type, conductor_ai_model, conductor_ai_model_public,
@@ -434,65 +463,56 @@ pub async fn do_submit(
                 ?, ?,
                 ?, ?
             )"#,
-        )
-        .bind(&arxiv_like_id)
-        .bind(&synthetic_doi)
-        .bind(user.id)
-        .bind(fields.title.trim())
-        .bind(fields.r#abstract.trim())
-        .bind(fields.authors.trim())
-        .bind(fields.category.trim())
-        .bind(pdf_path.as_deref())
-        .bind(opt(&fields.external_url))
-        .bind(source_path.as_deref())
-        .bind(&fields.conductor_type)
-        .bind(&ai_models_joined)
-        .bind(if fields.conductor_ai_model_public {
-            1i64
-        } else {
-            0
-        })
-        .bind(opt(&fields.conductor_human))
-        .bind(if fields.conductor_human_public {
-            1i64
-        } else {
-            0
-        })
-        .bind(opt(&fields.conductor_role))
-        .bind(opt(&fields.conductor_notes))
-        .bind(opt(&fields.agent_framework))
-        .bind(if has_auditor { 1i64 } else { 0 })
-        .bind(auditor_name.as_deref())
-        .bind(auditor_affiliation.as_deref())
-        .bind(auditor_role.as_deref())
-        .bind(auditor_statement.as_deref())
-        .bind(auditor_orcid.as_deref())
-        .bind(license)
-        .bind(ai_training)
-        .execute(&state.pool)
-        .await;
-        match r {
-            Ok(rr) => {
-                result = Some(rr);
-                break;
-            }
-            Err(e) if is_unique_violation(&e) => {
-                last_unique_err = Some(e);
-                continue;
-            }
-            Err(e) => return Err(e.into()),
+    )
+    .bind(&arxiv_like_id)
+    .bind(&synthetic_doi)
+    .bind(user.id)
+    .bind(fields.title.trim())
+    .bind(fields.r#abstract.trim())
+    .bind(fields.authors.trim())
+    .bind(fields.category.trim())
+    .bind(pdf_path.as_deref())
+    .bind(opt(&fields.external_url))
+    .bind(source_path.as_deref())
+    .bind(&fields.conductor_type)
+    .bind(&ai_models_joined)
+    .bind(if fields.conductor_ai_model_public {
+        1i64
+    } else {
+        0
+    })
+    .bind(opt(&fields.conductor_human))
+    .bind(if fields.conductor_human_public {
+        1i64
+    } else {
+        0
+    })
+    .bind(opt(&fields.conductor_role))
+    .bind(opt(&fields.conductor_notes))
+    .bind(opt(&fields.agent_framework))
+    .bind(if has_auditor { 1i64 } else { 0 })
+    .bind(auditor_name.as_deref())
+    .bind(auditor_affiliation.as_deref())
+    .bind(auditor_role.as_deref())
+    .bind(auditor_statement.as_deref())
+    .bind(auditor_orcid.as_deref())
+    .bind(license)
+    .bind(ai_training)
+    .execute(&state.pool)
+    .await;
+    let result = match result {
+        Ok(rr) => rr,
+        Err(e) if is_unique_violation(&e) => {
+            cleanup_uploads(&upload_dir, pdf_path.as_deref(), source_path.as_deref()).await;
+            return Err(crate::error::AppError::Other(anyhow::anyhow!(
+                "could not allocate a unique prexiv id; please retry"
+            )));
         }
-    }
-    let result = result.ok_or_else(|| {
-        // All retries exhausted — surface the last UNIQUE error as a generic
-        // "couldn't allocate id" so the user can retry. Extremely rare.
-        crate::error::AppError::Other(anyhow::anyhow!(
-            "could not allocate a unique prexiv id after retries: {}",
-            last_unique_err
-                .map(|e| e.to_string())
-                .unwrap_or_else(|| "unknown".to_string())
-        ))
-    })?;
+        Err(e) => {
+            cleanup_uploads(&upload_dir, pdf_path.as_deref(), source_path.as_deref()).await;
+            return Err(e.into());
+        }
+    };
 
     let new_id = result.last_insert_rowid();
     // Record v1 in manuscript_versions so the version log is complete
@@ -571,9 +591,9 @@ fn sanitize_filename(name: &str) -> String {
 /// 2. **Headroom for agent-driven load.** 32^6 ≈ 1.07 × 10^9 suffixes
 ///    per day. Birthday-paradox 50 % collision probability sits at
 ///    ~32 700 same-day submissions — orders of magnitude above any
-///    realistic rate. The caller wraps this in a small UNIQUE-retry
-///    loop so even the unlucky one-in-a-billion collision resolves
-///    by drawing a fresh suffix.
+///    realistic rate. The DB insert still enforces uniqueness; if the
+///    direct-submit path hits the unlucky collision, the user can retry and
+///    receive a fresh id.
 ///
 /// Legacy `prexiv:YYMM.NNNN(N)` ids stay valid via the
 /// `prexiv_id_aliases` table — see migration 0014.
@@ -600,6 +620,19 @@ fn is_unique_violation(e: &sqlx::Error) -> bool {
         return m.contains("unique constraint") || m.contains("constraint failed");
     }
     false
+}
+
+async fn cleanup_uploads(
+    upload_dir: &std::path::Path,
+    pdf_path: Option<&str>,
+    source_path: Option<&str>,
+) {
+    if let Some(path) = pdf_path {
+        let _ = fs::remove_file(upload_dir.join(path)).await;
+    }
+    if let Some(path) = source_path {
+        let _ = fs::remove_file(upload_dir.join(path)).await;
+    }
 }
 
 async fn err_page(session: &Session, maybe_user: MaybeUser, msg: &str) -> Response {

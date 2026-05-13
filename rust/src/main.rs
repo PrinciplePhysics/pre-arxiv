@@ -34,6 +34,7 @@ mod models;
 mod notifications;
 mod orcid;
 mod passwords;
+mod pdf_watermark;
 mod routes;
 mod state;
 mod templates;

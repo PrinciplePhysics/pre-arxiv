@@ -232,6 +232,15 @@ pub async fn submit(
             let upload_dir = upload_dir();
             fs::create_dir_all(&upload_dir).await
                 .map_err(|e| AppError::Other(e.into()))?;
+            let watermark_id = m.arxiv_like_id.clone().unwrap_or_else(|| format!("prexiv:{}", m.id));
+            let app_url = state.app_url.as_deref().unwrap_or("http://localhost:3001");
+            let watermarked = match crate::pdf_watermark::watermark_pdf(data, &watermark_id, app_url).await {
+                Ok(pdf) => pdf,
+                Err(e) => {
+                    let msg = format!("PDF watermarking failed: {e}");
+                    return Ok(Html(templates::revise::render(&ctx_err, &m, Some(&msg)).into_string()).into_response());
+                }
+            };
             let stored = format!(
                 "{}-{}-{}",
                 chrono::Utc::now().timestamp_millis(),
@@ -241,7 +250,7 @@ pub async fn submit(
             let full = upload_dir.join(&stored);
             let mut f = fs::File::create(&full).await
                 .map_err(|e| AppError::Other(e.into()))?;
-            f.write_all(data).await
+            f.write_all(&watermarked).await
                 .map_err(|e| AppError::Other(e.into()))?;
             Some(stored)
         }
