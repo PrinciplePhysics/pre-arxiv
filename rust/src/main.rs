@@ -21,6 +21,7 @@ mod api_auth;
 mod auth;
 mod categories;
 mod compile;
+mod crockford;
 mod crypto;
 mod db;
 mod email;

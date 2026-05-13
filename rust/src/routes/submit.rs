@@ -178,8 +178,9 @@ pub async fn do_submit(
         return Ok(err_page(&session, maybe_user, "Unknown AI-training option. Pick from the dropdown.").await);
     };
 
-    let arxiv_like_id = make_prexiv_id();
-    let synthetic_doi = format!("10.99999/{}", arxiv_like_id);
+    // id + doi are allocated just before the INSERT (inside the retry
+    // loop below) so a UNIQUE collision can re-allocate without
+    // throwing away the validated form payload.
 
     // Source-type gate. The form has three branches; enforce the
     // required artefact for each.
@@ -269,55 +270,81 @@ pub async fn do_submit(
         }
     }
 
-    let result = sqlx::query(
-        r#"INSERT INTO manuscripts (
-            arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
-            pdf_path, external_url, source_path,
-            conductor_type, conductor_ai_model, conductor_ai_model_public,
-            conductor_human, conductor_human_public, conductor_role, conductor_notes,
-            agent_framework,
-            has_auditor, auditor_name, auditor_affiliation, auditor_role,
-            auditor_statement, auditor_orcid,
-            license, ai_training
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?,
-            ?, ?, ?,
-            ?, ?, ?, ?,
-            ?,
-            ?, ?, ?, ?,
-            ?, ?,
-            ?, ?
-        )"#,
-    )
-    .bind(&arxiv_like_id)
-    .bind(&synthetic_doi)
-    .bind(user.id)
-    .bind(fields.title.trim())
-    .bind(fields.r#abstract.trim())
-    .bind(fields.authors.trim())
-    .bind(fields.category.trim())
-    .bind(pdf_path.as_deref())
-    .bind(opt(&fields.external_url))
-    .bind(source_path.as_deref())
-    .bind(&fields.conductor_type)
-    .bind(fields.conductor_ai_model.trim())
-    .bind(if fields.conductor_ai_model_public { 1i64 } else { 0 })
-    .bind(opt(&fields.conductor_human))
-    .bind(if fields.conductor_human_public { 1i64 } else { 0 })
-    .bind(opt(&fields.conductor_role))
-    .bind(opt(&fields.conductor_notes))
-    .bind(opt(&fields.agent_framework))
-    .bind(if has_auditor { 1i64 } else { 0 })
-    .bind(auditor_name.as_deref())
-    .bind(auditor_affiliation.as_deref())
-    .bind(auditor_role.as_deref())
-    .bind(auditor_statement.as_deref())
-    .bind(auditor_orcid.as_deref())
-    .bind(license)
-    .bind(ai_training)
-    .execute(&state.pool)
-    .await?;
+    // Allocate id + INSERT, retrying once on UNIQUE collision (defends
+    // against the rare race where two submitters read the same MAX
+    // before either commits).
+    let mut last_unique_err: Option<sqlx::Error> = None;
+    let mut arxiv_like_id = String::new();
+    let mut synthetic_doi = String::new();
+    let mut result = None;
+    for _ in 0..3 {
+        arxiv_like_id = make_prexiv_id(&state.pool).await?;
+        synthetic_doi = format!("10.99999/{}", arxiv_like_id);
+        let r = sqlx::query(
+            r#"INSERT INTO manuscripts (
+                arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
+                pdf_path, external_url, source_path,
+                conductor_type, conductor_ai_model, conductor_ai_model_public,
+                conductor_human, conductor_human_public, conductor_role, conductor_notes,
+                agent_framework,
+                has_auditor, auditor_name, auditor_affiliation, auditor_role,
+                auditor_statement, auditor_orcid,
+                license, ai_training
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?,
+                ?,
+                ?, ?, ?, ?,
+                ?, ?,
+                ?, ?
+            )"#,
+        )
+        .bind(&arxiv_like_id)
+        .bind(&synthetic_doi)
+        .bind(user.id)
+        .bind(fields.title.trim())
+        .bind(fields.r#abstract.trim())
+        .bind(fields.authors.trim())
+        .bind(fields.category.trim())
+        .bind(pdf_path.as_deref())
+        .bind(opt(&fields.external_url))
+        .bind(source_path.as_deref())
+        .bind(&fields.conductor_type)
+        .bind(fields.conductor_ai_model.trim())
+        .bind(if fields.conductor_ai_model_public { 1i64 } else { 0 })
+        .bind(opt(&fields.conductor_human))
+        .bind(if fields.conductor_human_public { 1i64 } else { 0 })
+        .bind(opt(&fields.conductor_role))
+        .bind(opt(&fields.conductor_notes))
+        .bind(opt(&fields.agent_framework))
+        .bind(if has_auditor { 1i64 } else { 0 })
+        .bind(auditor_name.as_deref())
+        .bind(auditor_affiliation.as_deref())
+        .bind(auditor_role.as_deref())
+        .bind(auditor_statement.as_deref())
+        .bind(auditor_orcid.as_deref())
+        .bind(license)
+        .bind(ai_training)
+        .execute(&state.pool)
+        .await;
+        match r {
+            Ok(rr) => { result = Some(rr); break; }
+            Err(e) if is_unique_violation(&e) => { last_unique_err = Some(e); continue; }
+            Err(e) => return Err(e.into()),
+        }
+    }
+    let result = result.ok_or_else(|| {
+        // All retries exhausted — surface the last UNIQUE error as a generic
+        // "couldn't allocate id" so the user can retry. Extremely rare.
+        crate::error::AppError::Other(anyhow::anyhow!(
+            "could not allocate a unique prexiv id after retries: {}",
+            last_unique_err
+                .map(|e| e.to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        ))
+    })?;
 
     let new_id = result.last_insert_rowid();
     // Record v1 in manuscript_versions so the version log is complete
@@ -367,12 +394,67 @@ fn sanitize_filename(name: &str) -> String {
     }
 }
 
-fn make_prexiv_id() -> String {
+/// Allocate the next `prexiv:YYMMDD.SSSSSS` id.
+///
+/// Format breakdown:
+///   - `YYMMDD` — UTC year/month/day, two digits each.
+///   - `SSSSSS` — 6-character lowercase Crockford base-32 serial.
+///
+/// Two design goals:
+///
+/// 1. **Chronological by string alone.** Crockford base-32 is sorted
+///    the same way as the integers it encodes, and YYMMDD sorts
+///    naturally as text. So `(a < b) ⇒ (a chronologically earlier)`
+///    for any two PreXiv ids: pick by lexicographic compare and you
+///    get the same answer as picking by submission time.
+///
+/// 2. **Headroom for agent-driven load.** 32^6 ≈ 1.07 × 10^9 serials
+///    per day — comfortable even under a hypothetical
+///    10 000-submissions-per-second agent swarm.
+///
+/// Algorithm: pull every existing id for today's `YYMMDD` window,
+/// decode each suffix, take the max, encode `max + 1`. Under bursts
+/// the caller wraps this in a small UNIQUE-retry loop, so a true race
+/// just re-allocates.
+///
+/// Backward compatibility: legacy ids used the old `prexiv:YYMM.NNNN(N)`
+/// shape. Those don't match this query's `LIKE prexiv:YYMMDD.%` pattern,
+/// so they're invisible to the new allocator — which is exactly what we
+/// want, since they aren't comparable to the new format anyway.
+async fn make_prexiv_id(pool: &sqlx::SqlitePool) -> Result<String, sqlx::Error> {
     let now = chrono::Utc::now();
-    let yy = now.year() % 100;
-    let mm = now.month();
-    let serial: u32 = rand::thread_rng().gen_range(0..100_000);
-    format!("prexiv:{:02}{:02}.{:05}", yy, mm, serial)
+    let yymmdd = format!(
+        "{:02}{:02}{:02}",
+        now.year() % 100,
+        now.month(),
+        now.day()
+    );
+    let prefix = format!("prexiv:{yymmdd}.");
+    let pattern = format!("{prefix}%");
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT arxiv_like_id FROM manuscripts WHERE arxiv_like_id LIKE ?")
+            .bind(&pattern)
+            .fetch_all(pool)
+            .await?;
+    let max_seen: u64 = rows
+        .iter()
+        .filter_map(|(id,)| id.strip_prefix(&prefix))
+        .filter_map(crate::crockford::decode)
+        .max()
+        .unwrap_or(0);
+    let next = max_seen.saturating_add(1);
+    Ok(format!("{prefix}{}", crate::crockford::encode(next, 6)))
+}
+
+/// Sqlx error -> "is this a UNIQUE-constraint violation?" predicate.
+/// SQLite returns extended code 2067 (SQLITE_CONSTRAINT_UNIQUE).
+fn is_unique_violation(e: &sqlx::Error) -> bool {
+    if let sqlx::Error::Database(db) = e {
+        if db.code().as_deref() == Some("2067") { return true; }
+        let m = db.message().to_ascii_lowercase();
+        return m.contains("unique constraint") || m.contains("constraint failed");
+    }
+    false
 }
 
 async fn err_page(session: &Session, maybe_user: MaybeUser, msg: &str) -> Response {

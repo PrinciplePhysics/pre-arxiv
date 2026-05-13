@@ -324,59 +324,78 @@ async fn post_manuscript(
         }))));
     }
 
-    let arxiv_like_id = make_prexiv_id();
-    let synthetic_doi = format!("10.99999/{}", arxiv_like_id);
     let model_public  = v.conductor_ai_model_public.unwrap_or(true);
     let human_public  = v.conductor_human_public.unwrap_or(true);
     let has_auditor   = v.has_auditor.unwrap_or(false);
 
+    // Allocate id + INSERT with retry on UNIQUE collision (see submit.rs
+    // for rationale).
+    let mut arxiv_like_id = String::new();
+    let mut synthetic_doi = String::new();
     let mut tx = state.pool.begin().await?;
-    let res = sqlx::query(
-        r#"INSERT INTO manuscripts (
-            arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
-            external_url,
-            conductor_type, conductor_ai_model, conductor_ai_model_public,
-            conductor_human, conductor_human_public, conductor_role, conductor_notes,
-            agent_framework,
-            has_auditor, auditor_name, auditor_affiliation, auditor_role,
-            auditor_statement, auditor_orcid,
-            score
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?,
-            ?,
-            ?, ?, ?,
-            ?, ?, ?, ?,
-            ?,
-            ?, ?, ?, ?,
-            ?, ?,
-            1
-        )"#,
-    )
-    .bind(&arxiv_like_id)
-    .bind(&synthetic_doi)
-    .bind(user.id)
-    .bind(v.title.trim())
-    .bind(v.r#abstract.trim())
-    .bind(v.authors.trim())
-    .bind(v.category.trim())
-    .bind(v.external_url.as_deref())
-    .bind(conductor_type)
-    .bind(v.conductor_ai_model.trim())
-    .bind(if model_public { 1i64 } else { 0 })
-    .bind(if conductor_type == "human-ai" { v.conductor_human.as_deref() } else { None })
-    .bind(if human_public { 1i64 } else { 0 })
-    .bind(if conductor_type == "human-ai" { v.conductor_role.as_deref() } else { None })
-    .bind(v.conductor_notes.as_deref())
-    .bind(if conductor_type == "ai-agent" { v.agent_framework.as_deref() } else { None })
-    .bind(if has_auditor { 1i64 } else { 0 })
-    .bind(if has_auditor { v.auditor_name.as_deref() } else { None })
-    .bind(if has_auditor { v.auditor_affiliation.as_deref() } else { None })
-    .bind(if has_auditor { v.auditor_role.as_deref() } else { None })
-    .bind(if has_auditor { v.auditor_statement.as_deref() } else { None })
-    .bind(if has_auditor { v.auditor_orcid.as_deref() } else { None })
-    .execute(&mut *tx)
-    .await?;
-    let new_id = res.last_insert_rowid();
+    let mut new_id: i64 = 0;
+    let mut ok = false;
+    let mut last_err: Option<sqlx::Error> = None;
+    for _ in 0..3 {
+        arxiv_like_id = make_prexiv_id_for_api(&state.pool).await?;
+        synthetic_doi = format!("10.99999/{}", arxiv_like_id);
+        let r = sqlx::query(
+            r#"INSERT INTO manuscripts (
+                arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
+                external_url,
+                conductor_type, conductor_ai_model, conductor_ai_model_public,
+                conductor_human, conductor_human_public, conductor_role, conductor_notes,
+                agent_framework,
+                has_auditor, auditor_name, auditor_affiliation, auditor_role,
+                auditor_statement, auditor_orcid,
+                score
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?,
+                ?,
+                ?, ?, ?,
+                ?, ?, ?, ?,
+                ?,
+                ?, ?, ?, ?,
+                ?, ?,
+                1
+            )"#,
+        )
+        .bind(&arxiv_like_id)
+        .bind(&synthetic_doi)
+        .bind(user.id)
+        .bind(v.title.trim())
+        .bind(v.r#abstract.trim())
+        .bind(v.authors.trim())
+        .bind(v.category.trim())
+        .bind(v.external_url.as_deref())
+        .bind(conductor_type)
+        .bind(v.conductor_ai_model.trim())
+        .bind(if model_public { 1i64 } else { 0 })
+        .bind(if conductor_type == "human-ai" { v.conductor_human.as_deref() } else { None })
+        .bind(if human_public { 1i64 } else { 0 })
+        .bind(if conductor_type == "human-ai" { v.conductor_role.as_deref() } else { None })
+        .bind(v.conductor_notes.as_deref())
+        .bind(if conductor_type == "ai-agent" { v.agent_framework.as_deref() } else { None })
+        .bind(if has_auditor { 1i64 } else { 0 })
+        .bind(if has_auditor { v.auditor_name.as_deref() } else { None })
+        .bind(if has_auditor { v.auditor_affiliation.as_deref() } else { None })
+        .bind(if has_auditor { v.auditor_role.as_deref() } else { None })
+        .bind(if has_auditor { v.auditor_statement.as_deref() } else { None })
+        .bind(if has_auditor { v.auditor_orcid.as_deref() } else { None })
+        .execute(&mut *tx)
+        .await;
+        match r {
+            Ok(rr) => { new_id = rr.last_insert_rowid(); ok = true; break; }
+            Err(e) if api_is_unique_violation(&e) => { last_err = Some(e); continue; }
+            Err(e) => return Err(e.into()),
+        }
+    }
+    if !ok {
+        return Err(ApiError::Other(anyhow::anyhow!(
+            "could not allocate a unique prexiv id after retries: {}",
+            last_err.map(|e| e.to_string()).unwrap_or_else(|| "unknown".to_string())
+        )));
+    }
     // Self-upvote (matches the JS app).
     let _ = sqlx::query("INSERT INTO votes (user_id, target_type, target_id, value) VALUES (?, 'manuscript', ?, 1)")
         .bind(user.id)
@@ -906,6 +925,45 @@ fn redact_manuscript(m: &Manuscript) -> Value {
     })
 }
 
+/// API-side allocator. Same algorithm as `submit::make_prexiv_id`,
+/// `prexiv:YYMMDD.SSSSSS` with Crockford base-32 serial. Both reach
+/// the same DB column so monotonicity is global.
+async fn make_prexiv_id_for_api(pool: &sqlx::SqlitePool) -> Result<String, sqlx::Error> {
+    use chrono::Datelike;
+    let now = chrono::Utc::now();
+    let yymmdd = format!(
+        "{:02}{:02}{:02}",
+        now.year() % 100,
+        now.month(),
+        now.day()
+    );
+    let prefix = format!("prexiv:{yymmdd}.");
+    let pattern = format!("{prefix}%");
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT arxiv_like_id FROM manuscripts WHERE arxiv_like_id LIKE ?")
+            .bind(&pattern)
+            .fetch_all(pool)
+            .await?;
+    let max_seen: u64 = rows
+        .iter()
+        .filter_map(|(id,)| id.strip_prefix(&prefix))
+        .filter_map(crate::crockford::decode)
+        .max()
+        .unwrap_or(0);
+    let next = max_seen.saturating_add(1);
+    Ok(format!("{prefix}{}", crate::crockford::encode(next, 6)))
+}
+
+fn api_is_unique_violation(e: &sqlx::Error) -> bool {
+    if let sqlx::Error::Database(db) = e {
+        if db.code().as_deref() == Some("2067") { return true; }
+        let m = db.message().to_ascii_lowercase();
+        return m.contains("unique constraint") || m.contains("constraint failed");
+    }
+    false
+}
+
+#[allow(dead_code)]
 fn make_prexiv_id() -> String {
     let now = chrono::Utc::now();
     let yy = now.year() % 100;
