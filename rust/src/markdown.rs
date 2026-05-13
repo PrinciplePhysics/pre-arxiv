@@ -45,6 +45,7 @@ pub fn render_inline(input: &str) -> String {
 /// tasklists, fenced code, autolinks) into sanitised HTML.
 pub fn render(input: &str) -> String {
     let (substituted, math) = extract_math(input);
+    let substituted = render_latex_text_commands(&substituted);
 
     let mut opts = Options::empty();
     opts.insert(Options::ENABLE_TABLES);
@@ -70,6 +71,96 @@ pub fn render(input: &str) -> String {
         .to_string();
 
     restore_math(sanitized, &math)
+}
+
+/// Convert a deliberately tiny subset of LaTeX text-mode commands that
+/// commonly appear when authors paste an abstract from a `.tex` source.
+/// Math regions are extracted before this runs, so commands inside
+/// `$...$`, `\(...\)`, etc. remain untouched for KaTeX.
+fn render_latex_text_commands(input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0usize;
+
+    while i < chars.len() {
+        if chars[i] == '\\' {
+            let cmd_start = i + 1;
+            let mut cmd_end = cmd_start;
+            while cmd_end < chars.len() && chars[cmd_end].is_ascii_alphabetic() {
+                cmd_end += 1;
+            }
+            if cmd_end > cmd_start && cmd_end < chars.len() && chars[cmd_end] == '{' {
+                let cmd: String = chars[cmd_start..cmd_end].iter().collect();
+                if let Some((open, close)) = latex_text_tag(&cmd) {
+                    if let Some((inner, next_i)) = take_braced(&chars, cmd_end) {
+                        out.push_str(open);
+                        out.push_str(&render_latex_text_commands(&inner));
+                        out.push_str(close);
+                        i = next_i;
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+
+    out
+}
+
+fn latex_text_tag(cmd: &str) -> Option<(&'static str, &'static str)> {
+    match cmd {
+        "emph" | "textit" => Some(("<em>", "</em>")),
+        "textbf" => Some(("<strong>", "</strong>")),
+        "texttt" => Some(("<code>", "</code>")),
+        _ => None,
+    }
+}
+
+fn take_braced(chars: &[char], open_i: usize) -> Option<(String, usize)> {
+    if chars.get(open_i) != Some(&'{') {
+        return None;
+    }
+    let mut out = String::new();
+    let mut depth = 0i32;
+    let mut i = open_i;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '\\' {
+            out.push(c);
+            if let Some(next) = chars.get(i + 1) {
+                out.push(*next);
+                i += 2;
+            } else {
+                i += 1;
+            }
+            continue;
+        }
+        if c == '{' {
+            depth += 1;
+            if depth > 1 {
+                out.push(c);
+            }
+            i += 1;
+            continue;
+        }
+        if c == '}' {
+            depth -= 1;
+            if depth == 0 {
+                return Some((out, i + 1));
+            }
+            if depth < 0 {
+                return None;
+            }
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    None
 }
 
 const PLACE_OPEN: char = '\u{FDD0}';
@@ -256,6 +347,27 @@ mod tests {
         let out = render(r"price: \$5 vs \$10");
         // The math placeholders shouldn't appear.
         assert!(!out.contains('\u{FDD0}'));
+    }
+
+    #[test]
+    fn latex_text_emph_renders_as_html_emphasis() {
+        let out = render(r"controlled \emph{without} any spectral gap assumption");
+        assert!(out.contains("<em>without</em>"));
+        assert!(!out.contains(r"\emph{without}"));
+    }
+
+    #[test]
+    fn latex_text_commands_leave_math_regions_alone() {
+        let out = render(r"$\emph{x}$ and \textbf{bold text} plus \texttt{code}");
+        assert!(out.contains(r"$\emph{x}$"));
+        assert!(out.contains("<strong>bold text</strong>"));
+        assert!(out.contains("<code>code</code>"));
+    }
+
+    #[test]
+    fn nested_latex_text_commands_render() {
+        let out = render(r"\emph{outer \textbf{inner}}");
+        assert!(out.contains("<em>outer <strong>inner</strong></em>"));
     }
 
     #[test]
