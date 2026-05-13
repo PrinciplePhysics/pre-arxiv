@@ -33,7 +33,7 @@ DATA_DIR="${DATA_DIR:-/var/lib/prexiv/current}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/lib/prexiv/backups}"
 PID_FILE="${PID_FILE:-$HOME/prexiv-deploy/prexiv-rust.pid}"
 LOG_FILE="${LOG_FILE:-$HOME/prexiv-deploy/prexiv-rust.log}"
-START_SCRIPT="${START_SCRIPT:-/tmp/start-rust.sh}"
+START_SCRIPT="${START_SCRIPT:-$REPO/scripts/start-rust.sh}"
 PORT="${PORT:-3000}"
 HEALTHCHECK_URL="${HEALTHCHECK_URL:-http://127.0.0.1:$PORT/}"
 
