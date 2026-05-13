@@ -6,14 +6,17 @@
 
 use std::time::Duration;
 
+use axum::Json;
 use axum::extract::{FromRef, FromRequestParts};
-use axum::http::request::Parts;
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::response::{IntoResponse, Redirect, Response};
+use serde_json::json;
 use sha1::{Digest, Sha1};
 use sqlx::SqlitePool;
 use tower_sessions::Session;
 
+use crate::api_auth::{BearerToken, extract_bearer, find_user_by_bearer};
 use crate::models::User;
 use crate::state::AppState;
 
@@ -34,8 +37,7 @@ pub fn verify_password(plain: &str, hash: &str) -> bool {
 ///
 /// Cost 10 to match `hash_password`. Generated once with bcrypt cost 10
 /// of a random 32-byte value the user can never produce.
-const DUMMY_BCRYPT_HASH: &str =
-    "$2b$10$zLMZvyd5qzLz7CV9OX1KF.VTSvKmiD.x3i2yTTC3Cw1VdKB5Qfzoy";
+const DUMMY_BCRYPT_HASH: &str = "$2b$10$zLMZvyd5qzLz7CV9OX1KF.VTSvKmiD.x3i2yTTC3Cw1VdKB5Qfzoy";
 
 /// Always run bcrypt on `plain`. If the user was found we use their real
 /// hash; if not, we use a dummy hash so the no-such-user branch costs the
@@ -76,12 +78,7 @@ pub async fn is_password_pwned(password: &str) -> bool {
     };
 
     let url = format!("https://api.pwnedpasswords.com/range/{prefix}");
-    let res = match client
-        .get(&url)
-        .header("Add-Padding", "true")
-        .send()
-        .await
-    {
+    let res = match client.get(&url).header("Add-Padding", "true").send().await {
         Ok(r) if r.status().is_success() => r,
         _ => return false,
     };
@@ -90,7 +87,10 @@ pub async fn is_password_pwned(password: &str) -> bool {
         Err(_) => return false,
     };
     body.lines().any(|line| {
-        line.split(':').next().map(|hex| hex.eq_ignore_ascii_case(suffix)).unwrap_or(false)
+        line.split(':')
+            .next()
+            .map(|hex| hex.eq_ignore_ascii_case(suffix))
+            .unwrap_or(false)
     })
 }
 
@@ -166,6 +166,23 @@ pub async fn load_user(pool: &SqlitePool, user_id: i64) -> Result<Option<User>, 
     Ok(u)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthSource {
+    Session,
+    Bearer,
+}
+
+fn bearer_auth_error(message: &str) -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({
+            "error": message,
+            "hint": "send `Authorization: Bearer prexiv_…` — mint a token at /me/tokens"
+        })),
+    )
+        .into_response()
+}
+
 /// Optional current user — extracted on every request. Use when the page
 /// renders differently for logged-in vs anonymous (most pages).
 pub struct MaybeUser(pub Option<User>);
@@ -177,17 +194,92 @@ where
 {
     type Rejection = Response;
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let app: AppState = AppState::from_ref(state);
+        if let BearerToken::Present(plain) = extract_bearer(parts) {
+            if let Some(user) = find_user_by_bearer(&app.pool, &plain).await {
+                return Ok(MaybeUser(Some(user)));
+            }
+        }
+
         let session = match Session::from_request_parts(parts, state).await {
             Ok(s) => s,
             Err(_) => return Ok(MaybeUser(None)),
         };
-        let app: AppState = AppState::from_ref(state);
         let uid = current_user_id(&session).await;
         let user = match uid {
             Some(id) => load_user(&app.pool, id).await.ok().flatten(),
             None => None,
         };
         Ok(MaybeUser(user))
+    }
+}
+
+/// Required current user plus the credential source that authenticated the
+/// request. Bearer-token auth lets agents exercise browser-form routes
+/// without a cookie session; CSRF checks can then stay session-only and be
+/// explicitly bypassed only for token-authenticated requests.
+pub struct RequireAuthUser {
+    pub user: User,
+    pub source: AuthSource,
+}
+
+impl<S> FromRequestParts<S> for RequireAuthUser
+where
+    AppState: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = Response;
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let app: AppState = AppState::from_ref(state);
+        match extract_bearer(parts) {
+            BearerToken::Present(plain) => {
+                return match find_user_by_bearer(&app.pool, &plain).await {
+                    Some(user) => Ok(RequireAuthUser {
+                        user,
+                        source: AuthSource::Bearer,
+                    }),
+                    None => Err(bearer_auth_error("invalid or expired bearer token")),
+                };
+            }
+            BearerToken::Malformed => {
+                return Err(bearer_auth_error(
+                    "missing or malformed Authorization header",
+                ));
+            }
+            BearerToken::Missing => {}
+        }
+
+        let session = match Session::from_request_parts(parts, state).await {
+            Ok(s) => s,
+            Err(_) => {
+                let path = parts
+                    .uri
+                    .path_and_query()
+                    .map(|p| p.as_str())
+                    .unwrap_or("/");
+                let target = format!("/login?next={}", urlencoding::encode(path));
+                return Err(Redirect::to(&target).into_response());
+            }
+        };
+        let user = match current_user_id(&session).await {
+            Some(id) => load_user(&app.pool, id).await.ok().flatten(),
+            None => None,
+        };
+        match user {
+            Some(user) => Ok(RequireAuthUser {
+                user,
+                source: AuthSource::Session,
+            }),
+            None => {
+                let path = parts
+                    .uri
+                    .path_and_query()
+                    .map(|p| p.as_str())
+                    .unwrap_or("/");
+                let target = format!("/login?next={}", urlencoding::encode(path));
+                Err(Redirect::to(&target).into_response())
+            }
+        }
     }
 }
 
@@ -202,15 +294,8 @@ where
 {
     type Rejection = Response;
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let MaybeUser(maybe) = MaybeUser::from_request_parts(parts, state).await?;
-        match maybe {
-            Some(u) => Ok(RequireUser(u)),
-            None => {
-                let path = parts.uri.path_and_query().map(|p| p.as_str()).unwrap_or("/");
-                let target = format!("/login?next={}", urlencoding::encode(path));
-                Err(Redirect::to(&target).into_response())
-            }
-        }
+        let auth = RequireAuthUser::from_request_parts(parts, state).await?;
+        Ok(RequireUser(auth.user))
     }
 }
 

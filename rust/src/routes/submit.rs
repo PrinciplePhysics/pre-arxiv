@@ -8,7 +8,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tower_sessions::Session;
 
-use crate::auth::{verify_csrf, MaybeUser, RequireUser};
+use crate::auth::{AuthSource, MaybeUser, RequireAuthUser, verify_csrf};
 use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
 use crate::state::AppState;
@@ -17,9 +17,9 @@ use crate::templates;
 pub async fn show_submit(
     State(_state): State<AppState>,
     session: Session,
-    maybe_user: MaybeUser,
-    RequireUser(_user): RequireUser,
+    auth: RequireAuthUser,
 ) -> AppResult<Html<String>> {
+    let maybe_user = MaybeUser(Some(auth.user));
     let mut ctx = build_ctx(&session, maybe_user, "/submit").await;
     ctx.no_index = true;
     Ok(Html(templates::submit::render(&ctx, None).into_string()))
@@ -28,10 +28,12 @@ pub async fn show_submit(
 pub async fn do_submit(
     State(state): State<AppState>,
     session: Session,
-    maybe_user: MaybeUser,
-    RequireUser(user): RequireUser,
+    auth: RequireAuthUser,
     mut multipart: Multipart,
 ) -> AppResult<Response> {
+    let bearer_authenticated = auth.source == AuthSource::Bearer;
+    let user = auth.user;
+    let maybe_user = MaybeUser(Some(user.clone()));
     let mut fields: SubmitFields = SubmitFields::default();
     // Buffer either the PDF OR the LaTeX-source upload in memory first;
     // only write to disk AFTER CSRF + field validation pass, so a forged
@@ -39,7 +41,7 @@ pub async fn do_submit(
     // also gets a magic-byte sanity check; the source buffer is left
     // raw because zip / tar.gz / single-.tex have wildly different
     // signatures (compile module re-detects).
-    let mut pdf_buf:    Option<(String, axum::body::Bytes)> = None;
+    let mut pdf_buf: Option<(String, axum::body::Bytes)> = None;
     let mut source_buf: Option<(String, axum::body::Bytes)> = None;
 
     while let Some(field) = multipart
@@ -65,7 +67,12 @@ pub async fn do_submit(
                 return Ok(err_page(&session, maybe_user, "PDF exceeds 30 MB.").await);
             }
             if !data.starts_with(b"%PDF-") {
-                return Ok(err_page(&session, maybe_user, "Uploaded file is not a valid PDF (missing %PDF header).").await);
+                return Ok(err_page(
+                    &session,
+                    maybe_user,
+                    "Uploaded file is not a valid PDF (missing %PDF header).",
+                )
+                .await);
             }
             pdf_buf = Some((safe, data));
         } else if name == "source" {
@@ -85,15 +92,12 @@ pub async fn do_submit(
             }
             source_buf = Some((safe, data));
         } else {
-            let value = field
-                .text()
-                .await
-                .unwrap_or_default();
+            let value = field.text().await.unwrap_or_default();
             fields.set(&name, value);
         }
     }
 
-    if !verify_csrf(&session, &fields.csrf_token).await {
+    if !bearer_authenticated && !verify_csrf(&session, &fields.csrf_token).await {
         return Ok(err_page(&session, maybe_user, "Form expired — please try again.").await);
     }
     if !user.is_verified() {
@@ -103,7 +107,12 @@ pub async fn do_submit(
         ).await);
     }
     if fields.title.trim().is_empty() || fields.r#abstract.trim().len() < 100 {
-        return Ok(err_page(&session, maybe_user, "Title required; abstract must be at least 100 chars.").await);
+        return Ok(err_page(
+            &session,
+            maybe_user,
+            "Title required; abstract must be at least 100 chars.",
+        )
+        .await);
     }
     if fields.authors.trim().is_empty() {
         return Ok(err_page(&session, maybe_user, "At least one author required.").await);
@@ -115,12 +124,19 @@ pub async fn do_submit(
         crate::models::manuscript::normalize_ai_models(&fields.conductor_ai_model);
     if ai_models_joined.is_empty() {
         return Ok(err_page(
-            &session, maybe_user,
+            &session,
+            maybe_user,
             "At least one AI model is required. Type the model name and press Enter / comma.",
-        ).await);
+        )
+        .await);
     }
     if fields.conductor_type == "human-ai" && fields.conductor_human.trim().is_empty() {
-        return Ok(err_page(&session, maybe_user, "Human conductor name required for Human + AI submissions.").await);
+        return Ok(err_page(
+            &session,
+            maybe_user,
+            "Human conductor name required for Human + AI submissions.",
+        )
+        .await);
     }
 
     // Audit-status post-processing.
@@ -135,39 +151,71 @@ pub async fn do_submit(
     // The form's CSS hides the inactive blocks but their fields still
     // submit, so we deliberately ignore them and pick only the ones that
     // belong to the chosen audit_status.
-    let (has_auditor, auditor_name, auditor_affiliation, auditor_role, auditor_statement, auditor_orcid)
-        = match fields.audit_status.as_str() {
-            "self" if fields.conductor_type == "human-ai" => {
-                if fields.self_audit_statement.trim().is_empty() {
-                    return Ok(err_page(&session, maybe_user, "Self-audit statement is required when you tick 'I am the auditor'. Say what you actually verified.").await);
-                }
-                (
-                    true,
-                    Some(fields.conductor_human.trim().to_string()),
-                    None,
-                    if fields.conductor_role.trim().is_empty() { None } else { Some(fields.conductor_role.trim().to_string()) },
-                    Some(fields.self_audit_statement.trim().to_string()),
-                    None,
-                )
+    let (
+        has_auditor,
+        auditor_name,
+        auditor_affiliation,
+        auditor_role,
+        auditor_statement,
+        auditor_orcid,
+    ) = match fields.audit_status.as_str() {
+        "self" if fields.conductor_type == "human-ai" => {
+            if fields.self_audit_statement.trim().is_empty() {
+                return Ok(err_page(&session, maybe_user, "Self-audit statement is required when you tick 'I am the auditor'. Say what you actually verified.").await);
             }
-            "other" => {
-                if fields.auditor_name.trim().is_empty() {
-                    return Ok(err_page(&session, maybe_user, "Auditor name is required when you select 'Someone else audited this'.").await);
-                }
-                if fields.auditor_statement.trim().is_empty() {
-                    return Ok(err_page(&session, maybe_user, "Auditor statement is required when you select 'Someone else audited this'.").await);
-                }
-                (
-                    true,
-                    Some(fields.auditor_name.trim().to_string()),
-                    if fields.auditor_affiliation.trim().is_empty() { None } else { Some(fields.auditor_affiliation.trim().to_string()) },
-                    if fields.auditor_role.trim().is_empty() { None } else { Some(fields.auditor_role.trim().to_string()) },
-                    Some(fields.auditor_statement.trim().to_string()),
-                    if fields.auditor_orcid.trim().is_empty() { None } else { Some(fields.auditor_orcid.trim().to_string()) },
+            (
+                true,
+                Some(fields.conductor_human.trim().to_string()),
+                None,
+                if fields.conductor_role.trim().is_empty() {
+                    None
+                } else {
+                    Some(fields.conductor_role.trim().to_string())
+                },
+                Some(fields.self_audit_statement.trim().to_string()),
+                None,
+            )
+        }
+        "other" => {
+            if fields.auditor_name.trim().is_empty() {
+                return Ok(err_page(
+                    &session,
+                    maybe_user,
+                    "Auditor name is required when you select 'Someone else audited this'.",
                 )
+                .await);
             }
-            _ => (false, None, None, None, None, None),
-        };
+            if fields.auditor_statement.trim().is_empty() {
+                return Ok(err_page(
+                    &session,
+                    maybe_user,
+                    "Auditor statement is required when you select 'Someone else audited this'.",
+                )
+                .await);
+            }
+            (
+                true,
+                Some(fields.auditor_name.trim().to_string()),
+                if fields.auditor_affiliation.trim().is_empty() {
+                    None
+                } else {
+                    Some(fields.auditor_affiliation.trim().to_string())
+                },
+                if fields.auditor_role.trim().is_empty() {
+                    None
+                } else {
+                    Some(fields.auditor_role.trim().to_string())
+                },
+                Some(fields.auditor_statement.trim().to_string()),
+                if fields.auditor_orcid.trim().is_empty() {
+                    None
+                } else {
+                    Some(fields.auditor_orcid.trim().to_string())
+                },
+            )
+        }
+        _ => (false, None, None, None, None, None),
+    };
 
     // Licensing — validate against the canonical lists. Empty defaults
     // accepted (sane fallback for legacy form posts).
@@ -176,14 +224,24 @@ pub async fn do_submit(
     } else if crate::licenses::lookup(fields.license.trim()).is_some() {
         fields.license.trim()
     } else {
-        return Ok(err_page(&session, maybe_user, "Unknown reader license. Pick from the dropdown.").await);
+        return Ok(err_page(
+            &session,
+            maybe_user,
+            "Unknown reader license. Pick from the dropdown.",
+        )
+        .await);
     };
     let ai_training = if fields.ai_training.trim().is_empty() {
         "allow"
     } else if crate::licenses::ai_training_lookup(fields.ai_training.trim()).is_some() {
         fields.ai_training.trim()
     } else {
-        return Ok(err_page(&session, maybe_user, "Unknown AI-training option. Pick from the dropdown.").await);
+        return Ok(err_page(
+            &session,
+            maybe_user,
+            "Unknown AI-training option. Pick from the dropdown.",
+        )
+        .await);
     };
 
     // id + doi are allocated just before the INSERT (inside the retry
@@ -192,7 +250,11 @@ pub async fn do_submit(
 
     // Source-type gate. The form has three branches; enforce the
     // required artefact for each.
-    let source_type = if fields.source_type.is_empty() { "tex".to_string() } else { fields.source_type.clone() };
+    let source_type = if fields.source_type.is_empty() {
+        "tex".to_string()
+    } else {
+        fields.source_type.clone()
+    };
     match source_type.as_str() {
         "tex" => {
             if source_buf.is_none() {
@@ -208,26 +270,39 @@ pub async fn do_submit(
                     "Private conductor/model fields require a LaTeX source upload so PreXiv can black out the public source and compiled PDF.").await);
             }
             if pdf_buf.is_none() {
-                return Ok(err_page(&session, maybe_user,
-                    "PDF upload is required for the 'PDF directly' option.").await);
+                return Ok(err_page(
+                    &session,
+                    maybe_user,
+                    "PDF upload is required for the 'PDF directly' option.",
+                )
+                .await);
             }
         }
         "url" => {
             if fields.external_url.trim().is_empty() {
-                return Ok(err_page(&session, maybe_user,
-                    "External URL is required for the 'External URL only' option.").await);
+                return Ok(err_page(
+                    &session,
+                    maybe_user,
+                    "External URL is required for the 'External URL only' option.",
+                )
+                .await);
             }
         }
         other => {
-            return Ok(err_page(&session, maybe_user,
-                &format!("Unknown source_type '{other}'.")).await);
+            return Ok(err_page(
+                &session,
+                maybe_user,
+                &format!("Unknown source_type '{other}'."),
+            )
+            .await);
         }
     }
 
     // All validation passed → now (and only now) persist files and (for
     // tex) run the compiler.
     let upload_dir = upload_dir();
-    fs::create_dir_all(&upload_dir).await
+    fs::create_dir_all(&upload_dir)
+        .await
         .map_err(|e| crate::error::AppError::Other(e.into()))?;
     let stamp = chrono::Utc::now().timestamp_millis();
     let rnd: u32 = rand::thread_rng().gen_range(100_000..1_000_000);
@@ -237,23 +312,28 @@ pub async fn do_submit(
 
     if source_type == "pdf" {
         let Some((safe, data)) = &pdf_buf else {
-            return Ok(err_page(&session, maybe_user,
-                "PDF upload is required for the 'PDF directly' option.").await);
+            return Ok(err_page(
+                &session,
+                maybe_user,
+                "PDF upload is required for the 'PDF directly' option.",
+            )
+            .await);
         };
         // Direct-PDF path: no compilation.
         let stored = format!("{stamp}-{rnd}-{safe}");
         let full = upload_dir.join(&stored);
-        let mut f = fs::File::create(&full).await
+        let mut f = fs::File::create(&full)
+            .await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
-        f.write_all(data).await
+        f.write_all(data)
+            .await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
         pdf_path = Some(stored);
     }
 
     if source_type == "tex" {
         let Some((safe, data)) = &source_buf else {
-            return Ok(err_page(&session, maybe_user,
-                "LaTeX source upload is required.").await);
+            return Ok(err_page(&session, maybe_user, "LaTeX source upload is required.").await);
         };
         let redaction = crate::compile::RedactionOptions {
             hide_human: fields.conductor_type == "human-ai" && !fields.conductor_human_public,
@@ -268,16 +348,28 @@ pub async fn do_submit(
         };
         let prepared = match crate::compile::prepare_source(safe, data, &redaction) {
             Ok(prepared) => prepared,
-            Err(e) => return Ok(err_page(&session, maybe_user, &format!("LaTeX source preparation failed: {e}")).await),
+            Err(e) => {
+                return Ok(err_page(
+                    &session,
+                    maybe_user,
+                    &format!("LaTeX source preparation failed: {e}"),
+                )
+                .await);
+            }
         };
 
         // Persist only the source artifact that will be offered publicly.
         // For private conductor/model fields, this is the blacked-out source.
-        let stored_src = format!("{stamp}-{rnd}-src-{}", sanitize_filename(&prepared.filename));
+        let stored_src = format!(
+            "{stamp}-{rnd}-src-{}",
+            sanitize_filename(&prepared.filename)
+        );
         let full_src = upload_dir.join(&stored_src);
-        let mut f = fs::File::create(&full_src).await
+        let mut f = fs::File::create(&full_src)
+            .await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
-        f.write_all(&prepared.data).await
+        f.write_all(&prepared.data)
+            .await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
         source_path = Some(stored_src);
 
@@ -286,9 +378,11 @@ pub async fn do_submit(
             Ok(compiled) => {
                 let pdf_name = format!("{stamp}-{rnd}-compiled.pdf");
                 let pdf_full = upload_dir.join(&pdf_name);
-                let mut pf = fs::File::create(&pdf_full).await
+                let mut pf = fs::File::create(&pdf_full)
+                    .await
                     .map_err(|e| crate::error::AppError::Other(e.into()))?;
-                pf.write_all(&compiled.pdf).await
+                pf.write_all(&compiled.pdf)
+                    .await
                     .map_err(|e| crate::error::AppError::Other(e.into()))?;
                 pdf_path = Some(pdf_name);
             }
@@ -296,7 +390,8 @@ pub async fn do_submit(
                 // Compile failed. Surface the error + the LaTeX log tail
                 // to the user; drop the source we just wrote (no manuscript
                 // row gets created).
-                let _ = fs::remove_file(upload_dir.join(source_path.as_deref().unwrap_or(""))).await;
+                let _ =
+                    fs::remove_file(upload_dir.join(source_path.as_deref().unwrap_or(""))).await;
                 let log_excerpt = e.log().map(|s| s.to_string());
                 let msg = match log_excerpt {
                     Some(log) => format!(
@@ -352,9 +447,17 @@ pub async fn do_submit(
         .bind(source_path.as_deref())
         .bind(&fields.conductor_type)
         .bind(&ai_models_joined)
-        .bind(if fields.conductor_ai_model_public { 1i64 } else { 0 })
+        .bind(if fields.conductor_ai_model_public {
+            1i64
+        } else {
+            0
+        })
         .bind(opt(&fields.conductor_human))
-        .bind(if fields.conductor_human_public { 1i64 } else { 0 })
+        .bind(if fields.conductor_human_public {
+            1i64
+        } else {
+            0
+        })
         .bind(opt(&fields.conductor_role))
         .bind(opt(&fields.conductor_notes))
         .bind(opt(&fields.agent_framework))
@@ -369,8 +472,14 @@ pub async fn do_submit(
         .execute(&state.pool)
         .await;
         match r {
-            Ok(rr) => { result = Some(rr); break; }
-            Err(e) if is_unique_violation(&e) => { last_unique_err = Some(e); continue; }
+            Ok(rr) => {
+                result = Some(rr);
+                break;
+            }
+            Err(e) if is_unique_violation(&e) => {
+                last_unique_err = Some(e);
+                continue;
+            }
             Err(e) => return Err(e.into()),
         }
     }
@@ -402,7 +511,11 @@ pub async fn do_submit(
     };
     let _ = crate::versions::insert_initial(&state.pool, new_id, &v1).await;
 
-    set_flash(&session, format!("Manuscript submitted as {arxiv_like_id}.")).await;
+    set_flash(
+        &session,
+        format!("Manuscript submitted as {arxiv_like_id}."),
+    )
+    .await;
     Ok(Redirect::to(&format!("/m/{arxiv_like_id}")).into_response())
 }
 
@@ -424,7 +537,13 @@ fn upload_dir() -> PathBuf {
 fn sanitize_filename(name: &str) -> String {
     let s: String = name
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     if s.len() > 80 {
         s.chars().take(80).collect()
@@ -460,23 +579,23 @@ fn sanitize_filename(name: &str) -> String {
 /// `prexiv_id_aliases` table — see migration 0014.
 fn make_prexiv_id() -> String {
     let now = chrono::Utc::now();
-    let yymmdd = format!(
-        "{:02}{:02}{:02}",
-        now.year() % 100,
-        now.month(),
-        now.day()
-    );
+    let yymmdd = format!("{:02}{:02}{:02}", now.year() % 100, now.month(), now.day());
     // 30 bits of randomness — fits in u32, encodes in exactly 6
     // Crockford-32 chars without any digit hitting modular wrap.
     let suffix_n: u32 = rand::thread_rng().gen_range(0..(1u32 << 30));
-    format!("prexiv:{yymmdd}.{}", crate::crockford::encode(suffix_n as u64, 6))
+    format!(
+        "prexiv:{yymmdd}.{}",
+        crate::crockford::encode(suffix_n as u64, 6)
+    )
 }
 
 /// Sqlx error -> "is this a UNIQUE-constraint violation?" predicate.
 /// SQLite returns extended code 2067 (SQLITE_CONSTRAINT_UNIQUE).
 fn is_unique_violation(e: &sqlx::Error) -> bool {
     if let sqlx::Error::Database(db) = e {
-        if db.code().as_deref() == Some("2067") { return true; }
+        if db.code().as_deref() == Some("2067") {
+            return true;
+        }
         let m = db.message().to_ascii_lowercase();
         return m.contains("unique constraint") || m.contains("constraint failed");
     }

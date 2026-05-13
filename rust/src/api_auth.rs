@@ -9,12 +9,12 @@
 //! `Authorization` header, looks the hash up, honours `expires_at`, and
 //! touches `last_used_at` so token-management UIs can show recency.
 
+use axum::Json;
 use axum::extract::{FromRef, FromRequestParts};
+use axum::http::StatusCode;
 use axum::http::header;
 use axum::http::request::Parts;
-use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use base64::Engine;
 use rand::RngCore;
 use serde_json::json;
@@ -42,14 +42,30 @@ pub fn hash_token(plain: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
-fn extract_bearer(parts: &Parts) -> Option<String> {
-    let h = parts.headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+pub enum BearerToken {
+    Missing,
+    Malformed,
+    Present(String),
+}
+
+pub fn extract_bearer(parts: &Parts) -> BearerToken {
+    let Some(raw) = parts.headers.get(header::AUTHORIZATION) else {
+        return BearerToken::Missing;
+    };
+    let Ok(h) = raw.to_str() else {
+        return BearerToken::Malformed;
+    };
     let mut it = h.splitn(2, ' ');
-    let scheme = it.next()?;
+    let Some(scheme) = it.next() else {
+        return BearerToken::Malformed;
+    };
     if !scheme.eq_ignore_ascii_case("bearer") {
-        return None;
+        return BearerToken::Malformed;
     }
-    Some(it.next()?.trim().to_string())
+    let Some(token) = it.next().map(str::trim).filter(|t| !t.is_empty()) else {
+        return BearerToken::Malformed;
+    };
+    BearerToken::Present(token.to_string())
 }
 
 /// Look up the user that owns the given plaintext bearer token. Honours
@@ -116,8 +132,8 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let app: AppState = AppState::from_ref(state);
         let plain = match extract_bearer(parts) {
-            Some(t) => t,
-            None => {
+            BearerToken::Present(t) => t,
+            BearerToken::Missing | BearerToken::Malformed => {
                 return Err((
                     StatusCode::UNAUTHORIZED,
                     Json(json!({
