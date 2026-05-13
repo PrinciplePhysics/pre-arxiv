@@ -323,7 +323,14 @@ pub async fn do_submit(
             .await);
         };
         let watermarked =
-            match crate::pdf_watermark::watermark_pdf(data, &arxiv_like_id, app_url).await {
+            match crate::pdf_watermark::watermark_pdf(
+                data,
+                &arxiv_like_id,
+                fields.category.trim(),
+                app_url,
+            )
+            .await
+            {
                 Ok(pdf) => pdf,
                 Err(e) => {
                     return Ok(err_page(
@@ -395,6 +402,7 @@ pub async fn do_submit(
                 let watermarked = match crate::pdf_watermark::watermark_pdf(
                     &compiled.pdf,
                     &arxiv_like_id,
+                    fields.category.trim(),
                     app_url,
                 )
                 .await

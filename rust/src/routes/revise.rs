@@ -234,7 +234,14 @@ pub async fn submit(
                 .map_err(|e| AppError::Other(e.into()))?;
             let watermark_id = m.arxiv_like_id.clone().unwrap_or_else(|| format!("prexiv:{}", m.id));
             let app_url = state.app_url.as_deref().unwrap_or("http://localhost:3001");
-            let watermarked = match crate::pdf_watermark::watermark_pdf(data, &watermark_id, app_url).await {
+            let watermarked = match crate::pdf_watermark::watermark_pdf(
+                data,
+                &watermark_id,
+                category_t,
+                app_url,
+            )
+            .await
+            {
                 Ok(pdf) => pdf,
                 Err(e) => {
                     let msg = format!("PDF watermarking failed: {e}");

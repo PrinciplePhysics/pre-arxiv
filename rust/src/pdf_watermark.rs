@@ -13,7 +13,12 @@ use tokio::time::timeout;
 
 const WATERMARK_TIMEOUT: Duration = Duration::from_secs(60);
 
-pub async fn watermark_pdf(input: &[u8], manuscript_id: &str, app_url: &str) -> Result<Vec<u8>> {
+pub async fn watermark_pdf(
+    input: &[u8],
+    manuscript_id: &str,
+    category: &str,
+    app_url: &str,
+) -> Result<Vec<u8>> {
     if input.is_empty() {
         bail!("PDF is empty");
     }
@@ -29,7 +34,7 @@ pub async fn watermark_pdf(input: &[u8], manuscript_id: &str, app_url: &str) -> 
     tokio::fs::write(&input_path, input)
         .await
         .context("writing watermark input")?;
-    tokio::fs::write(&ps_path, watermark_postscript(manuscript_id, app_url))
+    tokio::fs::write(&ps_path, watermark_postscript(manuscript_id, category, app_url))
         .await
         .context("writing watermark postscript")?;
 
@@ -79,12 +84,15 @@ async fn run_ghostscript(input_path: &Path, ps_path: &Path, output_path: &Path) 
     Ok(())
 }
 
-fn watermark_postscript(manuscript_id: &str, app_url: &str) -> String {
+fn watermark_postscript(manuscript_id: &str, category: &str, app_url: &str) -> String {
     let base = app_url.trim_end_matches('/');
-    let today = chrono::Utc::now().format("%Y-%m-%d");
-    let label = format!("PreXiv {manuscript_id} | {base}/m/{manuscript_id} | generated {today}");
+    let today = chrono::Utc::now().format("%d %b %Y");
+    let display_id = manuscript_id.strip_prefix("prexiv:").unwrap_or(manuscript_id);
+    let label = format!("PreXiv:{display_id} [{category}] {today}");
+    let href = format!("{base}/m/{manuscript_id}");
     format!(
         r#"/PreXivWatermark ({}) def
+/PreXivHref ({}) def
 << /EndPage {{
   exch pop
   2 eq {{ false }} {{
@@ -96,11 +104,17 @@ fn watermark_postscript(manuscript_id: &str, app_url: &str) -> String {
       0 0 moveto
       PreXivWatermark show
     grestore
+    [ /Rect [ 14 68 58 724 ]
+      /Border [ 0 0 0 ]
+      /Action << /Subtype /URI /URI PreXivHref >>
+      /Subtype /Link
+      /ANN pdfmark
     true
   }} ifelse
 }} bind >> setpagedevice
 "#,
-        ps_string(&label)
+        ps_string(&label),
+        ps_string(&href)
     )
 }
 
