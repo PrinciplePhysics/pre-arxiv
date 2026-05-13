@@ -20,7 +20,7 @@ pub async fn view(
     let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
         r#"
         SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
-               pdf_path, external_url,
+               pdf_path, external_url, source_path,
                conductor_type, conductor_ai_model, conductor_ai_model_public,
                conductor_human, conductor_human_public, conductor_role, conductor_notes,
                agent_framework,

@@ -6,7 +6,7 @@
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use chrono::Datelike;
@@ -15,9 +15,58 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::api_auth::{generate_token, hash_token, ApiUser, ApiVerifiedUser};
-use crate::error::AppResult;
 use crate::models::{Manuscript, ManuscriptListItem};
 use crate::state::AppState;
+
+// ─── JSON-native error type for /api/v1 ───────────────────────────────
+//
+// AppError renders HTML by default; for /api/* we must answer in JSON so
+// machine clients can parse it. ApiError carries the same kinds but its
+// IntoResponse emits `{"error": "..."}` with the right status. Sqlx /
+// anyhow conversions match AppError so existing `?`-propagating code in
+// this module only needs a type-alias swap (`AppResult` -> `ApiResult`).
+
+#[derive(Debug, thiserror::Error)]
+pub enum ApiError {
+    #[error("not found")]
+    NotFound,
+    #[error(transparent)]
+    Sqlx(#[from] sqlx::Error),
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+pub type ApiResult<T> = Result<T, ApiError>;
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        let (status, body) = match self {
+            ApiError::NotFound => (
+                StatusCode::NOT_FOUND,
+                json!({ "error": "not found" }),
+            ),
+            ApiError::Sqlx(sqlx::Error::RowNotFound) => (
+                StatusCode::NOT_FOUND,
+                json!({ "error": "not found" }),
+            ),
+            ApiError::Sqlx(e) => {
+                tracing::error!(error = %e, "sqlx error in api handler");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    json!({ "error": "internal error" }),
+                )
+            }
+            ApiError::Other(e) => {
+                tracing::error!(error = %e, "api handler error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    json!({ "error": "internal error" }),
+                )
+            }
+        };
+        (status, Json(body)).into_response()
+    }
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -53,7 +102,7 @@ async fn get_me(ApiUser(u): ApiUser) -> Json<Value> {
 async fn list_tokens(
     State(state): State<AppState>,
     ApiUser(u): ApiUser,
-) -> AppResult<Json<Value>> {
+) -> ApiResult<Json<Value>> {
     let rows: Vec<(i64, Option<String>, Option<chrono::NaiveDateTime>, Option<chrono::NaiveDateTime>, Option<chrono::NaiveDateTime>)> =
         sqlx::query_as("SELECT id, name, last_used_at, created_at, expires_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC")
             .bind(u.id)
@@ -81,7 +130,7 @@ async fn create_token(
     State(state): State<AppState>,
     ApiUser(u): ApiUser,
     Json(body): Json<CreateTokenBody>,
-) -> AppResult<(StatusCode, Json<Value>)> {
+) -> ApiResult<(StatusCode, Json<Value>)> {
     let plain = generate_token();
     let hash = hash_token(&plain);
     let expires_at: Option<chrono::NaiveDateTime> = body
@@ -115,7 +164,7 @@ async fn revoke_token(
     State(state): State<AppState>,
     ApiUser(u): ApiUser,
     Path(id): Path<i64>,
-) -> AppResult<(StatusCode, Json<Value>)> {
+) -> ApiResult<(StatusCode, Json<Value>)> {
     let res = sqlx::query("DELETE FROM api_tokens WHERE id = ? AND user_id = ?")
         .bind(id)
         .bind(u.id)
@@ -150,7 +199,7 @@ pub struct ListQuery {
 async fn list_manuscripts(
     State(state): State<AppState>,
     Query(q): Query<ListQuery>,
-) -> AppResult<Json<Value>> {
+) -> ApiResult<Json<Value>> {
     let per = q.per.unwrap_or(30).clamp(1, 100);
     let page = q.page.unwrap_or(1).max(1);
     let offset = (page - 1) * per;
@@ -191,7 +240,7 @@ async fn list_manuscripts(
 async fn get_manuscript(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> AppResult<Json<Value>> {
+) -> ApiResult<Json<Value>> {
     let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
         r#"SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
                   pdf_path, external_url,
@@ -211,7 +260,7 @@ async fn get_manuscript(
     .bind(&id)
     .fetch_optional(&state.pool)
     .await?;
-    let m = m.ok_or(crate::error::AppError::NotFound)?;
+    let m = m.ok_or(ApiError::NotFound)?;
     let _ = sqlx::query("UPDATE manuscripts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")
         .bind(m.id)
         .execute(&state.pool)
@@ -251,7 +300,7 @@ async fn post_manuscript(
     State(state): State<AppState>,
     ApiVerifiedUser(user): ApiVerifiedUser,
     Json(v): Json<ManuscriptIn>,
-) -> AppResult<(StatusCode, Json<Value>)> {
+) -> ApiResult<(StatusCode, Json<Value>)> {
     let mut errors = vec![];
     if v.title.trim().is_empty() { errors.push("title is required"); }
     if v.r#abstract.trim().len() < 100 { errors.push("abstract must be at least 100 chars"); }
@@ -389,13 +438,13 @@ async fn post_manuscript(
 async fn list_comments(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> AppResult<Json<Value>> {
+) -> ApiResult<Json<Value>> {
     let m: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
         "SELECT id FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
-    let manuscript_id = m.ok_or(crate::error::AppError::NotFound)?.0;
+    let manuscript_id = m.ok_or(ApiError::NotFound)?.0;
     let rows: Vec<(i64, i64, String, Option<i64>, String, Option<i64>, Option<chrono::NaiveDateTime>)> =
         sqlx::query_as(
             "SELECT c.id, c.author_id, u.username, c.parent_id, c.content, c.score, c.created_at
@@ -422,7 +471,7 @@ async fn post_comment(
     ApiUser(user): ApiUser,
     Path(id): Path<String>,
     Json(body): Json<CommentIn>,
-) -> AppResult<(StatusCode, Json<Value>)> {
+) -> ApiResult<(StatusCode, Json<Value>)> {
     let content = body.content.trim();
     if content.is_empty() || content.len() > 8000 {
         return Ok((StatusCode::UNPROCESSABLE_ENTITY, Json(json!({"error": "content must be 1..=8000 chars"}))));
@@ -432,7 +481,7 @@ async fn post_comment(
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
-    let (manuscript_id, withdrawn) = m.ok_or(crate::error::AppError::NotFound)?;
+    let (manuscript_id, withdrawn) = m.ok_or(ApiError::NotFound)?;
     if withdrawn != 0 {
         return Ok((StatusCode::CONFLICT, Json(json!({"error": "manuscript is withdrawn; comments are disabled"}))));
     }
@@ -486,7 +535,7 @@ async fn vote_manuscript(
     ApiUser(user): ApiUser,
     Path(id): Path<String>,
     Json(body): Json<VoteBody>,
-) -> AppResult<(StatusCode, Json<Value>)> {
+) -> ApiResult<(StatusCode, Json<Value>)> {
     if !matches!(body.value, -1 | 1) {
         return Ok((StatusCode::UNPROCESSABLE_ENTITY, Json(json!({"error": "value must be -1 or 1"}))));
     }
@@ -495,7 +544,7 @@ async fn vote_manuscript(
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
-    let (target_id, withdrawn) = m.ok_or(crate::error::AppError::NotFound)?;
+    let (target_id, withdrawn) = m.ok_or(ApiError::NotFound)?;
     if withdrawn != 0 {
         return Ok((StatusCode::CONFLICT, Json(json!({"error": "manuscript is withdrawn; voting is disabled"}))));
     }
@@ -524,16 +573,16 @@ async fn vote_manuscript(
 async fn list_manuscript_versions(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> AppResult<Json<Value>> {
+) -> ApiResult<Json<Value>> {
     let m: Option<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
         "SELECT id, current_version FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
-    let (manuscript_id, current_version) = m.ok_or(crate::error::AppError::NotFound)?;
+    let (manuscript_id, current_version) = m.ok_or(ApiError::NotFound)?;
     let vs = crate::versions::list_versions(&state.pool, manuscript_id)
         .await
-        .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("{e}")))?;
+        ?;
     let items: Vec<Value> = vs.iter().map(|v| json!({
         "version_number": v.version_number,
         "revision_note":  v.revision_note,
@@ -556,17 +605,17 @@ async fn list_manuscript_versions(
 async fn get_manuscript_version(
     State(state): State<AppState>,
     Path((id, n)): Path<(String, i64)>,
-) -> AppResult<Json<Value>> {
+) -> ApiResult<Json<Value>> {
     let m: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
         "SELECT id FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
-    let manuscript_id = m.ok_or(crate::error::AppError::NotFound)?.0;
+    let manuscript_id = m.ok_or(ApiError::NotFound)?.0;
     let v = crate::versions::get_version(&state.pool, manuscript_id, n)
         .await
-        .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("{e}")))?
-        .ok_or(crate::error::AppError::NotFound)?;
+        ?
+        .ok_or(ApiError::NotFound)?;
     Ok(Json(json!({
         "version_number": v.version_number,
         "revision_note":  v.revision_note,
@@ -603,7 +652,7 @@ async fn post_manuscript_version(
     ApiVerifiedUser(user): ApiVerifiedUser,
     Path(id): Path<String>,
     Json(v): Json<RevisionIn>,
-) -> AppResult<(StatusCode, Json<Value>)> {
+) -> ApiResult<(StatusCode, Json<Value>)> {
     let m: Option<(i64, i64, i64, Option<String>, Option<String>, Option<String>)> =
         sqlx::query_as(
             "SELECT id, submitter_id, withdrawn, pdf_path, license, ai_training
@@ -612,7 +661,7 @@ async fn post_manuscript_version(
         .bind(&id).bind(&id)
         .fetch_optional(&state.pool).await?;
     let (manuscript_id, submitter_id, withdrawn, pdf_path, existing_license, existing_ai) =
-        m.ok_or(crate::error::AppError::NotFound)?;
+        m.ok_or(ApiError::NotFound)?;
 
     if submitter_id != user.id && !user.is_admin() {
         return Ok((StatusCode::FORBIDDEN, Json(json!({
@@ -666,7 +715,7 @@ async fn post_manuscript_version(
         },
     )
     .await
-    .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("{e}")))?;
+    ?;
 
     let _ = sqlx::query(
         "INSERT INTO audit_log (actor_user_id, action, target_type, target_id, detail) VALUES (?, 'manuscript_revise', 'manuscript', ?, ?)",
@@ -692,7 +741,7 @@ pub struct SearchQuery { #[serde(default)] pub q: String }
 async fn search(
     State(state): State<AppState>,
     Query(p): Query<SearchQuery>,
-) -> AppResult<Json<Value>> {
+) -> ApiResult<Json<Value>> {
     let q = p.q.trim();
     if q.is_empty() {
         return Ok(Json(json!({"items": [], "q": ""})));

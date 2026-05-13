@@ -43,7 +43,12 @@ pub async fn vote(
     if !matches!(form.target_type.as_str(), "manuscript" | "comment") {
         return Ok(Redirect::to(&back).into_response());
     }
-    if !matches!(form.value, -1 | 1) {
+    // Three legal values:
+    //   -1, +1 → cast or replace the existing vote (or, if it already
+    //            equals the new value, toggle to neutral — Reddit-style).
+    //    0    → explicit clear. REST-friendly "DELETE my vote." Sent by
+    //            JSON clients and by the topbar's "neutral" click target.
+    if !matches!(form.value, -1 | 0 | 1) {
         return Ok(Redirect::to(&back).into_response());
     }
 
@@ -74,28 +79,40 @@ pub async fn vote(
     .fetch_optional(&mut *tx)
     .await?;
 
-    match existing {
-        Some((vote_id, prev)) if prev == form.value => {
+    match (existing, form.value) {
+        // Explicit clear (value=0) on an existing row, OR re-posting the
+        // same direction (Reddit-style toggle to neutral). Both delete.
+        (Some((vote_id, _)), 0) => {
             sqlx::query("DELETE FROM votes WHERE id = ?")
                 .bind(vote_id)
                 .execute(&mut *tx)
                 .await?;
         }
-        Some((vote_id, _)) => {
-            sqlx::query("UPDATE votes SET value = ? WHERE id = ?")
-                .bind(form.value)
+        (Some((vote_id, prev)), v) if prev == v => {
+            sqlx::query("DELETE FROM votes WHERE id = ?")
                 .bind(vote_id)
                 .execute(&mut *tx)
                 .await?;
         }
-        None => {
+        // Change direction: update the row in place.
+        (Some((vote_id, _)), v) => {
+            sqlx::query("UPDATE votes SET value = ? WHERE id = ?")
+                .bind(v)
+                .bind(vote_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        // No existing vote + clear request → nothing to do; recompute
+        // below still runs so the response is consistent.
+        (None, 0) => {}
+        (None, v) => {
             sqlx::query(
                 "INSERT INTO votes (user_id, target_type, target_id, value) VALUES (?, ?, ?, ?)",
             )
             .bind(user.id)
             .bind(&form.target_type)
             .bind(form.target_id)
-            .bind(form.value)
+            .bind(v)
             .execute(&mut *tx)
             .await?;
         }

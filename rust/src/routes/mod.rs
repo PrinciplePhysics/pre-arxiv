@@ -1,13 +1,22 @@
-use axum::http::StatusCode;
-use axum::response::{Html, IntoResponse};
+use axum::http::{StatusCode, Uri};
+use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
-use axum::Router;
+use axum::{Json, Router};
 
 use crate::error::render_error_page;
 use crate::state::AppState;
 
-/// Axum fallback for unmatched routes. Same look as AppError::NotFound.
-pub async fn not_found_fallback() -> impl IntoResponse {
+/// Axum fallback for unmatched routes. HTML 404 for browser paths,
+/// JSON 404 for `/api/*` so machine clients don't have to parse HTML
+/// when they hit a bad path. The HTML branch matches AppError::NotFound.
+pub async fn not_found_fallback(uri: Uri) -> Response {
+    if uri.path().starts_with("/api/") {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "not found" })),
+        )
+            .into_response();
+    }
     (
         StatusCode::NOT_FOUND,
         Html(render_error_page(
@@ -16,6 +25,7 @@ pub async fn not_found_fallback() -> impl IntoResponse {
             "The URL you followed doesn't match any route on PreXiv. It may have been renamed, or never existed.",
         )),
     )
+        .into_response()
 }
 
 pub mod admin;
