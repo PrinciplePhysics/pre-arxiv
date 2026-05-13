@@ -1790,7 +1790,7 @@ a[href^="#"], a[href*="#comment-"] { scroll-margin-top: 64px; }
   min-width: 0;
   box-shadow: var(--shadow-sm);
 }
-.admin-panel-wide { grid-column: 1; }
+.admin-panel-wide { grid-column: 1 / -1; }
 .admin-panel-head {
   display: flex;
   justify-content: space-between;
@@ -1835,7 +1835,7 @@ a[href^="#"], a[href*="#comment-"] { scroll-margin-top: 64px; }
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
 }
 .admin-table th,
 .admin-table td {
@@ -1843,6 +1843,8 @@ a[href^="#"], a[href*="#comment-"] { scroll-margin-top: 64px; }
   text-align: left;
   vertical-align: top;
   border-bottom: 1px dotted var(--rule);
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .admin-table th {
   color: var(--muted);
@@ -1856,18 +1858,21 @@ a[href^="#"], a[href*="#comment-"] { scroll-margin-top: 64px; }
 .admin-table-compact th,
 .admin-table-compact td { padding: 7px 8px; }
 .admin-title-cell {
-  min-width: 260px;
-  max-width: 620px;
+  min-width: 0;
+  max-width: none;
 }
 .admin-title-cell > a {
   color: var(--ink);
   font-weight: 700;
 }
+.admin-title-cell .mono {
+  overflow-wrap: anywhere;
+}
 .admin-pill-stack {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  min-width: 120px;
+  min-width: 0;
 }
 .admin-pill {
   display: inline-flex;
@@ -1931,7 +1936,11 @@ a[href^="#"], a[href*="#comment-"] { scroll-margin-top: 64px; }
   .admin-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-panel { padding: 13px 12px; }
   .admin-panel-head { flex-direction: column; align-items: stretch; gap: 8px; }
-  .admin-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .admin-table { display: block; overflow-x: auto; table-layout: auto; }
+  .admin-table th,
+  .admin-table td {
+    white-space: nowrap;
+  }
   .admin-title-cell { min-width: 240px; }
 }
 @media (max-width: 460px) {
