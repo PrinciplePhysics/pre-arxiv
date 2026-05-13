@@ -2620,21 +2620,31 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 
 /* ─── Profile verified-scholar pictorial badges ───────────────────
-   Small circular icons under the name (ORCID green + institutional
-   slate-blue), Twitter-verified-style. The whole badge is clickable
-   when it's a link; non-link badges (institutional) hover-emphasize
-   without a destination. Pure SVG inline — no icon fonts, no remote
-   image dependency. */
-.profile-name-badges {
+   Small circular SVG icons sitting at the end of the display-name
+   line, Twitter-verified-style. ORCID green + institutional
+   slate-blue. Pure inline SVG — no icon fonts, no remote images.
+   The flex row keeps the badges vertically centered against the
+   `<h1>` and lets them wrap below on a narrow viewport. */
+.profile-name-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 8px 0 2px;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+.profile-name-row .profile-name { margin: 0; }
+.profile-name-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* nudge down a hair so the icons sit visually centered against the
+     serif heading's x-height rather than its full cap-height */
+  margin-top: 4px;
 }
 .profile-name-badge {
   display: inline-flex;
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   text-decoration: none;
   box-shadow: var(--shadow-xs);
@@ -2653,10 +2663,5 @@ a.profile-name-badge { cursor: pointer; }
   display: block;
   border-radius: 50%;
 }
-.profile-name-badge.is-orcid:hover svg {
-  /* small ORCID-green halo on hover */
-  filter: drop-shadow(0 0 0.5px #A6CE39);
-}
-.profile-name-badge.is-inst:hover svg {
-  filter: drop-shadow(0 0 0.5px #3a6f9c);
-}
+.profile-name-badge.is-orcid:hover svg { filter: drop-shadow(0 0 0.5px #A6CE39); }
+.profile-name-badge.is-inst:hover  svg { filter: drop-shadow(0 0 0.5px #3a6f9c); }

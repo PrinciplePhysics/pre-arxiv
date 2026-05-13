@@ -38,27 +38,29 @@ pub fn render(
     let body = html! {
         header.profile-card {
             div.profile-card-id {
-                h1.profile-name { (real_name) }
-                @if u.is_verified_scholar() {
-                    div.profile-name-badges aria-label="Verified-scholar credentials" {
-                        @if u.is_orcid_verified() {
-                            @let orcid = u.orcid.as_deref().unwrap_or("");
-                            @let orcid_url = format!("https://orcid.org/{orcid}");
-                            @let orcid_title = format!("ORCID iD verified · {orcid}");
-                            @let orcid_aria  = format!("ORCID iD verified: {orcid}");
-                            a.profile-name-badge.is-orcid
-                              href=(orcid_url)
-                              target="_blank" rel="noopener me"
-                              title=(orcid_title)
-                              aria-label=(orcid_aria) {
-                                (PreEscaped(ORCID_BADGE_SVG))
+                div.profile-name-row {
+                    h1.profile-name { (real_name) }
+                    @if u.is_verified_scholar() {
+                        span.profile-name-badges aria-label="Verified-scholar credentials" {
+                            @if u.is_orcid_verified() {
+                                @let orcid = u.orcid.as_deref().unwrap_or("");
+                                @let orcid_url = format!("https://orcid.org/{orcid}");
+                                @let orcid_title = format!("ORCID iD verified · {orcid}");
+                                @let orcid_aria  = format!("ORCID iD verified: {orcid}");
+                                a.profile-name-badge.is-orcid
+                                  href=(orcid_url)
+                                  target="_blank" rel="noopener me"
+                                  title=(orcid_title)
+                                  aria-label=(orcid_aria) {
+                                    (PreEscaped(ORCID_BADGE_SVG))
+                                }
                             }
-                        }
-                        @if u.is_institutional_email() {
-                            span.profile-name-badge.is-inst
-                              title="Verified email on an institutional / R&D-org domain"
-                              aria-label="Verified institutional email" {
-                                (PreEscaped(INST_BADGE_SVG))
+                            @if u.is_institutional_email() {
+                                span.profile-name-badge.is-inst
+                                  title="Verified email on an institutional / R&D-org domain"
+                                  aria-label="Verified institutional email" {
+                                    (PreEscaped(INST_BADGE_SVG))
+                                }
                             }
                         }
                     }
