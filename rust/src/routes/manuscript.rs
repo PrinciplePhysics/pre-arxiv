@@ -1,5 +1,5 @@
 use axum::extract::{Path, State};
-use axum::response::Html;
+use axum::response::{Html, IntoResponse, Redirect, Response};
 use tower_sessions::Session;
 
 use crate::auth::MaybeUser;
@@ -16,7 +16,7 @@ pub async fn view(
     session: Session,
     maybe_user: MaybeUser,
     Path(id): Path<String>,
-) -> AppResult<Html<String>> {
+) -> AppResult<Response> {
     let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
         r#"
         SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
@@ -40,7 +40,25 @@ pub async fn view(
     .fetch_optional(&state.pool)
     .await?;
 
-    let m = m.ok_or(AppError::NotFound)?;
+    // If no row matched, check the retired-id alias table. A retired
+    // slug 301-redirects to its modern counterpart so external links
+    // and citations under the old `prexiv:YYMM.NNNNN` scheme keep
+    // working forever.
+    let m = match m {
+        Some(m) => m,
+        None => {
+            let alias: Option<(String,)> = sqlx::query_as(
+                "SELECT new_slug FROM prexiv_id_aliases WHERE old_slug = ? LIMIT 1",
+            )
+            .bind(&id)
+            .fetch_optional(&state.pool)
+            .await?;
+            if let Some((new_slug,)) = alias {
+                return Ok(Redirect::permanent(&format!("/m/{new_slug}")).into_response());
+            }
+            return Err(AppError::NotFound);
+        }
+    };
 
     let comments: Vec<CommentWithAuthor> = sqlx::query_as::<_, CommentWithAuthor>(
         r#"
@@ -113,7 +131,7 @@ pub async fn view(
     ctx.og = Some(og);
     ctx.jsonld = Some(jsonld);
     ctx.canonical_url = Some(canon);
-    Ok(Html(templates::manuscript::render(&ctx, &m, &comments, submitter.as_ref(), &cats, my_vote).into_string()))
+    Ok(Html(templates::manuscript::render(&ctx, &m, &comments, submitter.as_ref(), &cats, my_vote).into_string()).into_response())
 }
 
 /// First N chars of `s` with markdown + LaTeX stripped, suitable for an
