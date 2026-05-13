@@ -78,6 +78,23 @@ pub fn render(input: &str) -> String {
 /// Math regions are extracted before this runs, so commands inside
 /// `$...$`, `\(...\)`, etc. remain untouched for KaTeX.
 fn render_latex_text_commands(input: &str) -> String {
+    transform_latex_text_commands(input, &|cmd, inner| {
+        latex_text_tag(cmd).map(|(open, close)| format!("{open}{inner}{close}"))
+    })
+}
+
+/// Strip known LaTeX text-mode wrappers while keeping their visible prose.
+/// Useful for meta descriptions and citation exports that need plain text.
+pub fn strip_latex_text_commands(input: &str) -> String {
+    transform_latex_text_commands(input, &|cmd, inner| {
+        latex_text_tag(cmd).map(|_| inner.to_string())
+    })
+}
+
+fn transform_latex_text_commands(
+    input: &str,
+    emit: &dyn Fn(&str, &str) -> Option<String>,
+) -> String {
     let chars: Vec<char> = input.chars().collect();
     let mut out = String::with_capacity(input.len());
     let mut i = 0usize;
@@ -91,13 +108,14 @@ fn render_latex_text_commands(input: &str) -> String {
             }
             if cmd_end > cmd_start && cmd_end < chars.len() && chars[cmd_end] == '{' {
                 let cmd: String = chars[cmd_start..cmd_end].iter().collect();
-                if let Some((open, close)) = latex_text_tag(&cmd) {
+                if latex_text_tag(&cmd).is_some() {
                     if let Some((inner, next_i)) = take_braced(&chars, cmd_end) {
-                        out.push_str(open);
-                        out.push_str(&render_latex_text_commands(&inner));
-                        out.push_str(close);
-                        i = next_i;
-                        continue;
+                        let inner = transform_latex_text_commands(&inner, emit);
+                        if let Some(replacement) = emit(&cmd, &inner) {
+                            out.push_str(&replacement);
+                            i = next_i;
+                            continue;
+                        }
                     }
                 }
             }
@@ -368,6 +386,12 @@ mod tests {
     fn nested_latex_text_commands_render() {
         let out = render(r"\emph{outer \textbf{inner}}");
         assert!(out.contains("<em>outer <strong>inner</strong></em>"));
+    }
+
+    #[test]
+    fn latex_text_commands_strip_to_plain_text() {
+        let out = strip_latex_text_commands(r"controlled \emph{without} and \textbf{bold}");
+        assert_eq!(out, "controlled without and bold");
     }
 
     #[test]

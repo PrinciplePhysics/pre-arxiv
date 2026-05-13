@@ -5,6 +5,7 @@ use tower_sessions::Session;
 use crate::auth::MaybeUser;
 use crate::error::{AppError, AppResult};
 use crate::helpers::build_ctx;
+use crate::markdown;
 use crate::models::comment::CommentWithAuthor;
 use crate::models::Manuscript;
 use crate::state::AppState;
@@ -151,6 +152,7 @@ pub async fn view(
 fn excerpt_plain(s: &str, max: usize) -> String {
     // Pull out anything between $…$ or $$…$$, drop common markdown
     // markers, collapse whitespace.
+    let s = markdown::strip_latex_text_commands(s);
     let mut out = String::with_capacity(s.len());
     let mut in_math = false;
     let mut in_double = false;

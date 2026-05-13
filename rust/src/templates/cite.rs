@@ -1,6 +1,6 @@
 use maud::{html, Markup};
 
-use crate::models::Manuscript;
+use crate::{markdown, models::Manuscript};
 
 use super::layout::{layout, PageCtx};
 
@@ -128,7 +128,7 @@ pub fn ris(m: &Manuscript, base_url: &str) -> String {
         s.push_str(&format!("UR  - {}\n", manuscript_url(base_url, id)));
     }
     s.push_str("AB  - ");
-    s.push_str(&m.r#abstract);
+    s.push_str(&markdown::strip_latex_text_commands(&m.r#abstract));
     s.push('\n');
     s.push_str("ER  -\n");
     s
