@@ -8,7 +8,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tower_sessions::Session;
 
-use crate::auth::{AuthSource, MaybeUser, RequireAuthUser, verify_csrf};
+use crate::auth::{verify_csrf, AuthSource, MaybeUser, RequireAuthUser};
 use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
 use crate::state::AppState;
@@ -259,7 +259,7 @@ pub async fn do_submit(
         "tex" => {
             if source_buf.is_none() {
                 return Ok(err_page(&session, maybe_user,
-                    "LaTeX source upload is required. Choose 'PDF directly' or 'External URL only' if you don't have the .tex.").await);
+                    "LaTeX source upload is required. Choose 'PDF directly' if you don't have the .tex. External URL is only a supplemental link.").await);
             }
         }
         "pdf" => {
@@ -278,16 +278,11 @@ pub async fn do_submit(
                 .await);
             }
         }
-        "url" => {
-            if fields.external_url.trim().is_empty() {
-                return Ok(err_page(
-                    &session,
-                    maybe_user,
-                    "External URL is required for the 'External URL only' option.",
-                )
-                .await);
-            }
-        }
+        "url" => return Ok(err_page(
+            &session,
+            maybe_user,
+            "External URL-only submissions are no longer supported. Upload a LaTeX source or PDF so PreXiv can host the paper; use External URL only as a supplemental link.",
+        ).await),
         other => {
             return Ok(err_page(
                 &session,
@@ -322,25 +317,24 @@ pub async fn do_submit(
             )
             .await);
         };
-        let watermarked =
-            match crate::pdf_watermark::watermark_pdf(
-                data,
-                &arxiv_like_id,
-                fields.category.trim(),
-                app_url,
-            )
-            .await
-            {
-                Ok(pdf) => pdf,
-                Err(e) => {
-                    return Ok(err_page(
-                        &session,
-                        maybe_user,
-                        &format!("PDF watermarking failed: {e}"),
-                    )
-                    .await);
-                }
-            };
+        let watermarked = match crate::pdf_watermark::watermark_pdf(
+            data,
+            &arxiv_like_id,
+            fields.category.trim(),
+            app_url,
+        )
+        .await
+        {
+            Ok(pdf) => pdf,
+            Err(e) => {
+                return Ok(err_page(
+                    &session,
+                    maybe_user,
+                    &format!("PDF watermarking failed: {e}"),
+                )
+                .await);
+            }
+        };
         // Direct-PDF path: no compilation. Persist only the public,
         // watermarked PDF; the original upload is never written to disk.
         let stored = format!("{stamp}-{rnd}-{safe}");
@@ -409,8 +403,9 @@ pub async fn do_submit(
                 {
                     Ok(pdf) => pdf,
                     Err(e) => {
-                        let _ = fs::remove_file(upload_dir.join(source_path.as_deref().unwrap_or("")))
-                            .await;
+                        let _ =
+                            fs::remove_file(upload_dir.join(source_path.as_deref().unwrap_or("")))
+                                .await;
                         return Ok(err_page(
                             &session,
                             maybe_user,
@@ -549,7 +544,11 @@ pub async fn do_submit(
 
 fn opt(s: &str) -> Option<&str> {
     let t = s.trim();
-    if t.is_empty() { None } else { Some(t) }
+    if t.is_empty() {
+        None
+    } else {
+        Some(t)
+    }
 }
 
 fn upload_dir() -> PathBuf {
@@ -674,7 +673,7 @@ struct SubmitFields {
     auditor_orcid: String,
     license: String,
     ai_training: String,
-    /// "tex" / "pdf" / "url"
+    /// "tex" / "pdf"
     source_type: String,
 }
 

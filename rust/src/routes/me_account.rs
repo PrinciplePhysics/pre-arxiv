@@ -18,7 +18,9 @@ use serde::Deserialize;
 use serde_json::json;
 use tower_sessions::Session;
 
-use crate::auth::{logout_session, verify_csrf, verify_password_timing_safe, MaybeUser, RequireUser};
+use crate::auth::{
+    logout_session, verify_csrf, verify_password_timing_safe, MaybeUser, RequireUser,
+};
 use crate::error::AppResult;
 use crate::helpers::{build_ctx, set_flash};
 use crate::state::AppState;
@@ -33,7 +35,9 @@ pub async fn show_delete(
 ) -> AppResult<Html<String>> {
     let mut ctx = build_ctx(&session, maybe_user, "/me/delete-account").await;
     ctx.no_index = true;
-    Ok(Html(templates::me_account::render_delete(&ctx, None).into_string()))
+    Ok(Html(
+        templates::me_account::render_delete(&ctx, None).into_string(),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -63,13 +67,13 @@ pub async fn submit_delete(
         return Ok(render_err(
             "Confirmation didn't match — you have to type your username exactly to proceed.",
             maybe_user,
-        ).await);
+        )
+        .await);
     }
-    let hash: Option<(String,)> =
-        sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
-            .bind(user.id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let hash: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
+        .bind(user.id)
+        .fetch_optional(&state.pool)
+        .await?;
     if !verify_password_timing_safe(&form.current_password, hash.as_ref().map(|(h,)| h.as_str())) {
         return Ok(render_err("Current password is incorrect.", maybe_user).await);
     }
@@ -87,19 +91,25 @@ pub async fn submit_delete(
     .await?;
 
     sqlx::query("UPDATE manuscripts SET submitter_id = ? WHERE submitter_id = ?")
-        .bind(placeholder_id).bind(user.id)
-        .execute(&mut *tx).await?;
+        .bind(placeholder_id)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("UPDATE comments SET author_id = ? WHERE author_id = ?")
-        .bind(placeholder_id).bind(user.id)
-        .execute(&mut *tx).await?;
+        .bind(placeholder_id)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("UPDATE audit_log SET actor_user_id = NULL WHERE actor_user_id = ?")
         .bind(user.id)
-        .execute(&mut *tx).await?;
+        .execute(&mut *tx)
+        .await?;
     // Everything else (tokens, follows, votes, notifications, etc.)
     // cascades via FKs in the migrations.
     sqlx::query("DELETE FROM users WHERE id = ?")
         .bind(user.id)
-        .execute(&mut *tx).await?;
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
 
     let _ = logout_session(&session).await;
@@ -124,6 +134,9 @@ pub async fn export(
         "affiliation":   user.affiliation,
         "bio":           user.bio,
         "orcid":         user.orcid,
+        "orcid_name_matched": user.is_orcid_verified(),
+        "orcid_oauth_verified": user.is_orcid_oauth_verified(),
+        "orcid_oauth_verified_at": user.orcid_oauth_verified_at,
         "karma":         user.karma.unwrap_or(0),
         "email_verified": user.is_verified(),
         "is_admin":       user.is_admin(),
@@ -131,22 +144,44 @@ pub async fn export(
     });
 
     // Manuscripts you submitted.
-    let manuscripts: Vec<(i64, Option<String>, Option<String>, String, String, String, String, Option<String>, Option<String>, Option<chrono::NaiveDateTime>, Option<chrono::NaiveDateTime>, i64, Option<chrono::NaiveDateTime>, Option<String>, Option<String>)> =
-        sqlx::query_as(
-            "SELECT id, arxiv_like_id, doi, title, abstract, authors, category,
+    let manuscripts: Vec<(
+        i64,
+        Option<String>,
+        Option<String>,
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<chrono::NaiveDateTime>,
+        Option<chrono::NaiveDateTime>,
+        i64,
+        Option<chrono::NaiveDateTime>,
+        Option<String>,
+        Option<String>,
+    )> = sqlx::query_as(
+        "SELECT id, arxiv_like_id, doi, title, abstract, authors, category,
                     pdf_path, external_url, created_at, updated_at,
                     withdrawn, withdrawn_at, withdrawn_reason, conductor_notes
              FROM manuscripts WHERE submitter_id = ? ORDER BY id",
-        )
-        .bind(user.id).fetch_all(&state.pool).await?;
-    let ms_json: Vec<serde_json::Value> = manuscripts.into_iter().map(|m| json!({
-        "id": m.0, "arxiv_like_id": m.1, "doi": m.2, "title": m.3,
-        "abstract": m.4, "authors": m.5, "category": m.6,
-        "pdf_path": m.7, "external_url": m.8,
-        "created_at": m.9, "updated_at": m.10,
-        "withdrawn": m.11 != 0, "withdrawn_at": m.12, "withdrawn_reason": m.13,
-        "conductor_notes": m.14,
-    })).collect();
+    )
+    .bind(user.id)
+    .fetch_all(&state.pool)
+    .await?;
+    let ms_json: Vec<serde_json::Value> = manuscripts
+        .into_iter()
+        .map(|m| {
+            json!({
+                "id": m.0, "arxiv_like_id": m.1, "doi": m.2, "title": m.3,
+                "abstract": m.4, "authors": m.5, "category": m.6,
+                "pdf_path": m.7, "external_url": m.8,
+                "created_at": m.9, "updated_at": m.10,
+                "withdrawn": m.11 != 0, "withdrawn_at": m.12, "withdrawn_reason": m.13,
+                "conductor_notes": m.14,
+            })
+        })
+        .collect();
 
     // Comments you wrote.
     let comments: Vec<(i64, i64, Option<i64>, String, Option<chrono::NaiveDateTime>)> =
@@ -154,19 +189,28 @@ pub async fn export(
             "SELECT id, manuscript_id, parent_id, content, created_at
              FROM comments WHERE author_id = ? ORDER BY id",
         )
-        .bind(user.id).fetch_all(&state.pool).await?;
+        .bind(user.id)
+        .fetch_all(&state.pool)
+        .await?;
     let cm_json: Vec<serde_json::Value> = comments.into_iter().map(|c| json!({
         "id": c.0, "manuscript_id": c.1, "parent_id": c.2, "content": c.3, "created_at": c.4,
     })).collect();
 
     // Votes.
     let votes: Vec<(String, i64, i64, Option<chrono::NaiveDateTime>)> = sqlx::query_as(
-        "SELECT target_type, target_id, value, created_at FROM votes WHERE user_id = ? ORDER BY id"
+        "SELECT target_type, target_id, value, created_at FROM votes WHERE user_id = ? ORDER BY id",
     )
-    .bind(user.id).fetch_all(&state.pool).await?;
-    let votes_json: Vec<serde_json::Value> = votes.into_iter().map(|v| json!({
-        "target_type": v.0, "target_id": v.1, "value": v.2, "created_at": v.3,
-    })).collect();
+    .bind(user.id)
+    .fetch_all(&state.pool)
+    .await?;
+    let votes_json: Vec<serde_json::Value> = votes
+        .into_iter()
+        .map(|v| {
+            json!({
+                "target_type": v.0, "target_id": v.1, "value": v.2, "created_at": v.3,
+            })
+        })
+        .collect();
 
     // Follows.
     let following: Vec<(String,)> = sqlx::query_as(
@@ -179,14 +223,27 @@ pub async fn export(
     .bind(user.id).fetch_all(&state.pool).await?;
 
     // API tokens (hashes only; we never persist plaintext).
-    let tokens: Vec<(i64, Option<String>, Option<chrono::NaiveDateTime>, Option<chrono::NaiveDateTime>, Option<chrono::NaiveDateTime>)> =
-        sqlx::query_as(
-            "SELECT id, name, last_used_at, created_at, expires_at
-             FROM api_tokens WHERE user_id = ? ORDER BY id"
-        ).bind(user.id).fetch_all(&state.pool).await?;
-    let tokens_json: Vec<serde_json::Value> = tokens.into_iter().map(|t| json!({
-        "id": t.0, "name": t.1, "last_used_at": t.2, "created_at": t.3, "expires_at": t.4,
-    })).collect();
+    let tokens: Vec<(
+        i64,
+        Option<String>,
+        Option<chrono::NaiveDateTime>,
+        Option<chrono::NaiveDateTime>,
+        Option<chrono::NaiveDateTime>,
+    )> = sqlx::query_as(
+        "SELECT id, name, last_used_at, created_at, expires_at
+             FROM api_tokens WHERE user_id = ? ORDER BY id",
+    )
+    .bind(user.id)
+    .fetch_all(&state.pool)
+    .await?;
+    let tokens_json: Vec<serde_json::Value> = tokens
+        .into_iter()
+        .map(|t| {
+            json!({
+                "id": t.0, "name": t.1, "last_used_at": t.2, "created_at": t.3, "expires_at": t.4,
+            })
+        })
+        .collect();
 
     let bundle = json!({
         "exported_at":   chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
@@ -211,8 +268,14 @@ pub async fn export(
     );
     Ok((
         [
-            (header::CONTENT_TYPE, "application/json; charset=utf-8".to_string()),
-            (header::CONTENT_DISPOSITION, format!("attachment; filename=\"{filename}\"")),
+            (
+                header::CONTENT_TYPE,
+                "application/json; charset=utf-8".to_string(),
+            ),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{filename}\""),
+            ),
         ],
         body,
     )

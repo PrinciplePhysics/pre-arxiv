@@ -59,7 +59,7 @@ pub fn mode_toggle(self_path: &str, show_all: bool) -> Markup {
               href=(self_path)
               role="tab"
               aria-selected=(if !show_all { "true" } else { "false" })
-              title="Only show submissions from verified scholars (ORCID iD or institutional email)." {
+              title="Only show submissions from verified scholars: authenticated ORCID OAuth or verified institutional email. ORCID name-match alone is displayed on profiles but is not ownership proof." {
                 span.mode-pill-dot.is-standard aria-hidden="true" {}
                 "Standard"
             }
@@ -86,7 +86,7 @@ pub fn verified_widen_banner() -> Markup {
                 " No verified-scholar submissions yet, so the default ranked listing is temporarily showing "
                 em { "everything" }
                 ". The verified-only filter switches back on as soon as one verified scholar submits — "
-                a href="/me/edit" { "verify your ORCID or use an institutional email" }
+                a href="/me/edit" { "connect ORCID or use a verified institutional email" }
                 " to be that scholar."
             }
         }
@@ -164,11 +164,21 @@ fn welcome_modal() -> Markup {
 
 fn truncate_name(s: &str) -> String {
     let s = s.trim();
-    if s.chars().count() <= 24 { s.to_string() }
-    else { let mut t: String = s.chars().take(22).collect(); t.push('…'); t }
+    if s.chars().count() <= 24 {
+        s.to_string()
+    } else {
+        let mut t: String = s.chars().take(22).collect();
+        t.push('…');
+        t
+    }
 }
 
-pub fn manuscript_row(ctx: &PageCtx, m: &ManuscriptListItem, rank: usize, logged_in: bool) -> Markup {
+pub fn manuscript_row(
+    ctx: &PageCtx,
+    m: &ManuscriptListItem,
+    rank: usize,
+    logged_in: bool,
+) -> Markup {
     let id_url = m.arxiv_like_id.as_deref().unwrap_or("");
     let withdrawn = m.is_withdrawn();
     html! {

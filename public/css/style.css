@@ -198,7 +198,7 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 16px 0; }
 .userbox .logout-form button:hover { color: #fff; text-decoration: underline; }
 
 @media (max-width: 1320px) {
-  /* The tagline ("preprint of preprints") is the cheapest thing to drop —
+  /* The tagline is the cheapest thing to drop —
      buys ~110px without hurting wayfinding. */
   .brand-tagline { display: none; }
   .searchbox input { width: 170px; }

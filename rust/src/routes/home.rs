@@ -26,14 +26,19 @@ pub async fn index(
     let want_filter = filters.show_all == 0;
     let cat_sql = if want_filter {
         let c = restricted_not_in_clause();
-        if c.is_empty() { String::new() } else { format!(" AND {c}") }
+        if c.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {c}")
+        }
     } else {
         String::new()
     };
     let author_sql = if want_filter {
         " AND submitter_id IN (
             SELECT id FROM users
-             WHERE orcid_verified = 1 OR institutional_email = 1
+             WHERE orcid_oauth_verified = 1
+                OR (email_verified = 1 AND institutional_email = 1)
         )"
     } else {
         ""
@@ -87,14 +92,15 @@ pub async fn index(
     // overrides an explicit `?show_all=1`.
     let widened = rows.is_empty() && want_filter;
     if widened {
-        let fallback_sql = format!(
-            "SELECT {cols} FROM manuscripts WHERE withdrawn = 0 {rank_order} LIMIT 50"
-        );
+        let fallback_sql =
+            format!("SELECT {cols} FROM manuscripts WHERE withdrawn = 0 {rank_order} LIMIT 50");
         rows = sqlx::query_as::<_, ManuscriptListItem>(&fallback_sql)
             .fetch_all(&state.pool)
             .await?;
     }
 
     let ctx = build_ctx(&session, maybe_user, "/").await;
-    Ok(Html(templates::home::render(&ctx, &rows, widened, !want_filter).into_string()))
+    Ok(Html(
+        templates::home::render(&ctx, &rows, widened, !want_filter).into_string(),
+    ))
 }

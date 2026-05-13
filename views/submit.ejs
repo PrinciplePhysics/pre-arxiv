@@ -60,7 +60,7 @@
         <% if (isEditing && m && m.pdf_path) { %>
           <span class="hint">A PDF is already attached: <a href="<%= m.pdf_path %>" target="_blank" rel="noopener">view current</a>. Choose a new file to replace it; leave empty to keep the existing one.</span>
         <% } else { %>
-          <span class="hint">Optional if you provide an external URL. Max 30 MB.</span>
+          <span class="hint">Required for website submissions. External URL is supplemental. Max 30 MB.</span>
         <% } %>
       </div>
       <label class="grow">
@@ -181,7 +181,7 @@
                pattern="\d{4}-\d{4}-\d{4}-\d{3}[\dX]"
                value="<%= escapeHtml(values.auditor_orcid || '') %>"
                placeholder="0000-0002-1825-0097">
-        <span class="hint">Format: <code>XXXX-XXXX-XXXX-XXXX</code>. Displayed as a self-claim — PreXiv does <strong>not</strong> verify ORCID iDs yet.</span>
+        <span class="hint">Format: <code>XXXX-XXXX-XXXX-XXXX</code>. Auditor ORCID values are displayed as self-claims unless the manuscript separately documents authenticated auditor identity.</span>
       </label>
     </div>
 

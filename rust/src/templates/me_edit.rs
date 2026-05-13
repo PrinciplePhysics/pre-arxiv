@@ -3,10 +3,10 @@ use maud::{html, Markup};
 use super::layout::{layout, PageCtx};
 use crate::routes::me_edit::EditValues;
 
-// `orcid_flash` carries inline feedback from a recent POST
-// /me/verify-orcid attempt — `(message, is_error)`, or None when
-// nothing's fresh. Rendered INSIDE the verified-scholar status panel
-// so users don't have to scroll back up to discover what happened.
+// `orcid_flash` carries inline feedback from a recent ORCID OAuth or
+// public-name-match attempt — `(message, is_error)`, or None when
+// nothing's fresh. Rendered INSIDE the verified-scholar status panel so
+// users don't have to scroll back up to discover what happened.
 pub fn render(
     ctx: &PageCtx,
     v: &EditValues,
@@ -124,9 +124,7 @@ pub fn render(
                     code { "/top" } " " code { "/audited" }
                     ") only surface manuscripts from "
                     strong { "verified scholars" }
-                    ". Verification means one of: (a) an ORCID iD whose public name on "
-                    a href="https://orcid.org" target="_blank" rel="noopener" { "orcid.org" }
-                    " matches your PreXiv display name, OR (b) a verified email on an institutional domain (.edu, .ac.<cc>, .edu.<cc>, or our R&D-org allowlist). Unverified work is still reachable via "
+                    ". Verification means either an authenticated ORCID OAuth binding or a verified email on an institutional domain (.edu, .ac.<cc>, .edu.<cc>, or our R&D-org allowlist). The older manual ORCID name-match below is displayed on profiles but is not ownership proof. Unverified work is still reachable via "
                     code { "/browse" }
                     " and search; it just doesn't get the front-page slot."
                 }
@@ -136,11 +134,16 @@ pub fn render(
             section.form-section {
                 h2 { "ORCID " span.muted { "(optional)" } }
                 p.muted.small {
-                    "Paste your ORCID iD here and click "
-                    strong { "Save & Verify" }
-                    ". We fetch the public record from "
-                    code { "pub.orcid.org" }
-                    " and compare the name on file with your PreXiv display name (above). The verification is a one-step name match — no OAuth — so make sure your display name matches what's on your ORCID page first."
+                    "For real ORCID verification, connect through ORCID OAuth. Manual paste-and-name-match remains available as a profile hint only; it does not prove ownership."
+                }
+                div.orcid-oauth-card {
+                    div {
+                        strong { "Authenticated ORCID binding" }
+                        p.muted.small.no-katex {
+                            "You will be sent to orcid.org, sign in there, and authorize PreXiv to receive your authenticated ORCID iD."
+                        }
+                    }
+                    a.btn-primary href="/me/orcid/connect" { "Connect with ORCID" }
                 }
                 label {
                     span.label-text { "ORCID iD" }
@@ -159,12 +162,10 @@ pub fn render(
                 // generic save.
                 div.orcid-inline-actions {
                     button.btn-primary type="submit" formaction="/me/verify-orcid" {
-                        "Save & Verify ORCID"
+                        "Save & name-match ORCID"
                     }
                     span.muted.small.no-katex {
-                        "Submits this whole form to "
-                        code { "/me/verify-orcid" }
-                        " — saves edits, then checks your ORCID record."
+                        "Legacy check only: saves edits, fetches the public ORCID record, and compares the public name to your PreXiv display name."
                     }
                 }
             }
@@ -179,21 +180,22 @@ pub fn render(
     layout("Edit profile", ctx, body)
 }
 
-/// Status panel — read-only summary of the two verified-scholar
-/// signals (institutional email + ORCID). The verification *action*
-/// lives down in the ORCID section as "Save & Verify ORCID", which
-/// uses `formaction` to submit the whole edit form to /me/verify-orcid
-/// in one click. Putting the action next to the input it acts on is
-/// the clearer UX; this panel is for "where am I right now."
+/// Status panel — read-only summary of the ownership-grade
+/// verified-scholar signals plus the legacy public-name-match hint.
+/// The actions live down in the ORCID section: OAuth for ownership,
+/// and `formaction` name matching for the legacy public-record check.
 fn verified_scholar_status_panel(
     user: Option<&crate::models::User>,
     _orcid_in_form: &str,
     _csrf_token: &str,
     orcid_flash: Option<(&str, bool)>,
 ) -> Markup {
-    let orcid_verified = user.map(|u| u.is_orcid_verified()).unwrap_or(false);
-    let inst_email     = user.map(|u| u.is_institutional_email()).unwrap_or(false);
-    let stored_orcid   = user.and_then(|u| u.orcid.as_deref()).unwrap_or("");
+    let orcid_name_matched = user.map(|u| u.is_orcid_verified()).unwrap_or(false);
+    let orcid_oauth = user.map(|u| u.is_orcid_oauth_verified()).unwrap_or(false);
+    let inst_email = user
+        .map(|u| u.is_verified() && u.is_institutional_email())
+        .unwrap_or(false);
+    let stored_orcid = user.and_then(|u| u.orcid.as_deref()).unwrap_or("");
     html! {
         div.verified-scholar-panel {
             @if let Some((msg, is_err)) = orcid_flash {
@@ -211,42 +213,59 @@ fn verified_scholar_status_panel(
                 div.vsp-row-label {
                     strong { "Institutional email" }
                     span.muted.small.no-katex {
-                        "Auto-detected at register / email change from your verified email's domain."
+                        "Requires a verified email address on an institutional / R&D-org domain."
                     }
                 }
                 div.vsp-row-status {
                     @if inst_email {
                         span.vsp-pill.vsp-pill-ok { "✓ verified" }
                     } @else {
-                        span.vsp-pill.vsp-pill-pending { "not on file" }
+                        span.vsp-pill.vsp-pill-pending { "not yet" }
                     }
                 }
             }
             div.vsp-row {
                 div.vsp-row-label {
-                    strong { "ORCID iD" }
+                    strong { "Authenticated ORCID" }
                     @if !stored_orcid.is_empty() {
                         " " code.no-katex { (stored_orcid) }
                     }
                     span.muted.small.no-katex {
-                        @if stored_orcid.is_empty() {
-                            "Paste an iD in the ORCID section below, then click "
-                            strong { "Save & Verify ORCID" }
-                            "."
-                        } @else if orcid_verified {
-                            "Public ORCID name matched your display name."
+                        @if orcid_oauth {
+                            "Connected through ORCID OAuth. This proves account control and grants verified-scholar status."
                         } @else {
-                            "Saved but not verified. Use "
-                            strong { "Save & Verify ORCID" }
-                            " in the ORCID section below."
+                            "Not connected. Use "
+                            strong { "Connect with ORCID" }
+                            " below for ownership-grade verification."
                         }
                     }
                 }
                 div.vsp-row-status {
-                    @if orcid_verified {
-                        span.vsp-pill.vsp-pill-ok { "✓ verified" }
+                    @if orcid_oauth {
+                        span.vsp-pill.vsp-pill-ok { "authenticated" }
                     } @else {
-                        span.vsp-pill.vsp-pill-pending { "not yet" }
+                        span.vsp-pill.vsp-pill-pending { "not connected" }
+                    }
+                }
+            }
+            div.vsp-row {
+                div.vsp-row-label {
+                    strong { "ORCID public-name match" }
+                    span.muted.small.no-katex {
+                        @if stored_orcid.is_empty() {
+                            "Optional legacy check: paste an iD below and compare its public name with your display name."
+                        } @else if orcid_name_matched {
+                            "Public ORCID name matched your PreXiv display name. This is displayed on your profile but is not ownership proof."
+                        } @else {
+                            "Saved but not name-matched."
+                        }
+                    }
+                }
+                div.vsp-row-status {
+                    @if orcid_name_matched {
+                        span.vsp-pill.vsp-pill-ok { "name matched" }
+                    } @else {
+                        span.vsp-pill.vsp-pill-pending { "not matched" }
                     }
                 }
             }

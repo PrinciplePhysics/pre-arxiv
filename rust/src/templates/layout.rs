@@ -1,4 +1,4 @@
-use maud::{DOCTYPE, Markup, PreEscaped, html};
+use maud::{html, Markup, PreEscaped, DOCTYPE};
 
 use crate::models::User;
 
@@ -71,10 +71,14 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260513n";
+const ASSET_VER: &str = "20260513p";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
-    if current == target { "on" } else { "" }
+    if current == target {
+        "on"
+    } else {
+        ""
+    }
 }
 
 pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
@@ -170,7 +174,7 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                                 span.bx { "X" }
                                 span.bi { "iv" }
                             }
-                            span.brand-tagline { "preprint of preprints" }
+                            span.brand-tagline { "AI-authored preprints" }
                         }
                         nav.topnav aria-label="Main navigation" {
                             a href="/"        class=(nav_class(cur, "/"))        { "ranked" }
@@ -251,7 +255,7 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                             a href="/policies"   { "Policies" }
                         }
                         p.footer-meta {
-                            "© " (chrono::Utc::now().format("%Y")) " PreXiv. The preprint of preprints. Manuscripts here have not undergone formal peer review."
+                            "© " (chrono::Utc::now().format("%Y")) " PreXiv. AI-authored research preprints. Manuscripts here have not undergone formal peer review."
                         }
                     }
                 }

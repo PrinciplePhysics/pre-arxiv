@@ -33,20 +33,36 @@ pub fn render(
     // demoted to a small monospace handle below it. When display_name
     // is empty we fall back to the username as the headline so we
     // never render an anonymous-looking blank.
-    let real_name: &str = u.display_name.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or(&u.username);
-    let has_display_name = u.display_name.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false);
+    let real_name: &str = u
+        .display_name
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(&u.username);
+    let has_display_name = u
+        .display_name
+        .as_deref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false);
     let body = html! {
         header.profile-card {
             div.profile-card-id {
                 div.profile-name-row {
                     h1.profile-name { (real_name) }
-                    @if u.is_verified_scholar() {
-                        span.profile-name-badges aria-label="Verified-scholar credentials" {
-                            @if u.is_orcid_verified() {
+                    @if u.is_orcid_oauth_verified() || u.is_orcid_verified() || u.is_verified_scholar() {
+                        span.profile-name-badges aria-label="Profile trust signals" {
+                            @if u.is_orcid_oauth_verified() || u.is_orcid_verified() {
                                 @let orcid = u.orcid.as_deref().unwrap_or("");
                                 @let orcid_url = format!("https://orcid.org/{orcid}");
-                                @let orcid_title = format!("ORCID iD verified · {orcid}");
-                                @let orcid_aria  = format!("ORCID iD verified: {orcid}");
+                                @let orcid_title = if u.is_orcid_oauth_verified() {
+                                    format!("ORCID authenticated · {orcid}")
+                                } else {
+                                    format!("ORCID public-name match · {orcid}")
+                                };
+                                @let orcid_aria = if u.is_orcid_oauth_verified() {
+                                    format!("ORCID authenticated: {orcid}")
+                                } else {
+                                    format!("ORCID public-name match: {orcid}")
+                                };
                                 a.profile-name-badge.is-orcid
                                   href=(orcid_url)
                                   target="_blank" rel="noopener me"
@@ -55,9 +71,9 @@ pub fn render(
                                     (PreEscaped(ORCID_BADGE_SVG))
                                 }
                             }
-                            @if u.is_institutional_email() {
+                            @if u.is_verified_scholar() {
                                 span.profile-name-badge.is-inst
-                                  title="Verified email on an institutional / R&D-org domain"
+                                  title="Verified ownership of an institutional / R&D-org email domain"
                                   aria-label="Verified institutional email" {
                                     (PreEscaped(INST_BADGE_SVG))
                                 }

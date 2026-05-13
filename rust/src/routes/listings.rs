@@ -25,7 +25,9 @@ pub struct ListingFilters {
     pub show_all: u8,
 }
 impl ListingFilters {
-    pub fn show_all(&self) -> bool { self.show_all != 0 }
+    pub fn show_all(&self) -> bool {
+        self.show_all != 0
+    }
 }
 
 /// SQL fragment that excludes restricted categories. Returns an empty
@@ -36,21 +38,28 @@ fn restricted_filter(filters: &ListingFilters) -> String {
         String::new()
     } else {
         let c = restricted_not_in_clause();
-        if c.is_empty() { String::new() } else { format!(" AND {c}") }
+        if c.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {c}")
+        }
     }
 }
 
 /// SQL fragment that limits the listing to manuscripts submitted by a
-/// verified scholar (ORCID-verified OR institutional-email). Empty
-/// string when the toggle is off. Used by /, /new, /top — but NOT by
-/// /audited, since the named-auditor signal already does this job.
+/// verified scholar. ORCID public-name matching is not enough for
+/// curated-listing status; only ORCID OAuth or verified institutional
+/// email count. Empty string when the toggle is off. Used by /, /new,
+/// /top — but NOT by /audited, since the named-auditor signal already
+/// does this job.
 fn verified_author_filter(filters: &ListingFilters) -> &'static str {
     if filters.show_all() {
         ""
     } else {
         " AND submitter_id IN (
             SELECT id FROM users
-             WHERE orcid_verified = 1 OR institutional_email = 1
+             WHERE orcid_oauth_verified = 1
+                OR (email_verified = 1 AND institutional_email = 1)
         )"
     }
 }
@@ -62,7 +71,9 @@ const SLIM_COLS: &str = r#"id, arxiv_like_id, doi, title, authors, category,
     score, comment_count, withdrawn, created_at"#;
 
 async fn fetch(pool: &sqlx::SqlitePool, sql: &str) -> Result<Vec<ManuscriptListItem>, sqlx::Error> {
-    sqlx::query_as::<_, ManuscriptListItem>(sql).fetch_all(pool).await
+    sqlx::query_as::<_, ManuscriptListItem>(sql)
+        .fetch_all(pool)
+        .await
 }
 
 pub async fn new_listing(
@@ -80,16 +91,24 @@ pub async fn new_listing(
     let mut rows = fetch(&state.pool, &sql).await?;
     let widened = rows.is_empty() && !filters.show_all();
     if widened {
-        let fallback = format!(
-            "SELECT {SLIM_COLS} FROM manuscripts ORDER BY created_at DESC LIMIT 50"
-        );
+        let fallback =
+            format!("SELECT {SLIM_COLS} FROM manuscripts ORDER BY created_at DESC LIMIT 50");
         rows = fetch(&state.pool, &fallback).await?;
     }
     let ctx = build_ctx(&session, maybe_user, "/new").await;
-    Ok(Html(templates::listing::render(
-        &ctx, "Newest", "Most recent manuscripts.", &rows, "/new",
-        widened, filters.show_all(), true,
-    ).into_string()))
+    Ok(Html(
+        templates::listing::render(
+            &ctx,
+            "Newest",
+            "Most recent manuscripts.",
+            &rows,
+            "/new",
+            widened,
+            filters.show_all(),
+            true,
+        )
+        .into_string(),
+    ))
 }
 
 pub async fn top_listing(
@@ -114,10 +133,19 @@ pub async fn top_listing(
         rows = fetch(&state.pool, &fallback).await?;
     }
     let ctx = build_ctx(&session, maybe_user, "/top").await;
-    Ok(Html(templates::listing::render(
-        &ctx, "Top", "Highest-scoring manuscripts.", &rows, "/top",
-        widened, filters.show_all(), true,
-    ).into_string()))
+    Ok(Html(
+        templates::listing::render(
+            &ctx,
+            "Top",
+            "Highest-scoring manuscripts.",
+            &rows,
+            "/top",
+            widened,
+            filters.show_all(),
+            true,
+        )
+        .into_string(),
+    ))
 }
 
 pub async fn audited_listing(
@@ -137,17 +165,19 @@ pub async fn audited_listing(
     // /audited doesn't apply the verified-author filter, so it doesn't
     // need the cold-start widening — only restricted categories are
     // skipped, and the legitimate fix is "audit more papers."
-    Ok(Html(templates::listing::render(
-        &ctx,
-        "Audited",
-        "Only manuscripts with a named human auditor who has signed a correctness statement.",
-        &rows,
-        "/audited",
-        false,    // widened — never auto-widen on /audited
-        false,    // show_all — not meaningful here
-        false,    // show_mode_toggle — auditor presence is the only gate
-    )
-    .into_string()))
+    Ok(Html(
+        templates::listing::render(
+            &ctx,
+            "Audited",
+            "Only manuscripts with a named human auditor who has signed a correctness statement.",
+            &rows,
+            "/audited",
+            false, // widened — never auto-widen on /audited
+            false, // show_all — not meaningful here
+            false, // show_mode_toggle — auditor presence is the only gate
+        )
+        .into_string(),
+    ))
 }
 
 pub async fn browse_index(
@@ -161,7 +191,9 @@ pub async fn browse_index(
     .fetch_all(&state.pool)
     .await?;
     let ctx = build_ctx(&session, maybe_user, "/browse").await;
-    Ok(Html(templates::listing::render_browse(&ctx, &counts).into_string()))
+    Ok(Html(
+        templates::listing::render_browse(&ctx, &counts).into_string(),
+    ))
 }
 
 /// Helper exposed for the template — keeps the grouping logic out of maud.
@@ -171,8 +203,7 @@ pub fn browse_groups(counts: &[(String, i64)]) -> Vec<(&'static str, Vec<BrowseE
 
     // Build count map for O(1) lookup. Categories that aren't in our
     // canonical taxonomy (legacy data) bucket into "Other".
-    let count_map: HashMap<&str, i64> =
-        counts.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+    let count_map: HashMap<&str, i64> = counts.iter().map(|(k, v)| (k.as_str(), *v)).collect();
 
     let mut groups: Vec<(&'static str, Vec<BrowseEntry>)> = Vec::new();
     for &g in categories::GROUPS {
@@ -193,7 +224,11 @@ pub fn browse_groups(counts: &[(String, i64)]) -> Vec<(&'static str, Vec<BrowseE
     let legacy: Vec<BrowseEntry> = counts
         .iter()
         .filter(|(k, _)| !canonical.contains(k.as_str()))
-        .map(|(k, n)| BrowseEntry { id: leak(k.clone()), name: "(uncategorised in current taxonomy)", count: *n })
+        .map(|(k, n)| BrowseEntry {
+            id: leak(k.clone()),
+            name: "(uncategorised in current taxonomy)",
+            count: *n,
+        })
         .collect();
     if !legacy.is_empty() {
         groups.push(("Legacy ids", legacy));
@@ -239,8 +274,17 @@ pub async fn browse_category(
     let ctx = build_ctx(&session, maybe_user, "/browse").await;
     let heading = format!("Browse · {cat}");
     let sub = format!("All manuscripts categorized as {cat}, newest first.");
-    Ok(Html(templates::listing::render(
-        &ctx, &heading, &sub, &rows, &format!("/browse/{cat}"),
-        false, false, false,
-    ).into_string()))
+    Ok(Html(
+        templates::listing::render(
+            &ctx,
+            &heading,
+            &sub,
+            &rows,
+            &format!("/browse/{cat}"),
+            false,
+            false,
+            false,
+        )
+        .into_string(),
+    ))
 }

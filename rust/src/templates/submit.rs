@@ -1,7 +1,7 @@
 use maud::{html, Markup, PreEscaped};
 
-use crate::licenses::{AI_TRAINING_OPTIONS, LICENSES};
 use super::layout::{layout, PageCtx};
+use crate::licenses::{AI_TRAINING_OPTIONS, LICENSES};
 
 /// Upload-tray glyph. A simple stroked tray with an up-arrow on top —
 /// reads as "upload" at any size, doesn't depend on an icon font, and
@@ -20,36 +20,30 @@ const AI_MODELS: &[&str] = &[
     "Claude Sonnet 4.6",
     "Claude Haiku 4.5",
     "Claude Opus 4.6",
-
     // OpenAI — GPT-5.5 family launched April/May 2026.
     "GPT-5.5 Pro",
     "GPT-5.5 Thinking",
     "GPT-5.5 Instant",
     "GPT-5",
     "o3",
-
     // Google — Gemini 3.1 Pro preview Feb 19, 2026.
     "Gemini 3.1 Pro",
     "Gemini 3 Pro",
     "Gemini 3 Flash",
     "Gemini 3.1 Flash-Lite",
-
     // xAI — Grok 4.20 Beta currently exposes 2M-token context.
     "Grok 4.20",
     "Grok 4",
-
     // DeepSeek — V4-Pro released April 24, 2026 (MIT-licensed).
     "DeepSeek V4-Pro",
     "DeepSeek V3.1",
     "DeepSeek R1",
-
     // Open-weights frontier
     "Llama 4 Maverick",
     "Llama 4 Scout",
     "Qwen 3.5",
     "GLM-5",
     "Mistral Large 3",
-
     // Multi-model authorship
     "Multiple (see notes)",
 ];
@@ -68,7 +62,11 @@ const ROLES: &[&str] = &[
 use crate::categories::{self as cats};
 
 pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
-    let unverified = ctx.user.as_ref().map(|u| !u.is_verified_or_admin()).unwrap_or(false);
+    let unverified = ctx
+        .user
+        .as_ref()
+        .map(|u| !u.is_verified_or_admin())
+        .unwrap_or(false);
     let email = ctx.user.as_ref().map(|u| u.email.as_str()).unwrap_or("");
     let body = html! {
         div.page-header {
@@ -157,7 +155,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
 
                 section.source-choice-section {
                     p.label-text { "Source format " span.req { "*" } }
-                    p.muted.small.no-katex { "arXiv-style: upload your LaTeX source and we compile it. Or upload a finished PDF directly. Or link a hosted-elsewhere copy." }
+                    p.muted.small.no-katex { "PreXiv keeps a hosted copy of every paper. Upload your LaTeX source and we compile it, or upload a finished PDF directly. External URLs are supplemental links." }
 
                     div.conductor-type-choice.source-type-choice {
                         label.ctype-card {
@@ -184,13 +182,6 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                             div.ctype-body {
                                 strong { "PDF directly" }
                                 span.muted.small.no-katex { "Skip compilation: upload an already-finished PDF. Use this if you don't have the .tex source handy." }
-                            }
-                        }
-                        label.ctype-card {
-                            input type="radio" name="source_type" value="url";
-                            div.ctype-body {
-                                strong { "External URL only" }
-                                span.muted.small.no-katex { "No file upload. Link to a hosted copy (arXiv, GitHub, journal site, your homepage)." }
                             }
                         }
                     }
@@ -265,13 +256,12 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         }
                     }
 
-                    // External URL — visible always (an addition to the
-                    // tex/pdf upload, or the only field on source_type=url).
+                    // External URL — visible always as a supplemental link.
                     label.source-external-url {
-                        span.label-text { "External URL " span.muted.small { "(optional unless 'External URL only')" } }
+                        span.label-text { "External URL " span.muted.small { "(optional)" } }
                         input type="url" name="external_url" maxlength="500"
                               placeholder="https://… (e.g., arXiv abstract, GitHub repo, journal page)";
-                        span.hint.no-katex { "A canonical link to the same work elsewhere. Always shown to readers." }
+                        span.hint.no-katex { "A supplemental canonical link to the same work elsewhere. Readers see it alongside the PreXiv-hosted PDF/source." }
                     }
                 }
             }

@@ -1,8 +1,8 @@
 //! /m/{id}/revise — revision form (v{N+1}).
 
-use maud::{Markup, PreEscaped, html};
+use maud::{html, Markup, PreEscaped};
 
-use super::layout::{PageCtx, layout};
+use super::layout::{layout, PageCtx};
 use crate::categories::{self as cats};
 use crate::models::Manuscript;
 
@@ -157,23 +157,8 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                             span.label-text { "External URL " span.muted { "(optional)" } }
                             input type="url" name="external_url" maxlength="500" value=(m.external_url.clone().unwrap_or_default())
                                   placeholder="https://\u{2026}";
-                            span.hint.no-katex { "Canonical hosted copy elsewhere (arXiv, GitHub, journal site). Readers see this link alongside any stored PDF/source." }
-                        }
-                    }
-                    @if m.pdf_path.is_some() || m.source_path.is_some() {
-                        details.revision-file-cleanup {
-                            summary { "Advanced: remove current PreXiv-hosted files" }
-                            div.revision-file-cleanup-body {
-                                label.checkbox.revision-remove-artifacts {
-                                    input type="checkbox" name="remove_pdf" value="1";
-                                    span {
-                                        strong { "Remove the current PDF/source downloads from this PreXiv record." }
-                                        " Use this only if the External URL above is the copy readers should use."
-                                    }
-                                }
-                                p.muted.small {
-                                    "Leave unchecked to keep the existing PreXiv-hosted PDF/source downloads."
-                                }
+                            span.hint.no-katex {
+                                "Supplemental canonical link elsewhere (arXiv, GitHub, journal site). The revised manuscript must still keep or upload a PreXiv-hosted PDF/source artifact."
                             }
                         }
                     }

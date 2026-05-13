@@ -47,12 +47,11 @@ pub async fn view(
     let m = match m {
         Some(m) => m,
         None => {
-            let alias: Option<(String,)> = sqlx::query_as(
-                "SELECT new_slug FROM prexiv_id_aliases WHERE old_slug = ? LIMIT 1",
-            )
-            .bind(&id)
-            .fetch_optional(&state.pool)
-            .await?;
+            let alias: Option<(String,)> =
+                sqlx::query_as("SELECT new_slug FROM prexiv_id_aliases WHERE old_slug = ? LIMIT 1")
+                    .bind(&id)
+                    .fetch_optional(&state.pool)
+                    .await?;
             if let Some((new_slug,)) = alias {
                 return Ok(Redirect::permanent(&format!("/m/{new_slug}")).into_response());
             }
@@ -75,8 +74,8 @@ pub async fn view(
     .fetch_all(&state.pool)
     .await?;
 
-    let submitter: Option<(String, Option<String>, i64, i64)> = sqlx::query_as(
-        "SELECT username, display_name, orcid_verified, institutional_email
+    let submitter: Option<(String, Option<String>, i64, i64, i64)> = sqlx::query_as(
+        "SELECT username, display_name, email_verified, institutional_email, orcid_oauth_verified
            FROM users WHERE id = ?",
     )
     .bind(m.submitter_id)
@@ -115,14 +114,22 @@ pub async fn view(
     let slug = m.arxiv_like_id.as_deref().unwrap_or("").to_string();
     let abs_excerpt = excerpt_plain(&m.r#abstract, 280);
     let base = state.app_url.as_deref().unwrap_or("");
-    let canon = if base.is_empty() { format!("/m/{}", slug) } else { format!("{}/m/{}", base.trim_end_matches('/'), slug) };
+    let canon = if base.is_empty() {
+        format!("/m/{}", slug)
+    } else {
+        format!("{}/m/{}", base.trim_end_matches('/'), slug)
+    };
     let og = OgMeta {
         title: strip_inline_md(&m.title),
         description: abs_excerpt.clone(),
         url: canon.clone(),
         kind: "article",
-        published_time: m.created_at.map(|t| t.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
-        modified_time: m.updated_at.map(|t| t.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        published_time: m
+            .created_at
+            .map(|t| t.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        modified_time: m
+            .updated_at
+            .map(|t| t.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
         author: Some(m.authors.clone()),
     };
     let jsonld = build_scholarly_article_jsonld(&m, &abs_excerpt, &canon);
@@ -131,7 +138,11 @@ pub async fn view(
     ctx.og = Some(og);
     ctx.jsonld = Some(jsonld);
     ctx.canonical_url = Some(canon);
-    Ok(Html(templates::manuscript::render(&ctx, &m, &comments, submitter.as_ref(), &cats, my_vote).into_string()).into_response())
+    Ok(Html(
+        templates::manuscript::render(&ctx, &m, &comments, submitter.as_ref(), &cats, my_vote)
+            .into_string(),
+    )
+    .into_response())
 }
 
 /// First N chars of `s` with markdown + LaTeX stripped, suitable for an
@@ -145,19 +156,28 @@ fn excerpt_plain(s: &str, max: usize) -> String {
     let mut in_double = false;
     let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
-        if c == '\\' { let _ = chars.next(); continue; }
+        if c == '\\' {
+            let _ = chars.next();
+            continue;
+        }
         if c == '$' {
             if chars.peek() == Some(&'$') {
                 chars.next();
                 in_double = !in_double;
-                if !in_double { out.push(' '); }
+                if !in_double {
+                    out.push(' ');
+                }
                 continue;
             }
             in_math = !in_math;
-            if !in_math { out.push(' '); }
+            if !in_math {
+                out.push(' ');
+            }
             continue;
         }
-        if in_math || in_double { continue; }
+        if in_math || in_double {
+            continue;
+        }
         match c {
             '*' | '_' | '`' | '#' | '>' | '|' => {} // strip markdown markers
             '\n' | '\t' => out.push(' '),
@@ -183,7 +203,8 @@ fn strip_inline_md(s: &str) -> String {
 
 fn build_scholarly_article_jsonld(m: &Manuscript, description: &str, url: &str) -> String {
     use serde_json::json;
-    let authors: Vec<serde_json::Value> = m.authors
+    let authors: Vec<serde_json::Value> = m
+        .authors
         .split(',')
         .map(|a| a.trim())
         .filter(|a| !a.is_empty())
@@ -191,32 +212,42 @@ fn build_scholarly_article_jsonld(m: &Manuscript, description: &str, url: &str) 
         .collect();
     let mut obj = serde_json::Map::new();
     obj.insert("@context".into(), json!("https://schema.org"));
-    obj.insert("@type".into(),    json!("ScholarlyArticle"));
+    obj.insert("@type".into(), json!("ScholarlyArticle"));
     obj.insert("headline".into(), json!(strip_inline_md(&m.title)));
-    obj.insert("name".into(),     json!(strip_inline_md(&m.title)));
+    obj.insert("name".into(), json!(strip_inline_md(&m.title)));
     obj.insert("description".into(), json!(description));
-    obj.insert("author".into(),   json!(authors));
+    obj.insert("author".into(), json!(authors));
     if let Some(ts) = m.created_at {
-        obj.insert("datePublished".into(),
-            json!(ts.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()));
+        obj.insert(
+            "datePublished".into(),
+            json!(ts.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        );
     }
     if let Some(ts) = m.updated_at {
-        obj.insert("dateModified".into(),
-            json!(ts.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()));
+        obj.insert(
+            "dateModified".into(),
+            json!(ts.and_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        );
     }
-    obj.insert("url".into(),      json!(url));
+    obj.insert("url".into(), json!(url));
     obj.insert("inLanguage".into(), json!("en"));
-    obj.insert("publisher".into(), json!({
-        "@type": "Organization",
-        "name":  "PreXiv",
-        "url":   "https://victoria.tail921ea4.ts.net/",
-    }));
+    obj.insert(
+        "publisher".into(),
+        json!({
+            "@type": "Organization",
+            "name":  "PreXiv",
+            "url":   "https://victoria.tail921ea4.ts.net/",
+        }),
+    );
     if let Some(doi) = &m.doi {
-        obj.insert("identifier".into(), json!({
-            "@type":      "PropertyValue",
-            "propertyID": "DOI",
-            "value":      doi,
-        }));
+        obj.insert(
+            "identifier".into(),
+            json!({
+                "@type":      "PropertyValue",
+                "propertyID": "DOI",
+                "value":      doi,
+            }),
+        );
     }
     if let Some(lic) = &m.license {
         obj.insert("license".into(), json!(lic));

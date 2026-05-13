@@ -19,7 +19,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tower_sessions::Session;
 
-use crate::auth::{MaybeUser, RequireUser, verify_csrf};
+use crate::auth::{verify_csrf, MaybeUser, RequireUser};
 use crate::error::{AppError, AppResult};
 use crate::helpers::{build_ctx, set_flash};
 use crate::models::Manuscript;
@@ -164,7 +164,6 @@ pub async fn submit(
     let mut revision_note = String::new();
     let mut conductor_ai_model_public = m.conductor_ai_model_public != 0;
     let mut conductor_human_public = m.conductor_human_public != 0;
-    let mut remove_pdf: bool = false;
     let mut pdf_buf: Option<(String, axum::body::Bytes)> = None;
     let mut source_buf: Option<(String, axum::body::Bytes)> = None;
 
@@ -232,11 +231,6 @@ pub async fn submit(
                     .into_response());
                 }
                 source_buf = Some((safe, data));
-            }
-            "remove_pdf" => {
-                if field.text().await.unwrap_or_default() == "1" {
-                    remove_pdf = true;
-                }
             }
             _ => {
                 let value = field.text().await.unwrap_or_default();
@@ -354,23 +348,11 @@ pub async fn submit(
     if source_buf.is_some() && pdf_buf.is_some() {
         return Ok(Html(templates::revise::render(&ctx_err, &m, Some("Upload either replacement LaTeX source or a replacement PDF, not both. Source uploads compile their own PDF.")).into_string()).into_response());
     }
-    if remove_pdf && (source_buf.is_some() || pdf_buf.is_some()) {
-        return Ok(Html(
-            templates::revise::render(
-                &ctx_err,
-                &m,
-                Some("Choose either a replacement file or 'Remove stored PDF/source', not both."),
-            )
-            .into_string(),
-        )
-        .into_response());
-    }
     if final_hides_identity && pdf_buf.is_some() {
         return Ok(Html(templates::revise::render(&ctx_err, &m, Some("Private conductor/model fields require a LaTeX source upload so PreXiv can black out the public source and compiled PDF. Direct PDF replacement cannot be automatically redacted.")).into_string()).into_response());
     }
     if final_hides_identity
         && source_buf.is_none()
-        && !remove_pdf
         && ((privacy_tightened && (m.pdf_path.is_some() || m.source_path.is_some()))
             || (m.pdf_path.is_some() && m.source_path.is_none()))
     {
@@ -380,7 +362,8 @@ pub async fn submit(
     // Persist replacement artifacts if present. A source upload replaces
     // both public source and PDF; a direct PDF upload clears any older
     // source artifact because the source would no longer match the PDF.
-    // Removing artifacts clears both paths and requires an external URL.
+    // Revisions cannot remove the stored artifact entirely: PreXiv must
+    // continue hosting the paper, with external_url only as a supplement.
     let upload_dir = upload_dir();
     let watermark_id = m
         .arxiv_like_id
@@ -505,12 +488,9 @@ pub async fn submit(
         pdf_path_to_store = Some(stored.clone());
         source_path_to_store = None;
         new_pdf_for_cleanup = Some(stored);
-    } else if remove_pdf {
-        pdf_path_to_store = None;
-        source_path_to_store = None;
     }
 
-    if pdf_path_to_store.is_none() && ext_url_opt.is_none() {
+    if pdf_path_to_store.is_none() {
         cleanup_uploads(
             &upload_dir,
             new_pdf_for_cleanup.as_deref(),
@@ -521,7 +501,7 @@ pub async fn submit(
             templates::revise::render(
                 &ctx_err,
                 &m,
-                Some("A revision needs either a stored PDF/source artifact or an External URL."),
+                Some("A revision must keep or upload a PreXiv-hosted PDF/source artifact. External URL is only a supplemental link."),
             )
             .into_string(),
         )

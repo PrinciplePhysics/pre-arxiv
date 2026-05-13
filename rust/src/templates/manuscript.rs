@@ -19,14 +19,14 @@ pub fn render(
     ctx: &PageCtx,
     m: &Manuscript,
     comments: &[CommentWithAuthor],
-    submitter: Option<&(String, Option<String>, i64, i64)>,
+    submitter: Option<&(String, Option<String>, i64, i64, i64)>,
     cats: &[(String, i64)],
     my_vote: i64,
 ) -> Markup {
     let logged_in = ctx.user.is_some();
     let slug = m.arxiv_like_id.as_deref().unwrap_or("");
     let submitter_verified_scholar = submitter
-        .map(|(_, _, ov, ie)| *ov != 0 || *ie != 0)
+        .map(|(_, _, ev, ie, oo)| *oo != 0 || (*ev != 0 && *ie != 0))
         .unwrap_or(false);
     let cat_restricted = crate::categories::is_restricted(&m.category);
 
@@ -157,7 +157,7 @@ pub fn render(
                             div.advisory-banner role="note" {
                                 span {
                                     span.advisory-title { "Unverified author." }
-                                    " The submitter has not linked a verified ORCID iD or registered with an institutional email. Default listings only surface verified-scholar work; this submission is reachable via search, "
+                                    " The submitter has not connected ORCID through OAuth and is not using a verified institutional email. Default listings only surface verified-scholar work; ORCID public-name matches are shown on profiles but do not prove account ownership. This submission is reachable via search, "
                                     code { "/browse" }
                                     ", and direct link."
                                 }
@@ -410,11 +410,11 @@ pub fn render(
                 div.bx-sidebar-block {
                     h3 { "Subject area" }
                     a.ms-cat-pill href={ "/browse/" (m.category) } { (m.category) }
-                    @if let Some((un, dn, ov, ie)) = submitter {
+                    @if let Some((un, dn, ev, ie, oo)) = submitter {
                         p.muted.small style="margin:12px 0 0" {
                             "Submitted by "
                             a href={ "/u/" (un) } { (dn.as_deref().unwrap_or(un.as_str())) }
-                            @if *ov != 0 || *ie != 0 {
+                            @if *oo != 0 || (*ev != 0 && *ie != 0) {
                                 " "
                                 span.profile-vbadge title="Verified scholar"
                                     style="font-size:10.5px;padding:2px 7px" { "✓ verified" }
@@ -505,4 +505,6 @@ fn sidebar_external(url: &str) -> Markup {
 }
 
 #[allow(dead_code)]
-fn _ext(u: &str) -> Markup { external_link(u, u) }
+fn _ext(u: &str) -> Markup {
+    external_link(u, u)
+}

@@ -1497,6 +1497,74 @@ select:focus-visible {
   letter-spacing: 0;
 }
 
+/* ── H2. Auth pages — compact form + useful account context ─────── */
+.auth-shell {
+  display: grid;
+  grid-template-columns: minmax(360px, 560px) minmax(260px, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.auth-form {
+  margin-top: 0;
+  min-width: 0;
+}
+.auth-aside {
+  min-width: 0;
+  padding: 2px 0 0 22px;
+  border-left: 1px solid var(--rule);
+  color: var(--ink-soft);
+  font-family: var(--sans);
+}
+.auth-aside h2 {
+  margin: 0 0 10px;
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  font-weight: 800;
+}
+.auth-facts,
+.auth-steps {
+  margin: 0;
+  padding-left: 20px;
+}
+.auth-facts li,
+.auth-steps li {
+  margin: 0 0 12px;
+  line-height: 1.45;
+}
+.auth-facts strong,
+.auth-steps strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 700;
+}
+.auth-side-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+.auth-side-links a {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+@media (max-width: 700px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .auth-aside {
+    padding: 14px 0 0;
+    border-left: none;
+    border-top: 1px solid var(--rule);
+  }
+}
+
 /* ── I. Footer — quiet, dignified ────────────────────────────────── */
 .sitefooter {
   margin-top: 72px;
@@ -2651,39 +2719,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   border-top: 1px solid var(--rule);
 }
 .revision-url-field { display: block; margin: 0; }
-.revision-file-cleanup {
-  margin-top: 10px;
-  font-family: var(--sans);
-  font-size: 12.5px;
-}
-.revision-file-cleanup summary {
-  color: var(--muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  list-style-position: inside;
-}
-.revision-file-cleanup summary:hover { color: var(--brand); }
-.revision-file-cleanup-body {
-  margin-top: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--rule);
-  border-radius: 5px;
-  background: var(--bg-card);
-}
-.revision-remove-artifacts {
-  display: inline-flex;
-  gap: 8px;
-  align-items: flex-start;
-  margin: 0;
-  font-family: var(--sans);
-  color: var(--ink-soft);
-  line-height: 1.4;
-}
-.revision-remove-artifacts input { margin: 2px 0 0; }
-.revision-remove-artifacts strong { color: var(--ink); font-weight: 600; }
-.revision-file-cleanup-body p { margin: 6px 0 0 25px; }
 .disclosure-options {
   display: grid;
   gap: 10px;
@@ -2814,7 +2849,36 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   flex-wrap: wrap;
 }
 .orcid-inline-actions .muted.small { max-width: 540px; }
-.orcid-inline-actions button { white-space: nowrap; }
+.orcid-inline-actions button,
+.orcid-inline-actions a { white-space: nowrap; }
+.orcid-oauth-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md, 6px);
+  background: var(--bg-card-alt);
+}
+.orcid-oauth-card strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 700;
+}
+.orcid-oauth-card p {
+  margin: 3px 0 0;
+}
+@media (max-width: 700px) {
+  .orcid-oauth-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .orcid-oauth-card .btn-primary {
+    width: 100%;
+  }
+}
 
 /* Inline feedback rendered at the top of the verified-scholar status
    panel after a verify-orcid POST. The global flash banner above the

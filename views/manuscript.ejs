@@ -204,7 +204,7 @@
         <% if (m.auditor_affiliation) { %><tr><th>Affiliation</th><td><%= escapeHtml(m.auditor_affiliation) %></td></tr><% } %>
         <tr><th>Statement</th><td class="auditor-statement"><%= escapeHtml(m.auditor_statement) %></td></tr>
       </table>
-      <p class="muted small">ORCID iDs displayed here are <strong>self-claimed and unverified</strong>; PreXiv does not yet run an OAuth handshake.</p>
+      <p class="muted small">Auditor ORCID iDs entered on manuscripts are self-claimed unless the manuscript separately documents an authenticated auditor identity. Submitter ORCID ownership is shown on the submitter profile when connected through ORCID OAuth.</p>
     <% } else { %>
       <div class="no-auditor">
         <p><strong>No auditor.</strong> The submitter elected not to designate a human auditor and has acknowledged that they are <em>not</em> responsible for the correctness of this work.</p>

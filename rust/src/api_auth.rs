@@ -9,12 +9,12 @@
 //! `Authorization` header, looks the hash up, honours `expires_at`, and
 //! touches `last_used_at` so token-management UIs can show recency.
 
-use axum::Json;
 use axum::extract::{FromRef, FromRequestParts};
-use axum::http::StatusCode;
 use axum::http::header;
 use axum::http::request::Parts;
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use axum::Json;
 use base64::Engine;
 use rand::RngCore;
 use serde_json::json;
@@ -98,7 +98,8 @@ pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User>
     let mut user = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, display_name, affiliation, bio,
                   karma, is_admin, email_verified, orcid, created_at,
-                  email_enc, orcid_verified, institutional_email
+                  email_enc, orcid_verified, institutional_email,
+                  orcid_oauth_verified, orcid_oauth_verified_at, orcid_oauth_sub
            FROM users WHERE id = ?"#,
     )
     .bind(user_id)

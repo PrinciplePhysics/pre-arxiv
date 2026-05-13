@@ -26,7 +26,8 @@ pub async fn show(
     let u: Option<User> = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, display_name, affiliation, bio,
                   karma, is_admin, email_verified, orcid, created_at,
-                  email_enc, orcid_verified, institutional_email
+                  email_enc, orcid_verified, institutional_email,
+                  orcid_oauth_verified, orcid_oauth_verified_at, orcid_oauth_sub
            FROM users WHERE username = ? LIMIT 1"#,
     )
     .bind(&username)
@@ -47,24 +48,38 @@ pub async fn show(
     .fetch_all(&state.pool)
     .await?;
 
-    let (follower_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM follows WHERE followee_id = ?")
-        .bind(u.id).fetch_one(&state.pool).await?;
-    let (following_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM follows WHERE follower_id = ?")
-        .bind(u.id).fetch_one(&state.pool).await?;
+    let (follower_count,): (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM follows WHERE followee_id = ?")
+            .bind(u.id)
+            .fetch_one(&state.pool)
+            .await?;
+    let (following_count,): (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM follows WHERE follower_id = ?")
+            .bind(u.id)
+            .fetch_one(&state.pool)
+            .await?;
     let viewer_follows = match &maybe_user.0 {
         Some(viewer) if viewer.id != u.id => {
             let (c,): (i64,) = sqlx::query_as(
                 "SELECT COUNT(*) FROM follows WHERE follower_id = ? AND followee_id = ?",
             )
-            .bind(viewer.id).bind(u.id)
-            .fetch_one(&state.pool).await?;
+            .bind(viewer.id)
+            .bind(u.id)
+            .fetch_one(&state.pool)
+            .await?;
             c > 0
         }
         _ => false,
     };
 
-    let stats = ProfileStats { follower_count, following_count, viewer_follows };
+    let stats = ProfileStats {
+        follower_count,
+        following_count,
+        viewer_follows,
+    };
 
     let ctx = build_ctx(&session, maybe_user, &format!("/u/{username}")).await;
-    Ok(Html(templates::profile::render(&ctx, &u, &rows, &stats).into_string()))
+    Ok(Html(
+        templates::profile::render(&ctx, &u, &rows, &stats).into_string(),
+    ))
 }

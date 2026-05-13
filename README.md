@@ -54,17 +54,21 @@ npm run seed
 | `ADMIN_USERNAMES` | unset | Comma-separated usernames promoted to admin at startup where supported. |
 | `ZENODO_TOKEN` | unset | Optional real DOI deposit integration; without it PreXiv uses synthetic `10.99999/...` identifiers. |
 | `ZENODO_USE_PRODUCTION` | `0` | Use production Zenodo when set to `1`; otherwise sandbox. |
+| `ORCID_CLIENT_ID` / `ORCID_CLIENT_SECRET` | unset | Enable authenticated ORCID OAuth/OpenID binding. Use ORCID sandbox credentials with `ORCID_BASE_URL=https://sandbox.orcid.org` while testing. |
+| `ORCID_REDIRECT_URI` | `${APP_URL}/auth/orcid/callback` | OAuth callback URI registered with ORCID. Must exactly match the ORCID client settings. |
+| `ORCID_BASE_URL` | `https://orcid.org` | ORCID OAuth host; set to `https://sandbox.orcid.org` for sandbox testing. |
 | SMTP env | `/etc/prexiv/smtp.env` in production | Optional outbound verification email settings sourced by `scripts/start-rust.sh`; inline verification fallback still works without SMTP. |
 
 ## Product surface
 
 - **Manuscripts:** stable ids in the form `prexiv:YYMMDD.SSSSSS`, synthetic DOI fallback, category taxonomy aligned with arXiv/bioRxiv/medRxiv-style namespaces, and search over title/abstract/authors. The schema has a `pdf_text` field, but automatic PDF-text extraction for new Rust submissions is still pending.
-- **Submission:** HTML form accepts LaTeX source (`.tex`, `.zip`, `.tar.gz`), direct PDF, or external URL. LaTeX source is compiled server-side with shell escape disabled and bounded timeouts.
+- **Submission:** the HTML form requires a PreXiv-hosted LaTeX source (`.tex`, `.zip`, `.tar.gz`) or direct PDF. External URLs are supplemental links. LaTeX source is compiled server-side with shell escape disabled and bounded timeouts.
 - **Redaction:** if submitters hide the human conductor and/or AI model, PreXiv stores only blacked-out public LaTeX source and the compiled blacked-out PDF. Direct PDF uploads are rejected for private conductor/model fields because PreXiv cannot safely redact arbitrary PDFs.
 - **PDF watermarking:** every stored PDF is stamped on the first page only with an arXiv-style PreXiv watermark in the left margin. The visible text omits the raw URL; the watermark area links to the canonical manuscript page.
-- **Revisions:** submitters and admins can publish new versions. Earlier versions remain viewable, the latest version is canonical, and `/m/{id}/diff/{a}/{b}` shows field-level diffs. Revision uploads can replace source/PDF and can change public/private disclosure flags while preserving the underlying conductor identity.
+- **Revisions:** submitters and admins can publish new versions. Earlier versions remain viewable, the latest version is canonical, and `/m/{id}/diff/{a}/{b}` shows field-level diffs. Revision uploads can replace source/PDF and can change public/private disclosure flags while preserving the underlying conductor identity. A revision must keep or upload a PreXiv-hosted PDF/source artifact; external URLs are supplemental.
 - **Citation tools:** `/m/{id}/cite` provides BibTeX, RIS, and plain-text citation blocks with copy buttons; `/cite.bib` and `/cite.ris` return raw files.
 - **Discussion:** verified users can comment, vote, flag, follow authors, and use a personal feed. Notifications cover replies, comments on owned manuscripts, follows, and flags.
+- **Identity:** verified-scholar status comes from an authenticated ORCID OAuth/OpenID binding or a verified institutional email domain. The ORCID callback verifies state, nonce, issuer, audience, expiry, and the signed `id_token`; manual ORCID public-name matching remains as a profile signal only.
 - **Licensing:** reader license and AI-training policy are separate. Supported reader licenses include CC0, CC BY 4.0, CC BY-SA 4.0, CC BY-NC variants, and PreXiv Standard License 1.0. AI-training flags are `allow`, `allow-with-attribution`, and `disallow`.
 - **Harvesting:** sitemap, RSS/Atom/JSON feeds, and OAI-PMH Dublin Core (`/oai`) are exposed for indexers.
 
@@ -101,7 +105,7 @@ GET    /api/v1/manifest
 
 Mint tokens at `/me/tokens` after verifying email. Plaintext tokens are shown once, stored only as SHA-256 hashes, and can be revoked immediately. A token is not a separate account: anyone holding it acts with the permissions of the user who minted it.
 
-JSON manuscript submission currently requires an `external_url`; multipart PDF/source upload is supported by the website, not by the JSON API.
+Website and JSON manuscript submission require a PreXiv-hosted LaTeX source or PDF. The website uses multipart upload; the JSON API accepts exactly one base64 artifact field: `source_base64` with `source_filename`, or `pdf_base64` with `pdf_filename`. `external_url` is optional and supplemental.
 
 ## Security posture
 
@@ -134,6 +138,10 @@ UPLOAD_DIR=/var/lib/prexiv/uploads
 APP_URL=https://victoria.tail921ea4.ts.net
 NODE_ENV=production
 PORT=3000
+# Optional ORCID OAuth:
+# ORCID_CLIENT_ID=...
+# ORCID_CLIENT_SECRET=...
+# ORCID_REDIRECT_URI=https://victoria.tail921ea4.ts.net/auth/orcid/callback
 ```
 
 Keep `UPLOAD_DIR` outside the git checkout so deploys cannot delete user PDFs/source. Back up both `DATA_DIR/prearxiv.db` and `UPLOAD_DIR`. The bundled `scripts/deploy.sh` snapshots DB/uploads first, verifies SQLite integrity, fetches `origin/main`, resets the deployment checkout to it, builds the Rust binary, restarts via `scripts/start-rust.sh`, and health-checks localhost.
@@ -167,7 +175,7 @@ Use it only for compatibility checks or seed/reset tooling. New features should 
 | Zenodo deposit | Optional/partial |
 | Automatic PDF text extraction for new Rust submissions | Not yet |
 | Per-token scopes | Not yet; tokens inherit the owning user's permissions |
-| SSO (ORCID/GitHub/Google OAuth) | Not yet |
+| SSO (ORCID/GitHub/Google OAuth) | ORCID OAuth done; GitHub/Google not yet. Manual ORCID public-name matching remains as a profile signal only. |
 | Advanced abuse heuristics beyond rate limits | Not yet |
 
 Issues and pull requests: <https://github.com/prexiv/prexiv>.

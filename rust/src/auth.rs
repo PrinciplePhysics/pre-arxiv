@@ -6,17 +6,17 @@
 
 use std::time::Duration;
 
-use axum::Json;
 use axum::extract::{FromRef, FromRequestParts};
-use axum::http::StatusCode;
 use axum::http::request::Parts;
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect, Response};
+use axum::Json;
 use serde_json::json;
 use sha1::{Digest, Sha1};
 use sqlx::SqlitePool;
 use tower_sessions::Session;
 
-use crate::api_auth::{BearerToken, extract_bearer, find_user_by_bearer};
+use crate::api_auth::{extract_bearer, find_user_by_bearer, BearerToken};
 use crate::models::User;
 use crate::state::AppState;
 
@@ -154,7 +154,8 @@ pub async fn load_user(pool: &SqlitePool, user_id: i64) -> Result<Option<User>, 
     let mut u = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, display_name, affiliation, bio,
                   karma, is_admin, email_verified, orcid, created_at,
-                  email_enc, orcid_verified, institutional_email
+                  email_enc, orcid_verified, institutional_email,
+                  orcid_oauth_verified, orcid_oauth_verified_at, orcid_oauth_sub
            FROM users WHERE id = ?"#,
     )
     .bind(user_id)
