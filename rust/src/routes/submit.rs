@@ -277,8 +277,8 @@ pub async fn do_submit(
     let mut arxiv_like_id = String::new();
     let mut synthetic_doi = String::new();
     let mut result = None;
-    for _ in 0..3 {
-        arxiv_like_id = make_prexiv_id(&state.pool).await?;
+    for _ in 0..5 {
+        arxiv_like_id = make_prexiv_id();
         synthetic_doi = format!("10.99999/{}", arxiv_like_id);
         let r = sqlx::query(
             r#"INSERT INTO manuscripts (
@@ -394,34 +394,32 @@ fn sanitize_filename(name: &str) -> String {
     }
 }
 
-/// Allocate the next `prexiv:YYMMDD.SSSSSS` id.
+/// Allocate a fresh `prexiv:YYMMDD.SSSSSS` id.
 ///
 /// Format breakdown:
 ///   - `YYMMDD` — UTC year/month/day, two digits each.
-///   - `SSSSSS` — 6-character lowercase Crockford base-32 serial.
+///   - `SSSSSS` — 6-character lowercase Crockford base-32 random suffix.
 ///
-/// Two design goals:
+/// Two design properties:
 ///
-/// 1. **Chronological by string alone.** Crockford base-32 is sorted
-///    the same way as the integers it encodes, and YYMMDD sorts
-///    naturally as text. So `(a < b) ⇒ (a chronologically earlier)`
-///    for any two PreXiv ids: pick by lexicographic compare and you
-///    get the same answer as picking by submission time.
+/// 1. **Day-resolution chronological ordering by id alone.** Two ids
+///    submitted on different days lex-sort the same way they
+///    chronologically sort, because `YYMMDD` already does. Within
+///    the same day the suffix is random rather than monotonic, so
+///    two same-day ids aren't strictly ordered by time — but at the
+///    granularity that matters for a preprint server (which day did
+///    this drop?), the id alone is enough.
 ///
-/// 2. **Headroom for agent-driven load.** 32^6 ≈ 1.07 × 10^9 serials
-///    per day — comfortable even under a hypothetical
-///    10 000-submissions-per-second agent swarm.
+/// 2. **Headroom for agent-driven load.** 32^6 ≈ 1.07 × 10^9 suffixes
+///    per day. Birthday-paradox 50 % collision probability sits at
+///    ~32 700 same-day submissions — orders of magnitude above any
+///    realistic rate. The caller wraps this in a small UNIQUE-retry
+///    loop so even the unlucky one-in-a-billion collision resolves
+///    by drawing a fresh suffix.
 ///
-/// Algorithm: pull every existing id for today's `YYMMDD` window,
-/// decode each suffix, take the max, encode `max + 1`. Under bursts
-/// the caller wraps this in a small UNIQUE-retry loop, so a true race
-/// just re-allocates.
-///
-/// Backward compatibility: legacy ids used the old `prexiv:YYMM.NNNN(N)`
-/// shape. Those don't match this query's `LIKE prexiv:YYMMDD.%` pattern,
-/// so they're invisible to the new allocator — which is exactly what we
-/// want, since they aren't comparable to the new format anyway.
-async fn make_prexiv_id(pool: &sqlx::SqlitePool) -> Result<String, sqlx::Error> {
+/// Legacy `prexiv:YYMM.NNNN(N)` ids stay valid via the
+/// `prexiv_id_aliases` table — see migration 0014.
+fn make_prexiv_id() -> String {
     let now = chrono::Utc::now();
     let yymmdd = format!(
         "{:02}{:02}{:02}",
@@ -429,21 +427,10 @@ async fn make_prexiv_id(pool: &sqlx::SqlitePool) -> Result<String, sqlx::Error> 
         now.month(),
         now.day()
     );
-    let prefix = format!("prexiv:{yymmdd}.");
-    let pattern = format!("{prefix}%");
-    let rows: Vec<(String,)> =
-        sqlx::query_as("SELECT arxiv_like_id FROM manuscripts WHERE arxiv_like_id LIKE ?")
-            .bind(&pattern)
-            .fetch_all(pool)
-            .await?;
-    let max_seen: u64 = rows
-        .iter()
-        .filter_map(|(id,)| id.strip_prefix(&prefix))
-        .filter_map(crate::crockford::decode)
-        .max()
-        .unwrap_or(0);
-    let next = max_seen.saturating_add(1);
-    Ok(format!("{prefix}{}", crate::crockford::encode(next, 6)))
+    // 30 bits of randomness — fits in u32, encodes in exactly 6
+    // Crockford-32 chars without any digit hitting modular wrap.
+    let suffix_n: u32 = rand::thread_rng().gen_range(0..(1u32 << 30));
+    format!("prexiv:{yymmdd}.{}", crate::crockford::encode(suffix_n as u64, 6))
 }
 
 /// Sqlx error -> "is this a UNIQUE-constraint violation?" predicate.

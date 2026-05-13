@@ -337,7 +337,7 @@ async fn post_manuscript(
     let mut ok = false;
     let mut last_err: Option<sqlx::Error> = None;
     for _ in 0..3 {
-        arxiv_like_id = make_prexiv_id_for_api(&state.pool).await?;
+        arxiv_like_id = make_prexiv_id_for_api();
         synthetic_doi = format!("10.99999/{}", arxiv_like_id);
         let r = sqlx::query(
             r#"INSERT INTO manuscripts (
@@ -925,11 +925,14 @@ fn redact_manuscript(m: &Manuscript) -> Value {
     })
 }
 
-/// API-side allocator. Same algorithm as `submit::make_prexiv_id`,
-/// `prexiv:YYMMDD.SSSSSS` with Crockford base-32 serial. Both reach
-/// the same DB column so monotonicity is global.
-async fn make_prexiv_id_for_api(pool: &sqlx::SqlitePool) -> Result<String, sqlx::Error> {
+/// API-side allocator. Same algorithm as `submit::make_prexiv_id` —
+/// `prexiv:YYMMDD.SSSSSS` with a random Crockford-32 suffix. The
+/// UNIQUE constraint on `arxiv_like_id` plus the caller's small retry
+/// loop handles collisions, which are vanishingly rare given the
+/// ~10^9 suffix space.
+fn make_prexiv_id_for_api() -> String {
     use chrono::Datelike;
+    use rand::Rng;
     let now = chrono::Utc::now();
     let yymmdd = format!(
         "{:02}{:02}{:02}",
@@ -937,21 +940,8 @@ async fn make_prexiv_id_for_api(pool: &sqlx::SqlitePool) -> Result<String, sqlx:
         now.month(),
         now.day()
     );
-    let prefix = format!("prexiv:{yymmdd}.");
-    let pattern = format!("{prefix}%");
-    let rows: Vec<(String,)> =
-        sqlx::query_as("SELECT arxiv_like_id FROM manuscripts WHERE arxiv_like_id LIKE ?")
-            .bind(&pattern)
-            .fetch_all(pool)
-            .await?;
-    let max_seen: u64 = rows
-        .iter()
-        .filter_map(|(id,)| id.strip_prefix(&prefix))
-        .filter_map(crate::crockford::decode)
-        .max()
-        .unwrap_or(0);
-    let next = max_seen.saturating_add(1);
-    Ok(format!("{prefix}{}", crate::crockford::encode(next, 6)))
+    let suffix_n: u32 = rand::thread_rng().gen_range(0..(1u32 << 30));
+    format!("prexiv:{yymmdd}.{}", crate::crockford::encode(suffix_n as u64, 6))
 }
 
 fn api_is_unique_violation(e: &sqlx::Error) -> bool {
