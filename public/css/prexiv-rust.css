@@ -73,12 +73,34 @@
 .bx-stats li {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
   padding: 3px 0;
   border-bottom: 1px dotted var(--rule);
 }
 .bx-stats li:last-child { border-bottom: none; }
-.bx-stats .lbl { color: var(--muted); }
-.bx-stats .val { font-variant-numeric: tabular-nums; font-weight: 600; }
+.bx-stats .lbl {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+.bx-stats .val {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.bx-stats li.bx-stat-long {
+  display: block;
+}
+.bx-stats li.bx-stat-long .lbl,
+.bx-stats li.bx-stat-long .val {
+  display: block;
+  text-align: left;
+}
+.bx-stats li.bx-stat-long .val {
+  margin-top: 2px;
+  line-height: 1.22;
+}
 
 .bx-actions {
   display: flex;
