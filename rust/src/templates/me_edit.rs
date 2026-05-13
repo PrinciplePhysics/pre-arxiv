@@ -13,6 +13,7 @@ pub fn render(
     errors: &[String],
     pending_new_email: Option<&str>,
     orcid_flash: Option<(&str, bool)>,
+    orcid_oauth_unavailable: Option<&str>,
 ) -> Markup {
     let user = ctx.user.as_ref();
     let username = user.map(|u| u.username.as_str()).unwrap_or("");
@@ -140,10 +141,18 @@ pub fn render(
                     div {
                         strong { "Authenticated ORCID binding" }
                         p.muted.small.no-katex {
-                            "You will be sent to orcid.org, sign in there, and authorize PreXiv to receive your authenticated ORCID iD."
+                            @if let Some(msg) = orcid_oauth_unavailable {
+                                (msg)
+                            } @else {
+                                "You will be sent to orcid.org, sign in there, and authorize PreXiv to receive your authenticated ORCID iD."
+                            }
                         }
                     }
-                    a.btn-primary href="/me/orcid/connect" { "Connect with ORCID" }
+                    @if orcid_oauth_unavailable.is_some() {
+                        button.btn-secondary type="button" disabled { "ORCID not configured" }
+                    } @else {
+                        a.btn-primary href="/me/orcid/connect" { "Connect with ORCID" }
+                    }
                 }
                 label {
                     span.label-text { "ORCID iD" }

@@ -43,6 +43,7 @@ pub async fn show(
         .flatten()
         .map(|(addr, _)| addr);
     let orcid_flash = take_orcid_flash(&session).await;
+    let orcid_oauth_unavailable = orcid_oauth_unavailable_message(&state);
     let mut ctx = build_ctx(&session, maybe_user, "/me/edit").await;
     ctx.no_index = true;
     Ok(Html(
@@ -52,6 +53,7 @@ pub async fn show(
             &[],
             pending_email.as_deref(),
             orcid_flash.as_ref().map(|(m, e)| (m.as_str(), *e)),
+            orcid_oauth_unavailable.as_deref(),
         )
         .into_string(),
     ))
@@ -114,9 +116,17 @@ pub async fn submit(
             .map(|(addr, _)| addr);
         let mut ctx = build_ctx(&session, maybe_user, "/me/edit").await;
         ctx.no_index = true;
+        let orcid_oauth_unavailable = orcid_oauth_unavailable_message(&state);
         return Ok(Html(
-            templates::me_edit::render(&ctx, &values, &errors, pending_email.as_deref(), None)
-                .into_string(),
+            templates::me_edit::render(
+                &ctx,
+                &values,
+                &errors,
+                pending_email.as_deref(),
+                None,
+                orcid_oauth_unavailable.as_deref(),
+            )
+            .into_string(),
         )
         .into_response());
     }
@@ -571,6 +581,20 @@ fn opt(s: &str) -> Option<&str> {
         None
     } else {
         Some(s)
+    }
+}
+
+fn orcid_oauth_unavailable_message(state: &AppState) -> Option<String> {
+    match crate::orcid::oauth_config(state.app_url.as_deref()) {
+        Ok(Some(_)) => None,
+        Ok(None) => Some(
+            "ORCID sign-in is not configured on this server yet. Add ORCID_CLIENT_ID and ORCID_CLIENT_SECRET to enable ownership-grade ORCID binding."
+                .to_string(),
+        ),
+        Err(_) => Some(
+            "ORCID sign-in is configured incorrectly on this server. Check ORCID_CLIENT_ID, ORCID_CLIENT_SECRET, and ORCID_REDIRECT_URI."
+                .to_string(),
+        ),
     }
 }
 
