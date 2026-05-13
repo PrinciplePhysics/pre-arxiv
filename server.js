@@ -27,6 +27,7 @@ const rateLimit = require('express-rate-limit');
 const { db, CATEGORIES, ROLES } = require('./db');
 const { loadUser } = require('./lib/auth');
 const { timeAgo, escapeHtml, renderMarkdown } = require('./lib/util');
+const { extractBearer } = require('./lib/api-auth');
 const { buildApiRouter } = require('./lib/api');
 const { auditLog } = require('./lib/audit');
 const helpers = require('./lib/helpers');
@@ -105,7 +106,7 @@ app.use(helmet({
       fontSrc:    ["'self'", 'https://cdn.jsdelivr.net', 'https://fonts.gstatic.com', 'data:'],
       imgSrc:     ["'self'", 'data:'],
       connectSrc: ["'self'"],
-      objectSrc:  ["'self'"],
+      objectSrc:  ["'none'"],
       frameAncestors: ["'self'"],
       // helmet defaults to []; setting to null removes the directive entirely
       // in dev so Safari doesn't try to upgrade HTTP→HTTPS on localhost.
@@ -115,7 +116,6 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-app.use(express.static(path.join(__dirname, 'public')));
 // Force PDF downloads to be served with `Content-Disposition: attachment`.
 app.use('/uploads', (req, res, next) => {
   if (req.path.toLowerCase().endsWith('.pdf')) {
@@ -126,6 +126,7 @@ app.use('/uploads', (req, res, next) => {
   }
   next();
 }, express.static(UPLOAD_DIR));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(express.json({ limit: '2mb' }));
 app.use((err, req, res, next) => {
@@ -252,14 +253,24 @@ function csrfTokenFor(req) {
   }
   return req.session.csrfToken;
 }
+function isMultipartUploadRoute(req) {
+  return req.method === 'POST' && (
+    req.path === '/submit' ||
+    /^\/m\/[^/]+\/edit$/.test(req.path)
+  );
+}
 function verifyCsrf(req, res, next) {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
   if (req.path.startsWith('/api/v1/')) return next();
   const ct = (req.get('Content-Type') || '').toLowerCase();
-  if (ct.startsWith('multipart/form-data')) return next();
+  if (ct.startsWith('multipart/form-data')) {
+    if (isMultipartUploadRoute(req)) return next();
+    return res.status(403).render('error', { code: 403, msg: 'CSRF check failed. Reload the page and try again.' });
+  }
   return csrfCheckParsed(req, res, next);
 }
 function csrfCheckParsed(req, res, next) {
+  if (extractBearer(req) && req.user && req.user._api_token_id) return next();
   const token = (req.body && req.body._csrf) || req.get('X-CSRF-Token');
   if (!token || !req.session.csrfToken || token !== req.session.csrfToken) {
     helpers.cleanupUploadedRequestFiles(req);

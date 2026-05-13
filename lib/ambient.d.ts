@@ -42,6 +42,8 @@ declare var Buffer: {
 
 declare module 'path';
 declare module 'fs';
+declare module 'dns';
+declare module 'net';
 declare module 'crypto';
 declare module 'http';
 declare module 'https';

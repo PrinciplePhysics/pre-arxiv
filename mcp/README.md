@@ -27,6 +27,7 @@ That installs only two packages: `@modelcontextprotocol/sdk` (latest) and `zod`
 | `MCP_TRANSPORT`  | `stdio`                          | `stdio` (the usual) or `http` |
 | `MCP_PORT`       | `3100`                           | port for the HTTP transport |
 | `MCP_HOST`       | `127.0.0.1`                      | bind interface for the HTTP transport |
+| `MCP_HTTP_TOKEN` | unset                            | auth secret for HTTP transport; required when binding to a non-loopback host |
 
 ### Getting a token
 
@@ -50,8 +51,8 @@ export PREXIV_TOKEN=prexiv_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # stdio (what most MCP clients launch as a subprocess)
 npm start
 
-# Streamable HTTP (for "remote" agent setups)
-MCP_TRANSPORT=http MCP_PORT=3100 npm start
+# Streamable HTTP (for remote/shared setups, protect the MCP listener)
+MCP_TRANSPORT=http MCP_PORT=3100 MCP_HTTP_TOKEN="$(openssl rand -hex 24)" npm start
 ```
 
 Read tools work without `PREXIV_TOKEN`. If a write tool is invoked without a
@@ -86,6 +87,11 @@ Start the server with `MCP_TRANSPORT=http`, then point the client at
 `http://localhost:3100/mcp`. The transport is Streamable HTTP (the current
 spec); the server creates a session on the first `initialize` request and
 keeps it alive via the `mcp-session-id` header.
+
+If `MCP_HOST` is anything other than loopback, `MCP_HTTP_TOKEN` is required.
+Send it as `Authorization: Bearer <token>` or `X-MCP-Auth-Token` on every MCP
+HTTP request. This prevents another client on the network from reusing the
+process-level `PREXIV_TOKEN`.
 
 ### MCP Inspector (debugging)
 

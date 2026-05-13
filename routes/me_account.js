@@ -311,21 +311,14 @@ function register(app, deps) {
     });
   });
 
-  app.post('/me/webhooks', requireAuth, (req, res) => {
+  app.post('/me/webhooks', requireAuth, async (req, res) => {
     const url = (req.body.url || '').trim().slice(0, 500);
     const description = (req.body.description || '').trim().slice(0, 200) || null;
     const events = parseEventsList(req.body.events);
     /** @type {string[]} */
     const errors = [];
-    try {
-      const u = new URL(url);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
-        errors.push('Webhook URL must use http or https.');
-      }
-      if (deps.isProd && u.protocol !== 'https:') {
-        errors.push('Webhook URL must be HTTPS in production.');
-      }
-    } catch { errors.push('Webhook URL is not a valid URL.'); }
+    const urlErr = await webhooks.validateWebhookUrl(url, { requireHttps: deps.isProd });
+    if (urlErr) errors.push(urlErr);
     if (!events.length) errors.push('Pick at least one event to subscribe to.');
     if (errors.length) {
       return res.status(400).render('me_webhooks', {

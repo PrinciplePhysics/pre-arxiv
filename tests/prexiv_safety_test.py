@@ -6,7 +6,10 @@ BASE = os.environ.get("BASE", "http://localhost:3000/api/v1")
 WEB  = os.environ.get("WEB",  "http://localhost:3000")
 PASSWD = "PreXivTest-7yk5N2qWf3-nonbreach-passphrase"
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DB_PATH = os.path.join(REPO_ROOT, "data", "prearxiv.db")
+DB_PATH = os.environ.get(
+    "DB_PATH",
+    os.path.join(os.environ.get("DATA_DIR", os.path.join(REPO_ROOT, "data")), "prearxiv.db"),
+)
 for k in ("http_proxy","HTTP_PROXY","https_proxy","HTTPS_PROXY","all_proxy","ALL_PROXY"):
     os.environ.pop(k, None)
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -187,19 +190,24 @@ check("bob revoking alice's token → 403/404", s in (401, 403, 404))
 s, _ = req("GET", "/me", token=newt2["token"])
 check("alice's token still valid", s == 200)
 
-# API tokens must not authenticate HTML website routes. Agents should be
-# confined to /api/v1/*, while /me/* web pages continue to require a browser
-# session cookie plus CSRF.
+# API tokens intentionally authenticate protected web routes too: an
+# authorized AI agent can perform the same actions exposed by the GUI. Without
+# a token, the same protected website routes remain unavailable.
 _, before_tokens = req("GET", "/me/tokens", token=ALICE)
-s, headers, _ = web_req("GET", "/me/tokens", token=ALICE)
-check("Bearer token cannot open /me/tokens web UI",
+s, headers, _ = web_req("GET", "/me/tokens")
+check("no-token agent cannot open /me/tokens web UI",
       s in (301, 302, 303) and "/login" in headers.get("Location", ""),
       f"got status={s}, location={headers.get('Location')!r}")
-s, _, _ = web_req("POST", "/me/tokens", token=ALICE, body={"name":"web-bypass-attempt"})
-check("Bearer token cannot POST to /me/tokens web UI", s in (401, 403), f"got status={s}")
+s, _, _ = web_req("POST", "/me/tokens", body={"name":"no-token-attempt"})
+check("no-token agent cannot POST to /me/tokens web UI", s in (301, 302, 303, 401, 403), f"got status={s}")
+s, _, _ = web_req("GET", "/me/tokens", token=ALICE)
+check("Bearer token can open /me/tokens web UI", s == 200, f"got status={s}")
+s, headers, _ = web_req("POST", "/me/tokens", token=ALICE, body={"name":"web-agent-token"})
+check("Bearer token can POST to /me/tokens web UI", s in (301, 302, 303) and headers.get("Location") == "/me/tokens",
+      f"got status={s}, location={headers.get('Location')!r}")
 _, after_tokens = req("GET", "/me/tokens", token=ALICE)
-check("web token-bypass attempt did not mint a token",
-      isinstance(before_tokens, list) and isinstance(after_tokens, list) and len(before_tokens) == len(after_tokens),
+check("Bearer-authenticated web action minted a token",
+      isinstance(before_tokens, list) and isinstance(after_tokens, list) and len(after_tokens) == len(before_tokens) + 1,
       f"before={len(before_tokens) if isinstance(before_tokens, list) else '?'} after={len(after_tokens) if isinstance(after_tokens, list) else '?'}")
 
 # garbage tokens

@@ -17,6 +17,8 @@
  *   MCP_TRANSPORT   `stdio` (default) or `http`.
  *   MCP_PORT        port for HTTP transport. default 3100.
  *   MCP_HOST        bind interface for HTTP transport. default 127.0.0.1.
+ *   MCP_HTTP_TOKEN  optional auth secret for HTTP transport. Required when
+ *                   binding HTTP transport to a non-loopback interface.
  *
  * The server has zero dependencies beyond `@modelcontextprotocol/sdk` (and its
  * peer `zod`); HTTP is performed via Node's built-in `fetch`.
@@ -33,11 +35,34 @@ import {
 // Configuration
 // -----------------------------------------------------------------------------
 
-const API_URL = (process.env.PREXIV_API_URL || 'http://localhost:3000/api/v1').replace(/\/+$/, '');
+function configError(message) {
+  // eslint-disable-next-line no-console
+  console.error(`prexiv-mcp config error: ${message}`);
+  process.exit(2);
+}
+
+function normalizeApiUrl(raw) {
+  let u;
+  try {
+    u = new URL(raw);
+  } catch {
+    configError(`PREXIV_API_URL must be an absolute URL ending in /api/v1; got ${JSON.stringify(raw)}`);
+  }
+  u.hash = '';
+  u.search = '';
+  u.pathname = u.pathname.replace(/\/+$/, '');
+  if (!u.pathname.endsWith('/api/v1')) {
+    configError(`PREXIV_API_URL must point at the PreXiv JSON API and end in /api/v1; got ${u.toString()}`);
+  }
+  return u.toString().replace(/\/+$/, '');
+}
+
+const API_URL = normalizeApiUrl(process.env.PREXIV_API_URL || 'http://localhost:3000/api/v1');
 const TOKEN = process.env.PREXIV_TOKEN || '';
 const TRANSPORT = (process.env.MCP_TRANSPORT || 'stdio').toLowerCase();
 const PORT = Number(process.env.MCP_PORT || 3100);
 const HOST = process.env.MCP_HOST || '127.0.0.1';
+const HTTP_AUTH_TOKEN = process.env.MCP_HTTP_TOKEN || '';
 
 // Roles enum, reused by several tool schemas.
 const ROLES = [
@@ -109,15 +134,14 @@ async function apiCall(method, path, body, opts = {}) {
       data = null;
     }
   } else {
-    // Non-JSON error pages, etc.
+    // Non-JSON responses mean the configured base is not the PreXiv JSON API
+    // (or a proxy returned an HTML error page). Do not hand arbitrary text
+    // back to an agent as if it were trusted API output.
     const text = await res.text().catch(() => '');
-    if (!res.ok) {
-      throw new Error(
-        `PreXiv API ${method} ${path} failed: HTTP ${res.status} ${res.statusText}` +
-          (text ? ` — ${text.slice(0, 500)}` : ''),
-      );
-    }
-    return text;
+    throw new Error(
+      `PreXiv API ${method} ${path} returned non-JSON HTTP ${res.status} ${res.statusText}` +
+        (text ? ` — ${text.slice(0, 300)}` : ''),
+    );
   }
   if (!res.ok) {
     const detail = data && data.error
@@ -482,7 +506,43 @@ async function runStdio() {
   // stdio servers run until stdin closes; nothing more to do here.
 }
 
+function isLoopbackBind(host) {
+  const h = String(host || '').trim().toLowerCase();
+  return h === '127.0.0.1' || h === 'localhost' || h === '::1' || h === '[::1]';
+}
+
+function constantTimeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i += 1) diff |= ab[i] ^ bb[i];
+  return diff === 0;
+}
+
+function extractHttpAuthToken(req) {
+  const direct = req.headers['x-mcp-auth-token'];
+  if (typeof direct === 'string' && direct) return direct;
+  const auth = req.headers.authorization;
+  if (typeof auth !== 'string') return '';
+  const m = auth.match(/^Bearer\s+(.+?)\s*$/i);
+  return m ? m[1] : '';
+}
+
+function httpAuthorized(req) {
+  if (!HTTP_AUTH_TOKEN) return true;
+  return constantTimeEqual(extractHttpAuthToken(req), HTTP_AUTH_TOKEN);
+}
+
 async function runHttp() {
+  if (!HTTP_AUTH_TOKEN && !isLoopbackBind(HOST)) {
+    throw new Error(
+      'Refusing to start HTTP MCP transport on a non-loopback MCP_HOST without MCP_HTTP_TOKEN. ' +
+      'Set MCP_HTTP_TOKEN and send it as `Authorization: Bearer <token>` or `X-MCP-Auth-Token`.',
+    );
+  }
+
   // Lazy-load http transport so stdio runs don't pay its startup cost.
   const { StreamableHTTPServerTransport } = await import(
     '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -499,6 +559,14 @@ async function runHttp() {
       res.statusCode = 404;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: 'not found. POST/GET/DELETE to /mcp.' }));
+      return;
+    }
+
+    if (!httpAuthorized(req)) {
+      res.statusCode = 401;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('WWW-Authenticate', 'Bearer realm="prexiv-mcp"');
+      res.end(JSON.stringify({ error: 'unauthorized' }));
       return;
     }
 
