@@ -79,6 +79,8 @@ pub fn router() -> Router<AppState> {
         .route("/m/{id}", get(manuscript::view))
         // /m/{id}/comment POST is in write_post_router() (rate-limited)
         .route("/m/{id}/cite", get(cite::cite))
+        .route("/m/{id}/cite.bib", get(cite::bib))
+        .route("/m/{id}/cite.ris", get(cite::ris))
         .route("/m/{id}/withdraw", post(withdraw::withdraw))
         .route(
             "/m/{id}/revise",

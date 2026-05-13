@@ -1,5 +1,6 @@
 use axum::extract::{Path, State};
-use axum::response::Html;
+use axum::http::header;
+use axum::response::{Html, IntoResponse, Response};
 use tower_sessions::Session;
 
 use crate::auth::MaybeUser;
@@ -15,6 +16,50 @@ pub async fn cite(
     maybe_user: MaybeUser,
     Path(id): Path<String>,
 ) -> AppResult<Html<String>> {
+    let m = load_manuscript(&state, &id).await?;
+    let ctx = build_ctx(&session, maybe_user, "/m").await;
+    let base_url = state.app_url.as_deref().unwrap_or("http://localhost:3001");
+    Ok(Html(
+        templates::cite::render(&ctx, &m, base_url).into_string(),
+    ))
+}
+
+pub async fn bib(State(state): State<AppState>, Path(id): Path<String>) -> AppResult<Response> {
+    let m = load_manuscript(&state, &id).await?;
+    let base_url = state.app_url.as_deref().unwrap_or("http://localhost:3001");
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/x-bibtex; charset=utf-8"),
+            (
+                header::CONTENT_DISPOSITION,
+                "inline; filename=\"prexiv-citation.bib\"",
+            ),
+        ],
+        templates::cite::bibtex(&m, base_url),
+    )
+        .into_response())
+}
+
+pub async fn ris(State(state): State<AppState>, Path(id): Path<String>) -> AppResult<Response> {
+    let m = load_manuscript(&state, &id).await?;
+    let base_url = state.app_url.as_deref().unwrap_or("http://localhost:3001");
+    Ok((
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/x-research-info-systems; charset=utf-8",
+            ),
+            (
+                header::CONTENT_DISPOSITION,
+                "inline; filename=\"prexiv-citation.ris\"",
+            ),
+        ],
+        templates::cite::ris(&m, base_url),
+    )
+        .into_response())
+}
+
+async fn load_manuscript(state: &AppState, id: &str) -> AppResult<Manuscript> {
     let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
         r#"
         SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
@@ -32,11 +77,9 @@ pub async fn cite(
         LIMIT 1
         "#,
     )
-    .bind(&id)
-    .bind(&id)
+    .bind(id)
+    .bind(id)
     .fetch_optional(&state.pool)
     .await?;
-    let m = m.ok_or(AppError::NotFound)?;
-    let ctx = build_ctx(&session, maybe_user, "/m").await;
-    Ok(Html(templates::cite::render(&ctx, &m).into_string()))
+    m.ok_or(AppError::NotFound)
 }

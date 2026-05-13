@@ -4,9 +4,9 @@ use crate::models::Manuscript;
 
 use super::layout::{layout, PageCtx};
 
-pub fn render(ctx: &PageCtx, m: &Manuscript) -> Markup {
-    let bib = bibtex(m);
-    let ris = ris(m);
+pub fn render(ctx: &PageCtx, m: &Manuscript, base_url: &str) -> Markup {
+    let bib = bibtex(m, base_url);
+    let ris = ris(m, base_url);
     let plain = plain_text(m);
     let body = html! {
         div.page-header {
@@ -18,20 +18,29 @@ pub fn render(ctx: &PageCtx, m: &Manuscript) -> Markup {
                 a href={ "/m/" (m.arxiv_like_id.as_deref().unwrap_or("")) "/cite.bib" } { "/cite.bib" }
                 " or "
                 a href={ "/m/" (m.arxiv_like_id.as_deref().unwrap_or("")) "/cite.ris" } { "/cite.ris" }
-                " for the raw files (TODO)."
+                " for raw files, or copy from the blocks below."
             }
         }
         section.ms-section {
             h2.ms-section-h { "BibTeX" }
-            pre { (bib) }
+            div.copy-pre-wrap {
+                button.copy-pre-btn type="button" { "Copy BibTeX" }
+                pre { (bib) }
+            }
         }
         section.ms-section {
             h2.ms-section-h { "RIS" }
-            pre { (ris) }
+            div.copy-pre-wrap {
+                button.copy-pre-btn type="button" { "Copy RIS" }
+                pre { (ris) }
+            }
         }
         section.ms-section {
             h2.ms-section-h { "Plain text" }
-            pre { (plain) }
+            div.copy-pre-wrap {
+                button.copy-pre-btn type="button" { "Copy text" }
+                pre { (plain) }
+            }
         }
         p { a.btn-secondary href={ "/m/" (m.arxiv_like_id.as_deref().unwrap_or("")) } { "← Back to manuscript" } }
     };
@@ -39,7 +48,11 @@ pub fn render(ctx: &PageCtx, m: &Manuscript) -> Markup {
 }
 
 fn first_author(authors: &str) -> &str {
-    authors.split(|c| c == ';' || c == ',').next().unwrap_or(authors).trim()
+    authors
+        .split(|c| c == ';' || c == ',')
+        .next()
+        .unwrap_or(authors)
+        .trim()
 }
 
 fn citekey(m: &Manuscript) -> String {
@@ -64,14 +77,17 @@ fn citekey(m: &Manuscript) -> String {
     format!("{}{}_{}", surname.to_lowercase(), year, id_tail)
 }
 
-fn bibtex(m: &Manuscript) -> String {
+pub fn bibtex(m: &Manuscript, base_url: &str) -> String {
     let key = citekey(m);
     let url = m
         .arxiv_like_id
         .as_deref()
-        .map(|id| format!("https://prexiv.example/m/{id}"))
+        .map(|id| manuscript_url(base_url, id))
         .unwrap_or_default();
-    let year = m.created_at.map(|t| t.format("%Y").to_string()).unwrap_or_default();
+    let year = m
+        .created_at
+        .map(|t| t.format("%Y").to_string())
+        .unwrap_or_default();
     let mut s = String::new();
     s.push_str(&format!("@misc{{{key},\n"));
     s.push_str(&format!("  title        = {{{}}},\n", m.title));
@@ -90,8 +106,11 @@ fn bibtex(m: &Manuscript) -> String {
     s
 }
 
-fn ris(m: &Manuscript) -> String {
-    let year = m.created_at.map(|t| t.format("%Y").to_string()).unwrap_or_default();
+pub fn ris(m: &Manuscript, base_url: &str) -> String {
+    let year = m
+        .created_at
+        .map(|t| t.format("%Y").to_string())
+        .unwrap_or_default();
     let mut s = String::new();
     s.push_str("TY  - GEN\n");
     s.push_str(&format!("TI  - {}\n", m.title));
@@ -106,7 +125,7 @@ fn ris(m: &Manuscript) -> String {
     }
     if let Some(id) = &m.arxiv_like_id {
         s.push_str(&format!("ID  - {id}\n"));
-        s.push_str(&format!("UR  - https://prexiv.example/m/{id}\n"));
+        s.push_str(&format!("UR  - {}\n", manuscript_url(base_url, id)));
     }
     s.push_str("AB  - ");
     s.push_str(&m.r#abstract);
@@ -115,14 +134,25 @@ fn ris(m: &Manuscript) -> String {
     s
 }
 
+fn manuscript_url(base_url: &str, id: &str) -> String {
+    format!("{}/m/{id}", base_url.trim_end_matches('/'))
+}
+
 fn plain_text(m: &Manuscript) -> String {
-    let year = m.created_at.map(|t| t.format("%Y").to_string()).unwrap_or_default();
+    let year = m
+        .created_at
+        .map(|t| t.format("%Y").to_string())
+        .unwrap_or_default();
     format!(
         "{authors} ({year}). {title}. PreXiv {id}{doi}.",
         authors = m.authors,
         year = year,
         title = m.title,
         id = m.arxiv_like_id.as_deref().unwrap_or(""),
-        doi = m.doi.as_deref().map(|d| format!(", doi:{d}")).unwrap_or_default(),
+        doi = m
+            .doi
+            .as_deref()
+            .map(|d| format!(", doi:{d}"))
+            .unwrap_or_default(),
     )
 }

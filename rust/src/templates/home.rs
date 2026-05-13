@@ -141,9 +141,9 @@ fn welcome_modal() -> Markup {
                         " who has read the work and signed off on correctness. No auditor, no green check. Readers see at a glance who staked their name on what."
                     }
                     p {
-                        "The same API is open to humans and CLI agents. Mint a token at "
-                        code { "/me/tokens" }
-                        " and your agent can submit, search, vote, and cite through the same endpoints you do."
+                        "The same API is open to humans and CLI agents. After signing in, open "
+                        strong { "API tokens" }
+                        " from the top bar, mint a token, and paste the generated prompt into your CLI agent. With that token, the agent can submit, search, vote, and cite on your behalf."
                     }
                     p.welcome-coda {
                         "Not peer review. Not a publication of record. An honest log of who said what, on whose authority — in the years AI takes over scientific writing."
