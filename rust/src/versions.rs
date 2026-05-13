@@ -38,11 +38,7 @@ pub struct VersionInput<'a> {
 /// Insert the initial v1 row alongside a freshly-created manuscript.
 /// Called from the two submit handlers (HTML + JSON API) after the
 /// manuscripts INSERT, inside the same enclosing transaction.
-pub async fn insert_initial<'c, E>(
-    tx: E,
-    manuscript_id: i64,
-    v: &VersionInput<'_>,
-) -> Result<i64>
+pub async fn insert_initial<'c, E>(tx: E, manuscript_id: i64, v: &VersionInput<'_>) -> Result<i64>
 where
     E: sqlx::Executor<'c, Database = sqlx::Sqlite>,
 {
@@ -80,12 +76,11 @@ pub async fn mint_revision(
 ) -> Result<i64> {
     let mut tx = pool.begin().await?;
 
-    let (current,): (i64,) =
-        sqlx::query_as("SELECT current_version FROM manuscripts WHERE id = ?")
-            .bind(manuscript_id)
-            .fetch_one(&mut *tx)
-            .await
-            .context("fetching current_version")?;
+    let (current,): (i64,) = sqlx::query_as("SELECT current_version FROM manuscripts WHERE id = ?")
+        .bind(manuscript_id)
+        .fetch_one(&mut *tx)
+        .await
+        .context("fetching current_version")?;
     let next = current + 1;
 
     sqlx::query(
@@ -140,8 +135,88 @@ pub async fn mint_revision(
     Ok(next)
 }
 
+/// Apply a revision and update current-version-only publication fields
+/// atomically. Used by the HTML revision form, where the submitter may
+/// replace the public source artifact and change conductor disclosure
+/// flags while minting the new manuscript version.
+pub async fn mint_revision_with_publication(
+    pool: &SqlitePool,
+    manuscript_id: i64,
+    v: &VersionInput<'_>,
+    source_path: Option<&str>,
+    conductor_ai_model_public: i64,
+    conductor_human_public: i64,
+) -> Result<i64> {
+    let mut tx = pool.begin().await?;
+
+    let (current,): (i64,) = sqlx::query_as("SELECT current_version FROM manuscripts WHERE id = ?")
+        .bind(manuscript_id)
+        .fetch_one(&mut *tx)
+        .await
+        .context("fetching current_version")?;
+    let next = current + 1;
+
+    sqlx::query(
+        r#"UPDATE manuscripts SET
+              title = ?, abstract = ?, authors = ?, category = ?,
+              pdf_path = ?, external_url = ?, source_path = ?,
+              conductor_ai_model_public = ?, conductor_human_public = ?,
+              conductor_notes = ?, license = ?, ai_training = ?,
+              current_version = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?"#,
+    )
+    .bind(v.title)
+    .bind(v.r#abstract)
+    .bind(v.authors)
+    .bind(v.category)
+    .bind(v.pdf_path)
+    .bind(v.external_url)
+    .bind(source_path)
+    .bind(conductor_ai_model_public)
+    .bind(conductor_human_public)
+    .bind(v.conductor_notes)
+    .bind(v.license)
+    .bind(v.ai_training)
+    .bind(next)
+    .bind(manuscript_id)
+    .execute(&mut *tx)
+    .await
+    .context("updating manuscripts with new version and publication fields")?;
+
+    sqlx::query(
+        r#"INSERT INTO manuscript_versions
+              (manuscript_id, version_number,
+               title, abstract, authors, category,
+               pdf_path, external_url, conductor_notes,
+               license, ai_training,
+               revision_note)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+    )
+    .bind(manuscript_id)
+    .bind(next)
+    .bind(v.title)
+    .bind(v.r#abstract)
+    .bind(v.authors)
+    .bind(v.category)
+    .bind(v.pdf_path)
+    .bind(v.external_url)
+    .bind(v.conductor_notes)
+    .bind(v.license)
+    .bind(v.ai_training)
+    .bind(v.revision_note)
+    .execute(&mut *tx)
+    .await
+    .context("inserting new manuscript_versions row")?;
+
+    tx.commit().await?;
+    Ok(next)
+}
+
 /// List all versions of a manuscript, newest first.
-pub async fn list_versions(pool: &SqlitePool, manuscript_id: i64) -> Result<Vec<ManuscriptVersion>> {
+pub async fn list_versions(
+    pool: &SqlitePool,
+    manuscript_id: i64,
+) -> Result<Vec<ManuscriptVersion>> {
     let rows = sqlx::query_as::<_, ManuscriptVersion>(
         r#"SELECT id, manuscript_id, version_number,
                   title, abstract, authors, category,

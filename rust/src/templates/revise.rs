@@ -1,13 +1,18 @@
 //! /m/{id}/revise — revision form (v{N+1}).
 
-use maud::{html, Markup};
+use maud::{Markup, PreEscaped, html};
 
-use super::layout::{layout, PageCtx};
+use super::layout::{PageCtx, layout};
 use crate::models::Manuscript;
+
+const UPLOAD_ICON_SVG: &str = r##"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5v11"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M4.5 14.5v3.25A2.25 2.25 0 0 0 6.75 20h10.5a2.25 2.25 0 0 0 2.25-2.25V14.5"/></svg>"##;
 
 pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
     let slug = m.arxiv_like_id.clone().unwrap_or_else(|| m.id.to_string());
     let next_version = m.current_version + 1;
+    let ai_model_public = m.conductor_ai_model_public != 0;
+    let human_public = m.conductor_human_public != 0;
+    let has_human_conductor = m.conductor_type == "human-ai" && m.conductor_human.is_some();
     let body = html! {
         div.page-header {
             h1 {
@@ -80,29 +85,80 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                     }
                 }
 
-                div.row-fields {
-                    div.grow.field {
-                        label for="pdf_upload" { span.label-text { "Upload new PDF " span.muted { "(optional)" } } }
-                        input id="pdf_upload" type="file" name="pdf" accept="application/pdf";
-                        span.hint.no-katex {
-                            @if let Some(p) = &m.pdf_path {
-                                "Current: " code.no-katex { (p) } ". Leave empty to keep the existing PDF. Or check \"Remove\" below to delete the PDF entirely (you'd then rely on the external URL)."
+                div.revision-artifacts {
+                    div.revision-artifact-heading {
+                        span.label-text { "Manuscript files" }
+                        span.muted.small {
+                            @if m.pdf_path.is_some() || m.source_path.is_some() {
+                                "Current stored artifact: "
+                                @if m.source_path.is_some() { strong { "LaTeX source + compiled PDF" } }
+                                @else { strong { "PDF" } }
                             } @else {
-                                "No PDF currently attached. Upload one if you'd like to add it. PDF only, up to 30 MB."
-                            }
-                        }
-                        @if m.pdf_path.is_some() {
-                            label.checkbox style="margin-top:6px" {
-                                input type="checkbox" name="remove_pdf" value="1";
-                                " Remove the current PDF (don't replace, just remove it)"
+                                "No stored PDF/source artifact."
                             }
                         }
                     }
-                    label.grow {
-                        span.label-text { "External URL " span.muted { "(optional)" } }
-                        input type="url" name="external_url" maxlength="500" value=(m.external_url.clone().unwrap_or_default())
-                              placeholder="https://\u{2026}";
-                        span.hint.no-katex { "For hosted-elsewhere copies (arXiv, GitHub, journal site)." }
+
+                    div.revision-upload-grid {
+                        div.field {
+                            p.label-text { "Replacement LaTeX source " span.muted { "(optional)" } }
+                            div.upload-dropzone data-bound-name="revision-source-name" {
+                                input #source_upload.upload-input type="file" name="source"
+                                      accept=".tex,.zip,.tar.gz,.tgz,application/x-tex,application/zip,application/gzip,application/x-gzip";
+                                label.upload-target for="source_upload" {
+                                    span.upload-icon aria-hidden="true" { (PreEscaped(UPLOAD_ICON_SVG)) }
+                                    span.upload-copy {
+                                        strong.upload-prompt { "Choose source, or drop it here" }
+                                        span.upload-filename #revision-source-name data-empty="No replacement source selected" {
+                                            "No replacement source selected"
+                                        }
+                                    }
+                                    span.upload-button { "Browse" }
+                                }
+                            }
+                            span.hint.no-katex {
+                                "Upload "
+                                code { ".tex" } ", " code { ".zip" } ", or " code { ".tar.gz" }
+                                ". Required when changing a public conductor/model field to private, because PreXiv must regenerate the blacked-out source and PDF."
+                            }
+                        }
+
+                        div.field {
+                            p.label-text { "Replacement PDF " span.muted { "(optional)" } }
+                            div.upload-dropzone data-bound-name="revision-pdf-name" {
+                                input #pdf_upload.upload-input type="file" name="pdf" accept="application/pdf";
+                                label.upload-target for="pdf_upload" {
+                                    span.upload-icon aria-hidden="true" { (PreEscaped(UPLOAD_ICON_SVG)) }
+                                    span.upload-copy {
+                                        strong.upload-prompt { "Choose PDF, or drop it here" }
+                                        span.upload-filename #revision-pdf-name data-empty="No replacement PDF selected" {
+                                            "No replacement PDF selected"
+                                        }
+                                    }
+                                    span.upload-button { "Browse" }
+                                }
+                            }
+                            span.hint.no-katex {
+                                "PDF only, up to 30 MB. Direct PDF replacement is available only when public conductor/model fields stay public; private fields need source-based redaction."
+                            }
+                        }
+                    }
+
+                    div.revision-url-row {
+                        label {
+                            span.label-text { "External URL " span.muted { "(optional)" } }
+                            input type="url" name="external_url" maxlength="500" value=(m.external_url.clone().unwrap_or_default())
+                                  placeholder="https://\u{2026}";
+                            span.hint.no-katex { "Canonical hosted copy elsewhere (arXiv, GitHub, journal site). Readers see this link alongside any stored PDF/source." }
+                        }
+                        @if m.pdf_path.is_some() || m.source_path.is_some() {
+                            label.checkbox.revision-remove-artifacts {
+                                input type="checkbox" name="remove_pdf" value="1";
+                                span {
+                                    "Remove stored PDF/source and rely on External URL only"
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -114,7 +170,40 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
             }
 
             section.form-section {
-                h2 { "3 — Licensing" }
+                h2 { "3 — Disclosure" }
+                p.muted.small {
+                    "These controls change what public readers and API clients see for this version onward. Submitters and admins can still see the stored conductor values."
+                }
+                div.disclosure-options {
+                    label.checkbox-inline.disclosure-choice {
+                        input type="hidden" name="conductor_ai_model_public" value="0";
+                        input type="checkbox" name="conductor_ai_model_public" value="1" checked[ai_model_public];
+                        span {
+                            strong { "Show AI model(s) publicly" }
+                            " — if unchecked, readers see " em { "(undisclosed)" } "."
+                        }
+                    }
+                    @if has_human_conductor {
+                        label.checkbox-inline.disclosure-choice {
+                            input type="hidden" name="conductor_human_public" value="0";
+                            input type="checkbox" name="conductor_human_public" value="1" checked[human_public];
+                            span {
+                                strong { "Show human conductor publicly" }
+                                " — if unchecked, readers see " em { "(undisclosed)" } "."
+                            }
+                        }
+                    } @else {
+                        input type="hidden" name="conductor_human_public" value=(if human_public { "1" } else { "0" });
+                    }
+                }
+                div.disclosure-redaction-note.no-katex {
+                    strong { "Privacy rule:" }
+                    " if you turn a previously public name/model private while stored artifacts remain on PreXiv, upload replacement LaTeX source. PreXiv will black out the source before compiling and will serve only the blacked-out source/PDF."
+                }
+            }
+
+            section.form-section {
+                h2 { "4 — Licensing" }
                 p.muted.small { "Defaults to the existing values. Change only if the licensing terms have actually changed across this version." }
                 div.row-fields {
                     label.grow {
@@ -149,11 +238,31 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
             }
 
             p.muted.small style="margin-top:18px" {
-                "Conductor identity, audit status, and the manuscript id are immutable across versions. To change those you'd withdraw this and submit anew. To view earlier versions after revising, visit "
+                "Conductor identity, audit status, and the manuscript id are immutable across versions; disclosure flags can be changed here. To change the underlying conductor or auditor, withdraw this and submit anew. To view earlier versions after revising, visit "
                 a href={ "/m/" (slug) "/versions" } { "/m/" (slug) "/versions" }
                 "."
             }
         }
+        script { (PreEscaped(r#"
+(function(){
+  document.querySelectorAll('.upload-dropzone').forEach(function(zone){
+    var inp = zone.querySelector('.upload-input');
+    var out = document.getElementById(zone.dataset.boundName);
+    if(!inp || !out) return;
+    var empty = out.dataset.empty || 'No file selected';
+    inp.addEventListener('change', function(){
+      var f = inp.files && inp.files[0];
+      if(f){
+        out.textContent = f.name + ' · ' + (f.size/1024/1024).toFixed(2) + ' MB';
+        out.classList.add('has-file');
+      } else {
+        out.textContent = empty;
+        out.classList.remove('has-file');
+      }
+    });
+  });
+})();
+"#)) }
     };
     layout(&format!("Revise {slug}"), ctx, body)
 }

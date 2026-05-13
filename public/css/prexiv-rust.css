@@ -2611,6 +2611,94 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   font-size: 12px;
 }
 
+/* ─── /m/{id}/revise: artifact and disclosure controls ───────────── */
+.revision-artifacts {
+  margin: 16px 0 8px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--bg-card-alt);
+}
+.revision-artifact-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.revision-artifact-heading .label-text { margin: 0; }
+.revision-upload-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+}
+.revision-upload-grid .field,
+.revision-url-row label { margin: 0; }
+.revision-upload-grid .upload-target {
+  padding: 14px 16px;
+  background: var(--bg-card);
+}
+.revision-upload-grid .upload-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+}
+.revision-url-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 16px;
+  align-items: end;
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+.revision-remove-artifacts {
+  align-self: center;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 9px 12px;
+  margin: 0;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--bg-card);
+  font-family: var(--sans);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.revision-remove-artifacts input { margin: 0; }
+.disclosure-options {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 12px;
+}
+.disclosure-choice {
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--bg-card-alt);
+}
+.disclosure-choice strong { color: var(--ink); }
+.disclosure-redaction-note {
+  border-left: 3px solid var(--brand);
+  background: var(--brand-bg);
+  padding: 10px 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.disclosure-redaction-note strong { color: var(--brand); }
+
+@media (max-width: 860px) {
+  .revision-upload-grid,
+  .revision-url-row { grid-template-columns: 1fr; }
+  .revision-artifact-heading { flex-direction: column; gap: 4px; }
+  .revision-remove-artifacts { white-space: normal; align-items: flex-start; }
+}
+
 @media (max-width: 560px) {
   .upload-target { flex-wrap: wrap; padding: 14px 14px; gap: 12px; }
   .upload-button { width: 100%; justify-content: center; }

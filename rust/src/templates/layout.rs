@@ -1,4 +1,4 @@
-use maud::{html, Markup, PreEscaped, DOCTYPE};
+use maud::{DOCTYPE, Markup, PreEscaped, html};
 
 use crate::models::User;
 
@@ -51,7 +51,7 @@ pub struct OgMeta {
     pub title: String,
     pub description: String,
     pub url: String,
-    pub kind: &'static str,            // "article" / "website" / "profile"
+    pub kind: &'static str, // "article" / "website" / "profile"
     pub published_time: Option<String>,
     pub modified_time: Option<String>,
     pub author: Option<String>,
@@ -71,7 +71,7 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260513k";
+const ASSET_VER: &str = "20260513l";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target { "on" } else { "" }
@@ -82,10 +82,18 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
     // OG/Twitter description falls back to the static site tagline if
     // the route didn't supply one, so generic pages still preview
     // reasonably when shared.
-    let default_desc = "PreXiv: agent-native preprint server for AI-authored, human-conducted manuscripts.";
+    let default_desc =
+        "PreXiv: agent-native preprint server for AI-authored, human-conducted manuscripts.";
     let og_title = ctx.og.as_ref().map(|o| o.title.as_str()).unwrap_or(title);
-    let og_desc = ctx.og.as_ref().map(|o| o.description.as_str()).unwrap_or(default_desc);
-    let og_url = ctx.og.as_ref().map(|o| o.url.as_str())
+    let og_desc = ctx
+        .og
+        .as_ref()
+        .map(|o| o.description.as_str())
+        .unwrap_or(default_desc);
+    let og_url = ctx
+        .og
+        .as_ref()
+        .map(|o| o.url.as_str())
         .or(ctx.canonical_url.as_deref())
         .unwrap_or("");
     let og_type = ctx.og.as_ref().map(|o| o.kind).unwrap_or("website");
@@ -265,15 +273,25 @@ pub fn time_ago(ts: &chrono::NaiveDateTime) -> String {
     let now = chrono::Utc::now().naive_utc();
     let dur = now.signed_duration_since(*ts);
     let secs = dur.num_seconds().max(0);
-    if secs < 60 { return format!("{secs}s ago"); }
+    if secs < 60 {
+        return format!("{secs}s ago");
+    }
     let mins = secs / 60;
-    if mins < 60 { return format!("{mins}m ago"); }
+    if mins < 60 {
+        return format!("{mins}m ago");
+    }
     let hours = mins / 60;
-    if hours < 24 { return format!("{hours}h ago"); }
+    if hours < 24 {
+        return format!("{hours}h ago");
+    }
     let days = hours / 24;
-    if days < 30 { return format!("{days}d ago"); }
+    if days < 30 {
+        return format!("{days}d ago");
+    }
     let months = days / 30;
-    if months < 12 { return format!("{months}mo ago"); }
+    if months < 12 {
+        return format!("{months}mo ago");
+    }
     let years = days / 365;
     format!("{years}y ago")
 }
