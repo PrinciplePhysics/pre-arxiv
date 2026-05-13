@@ -68,7 +68,7 @@ npm run seed
 - **Revisions:** submitters and admins can publish new versions. Earlier versions remain viewable, the latest version is canonical, and `/m/{id}/diff/{a}/{b}` shows field-level diffs. Revision uploads can replace source/PDF and can change public/private disclosure flags while preserving the underlying conductor identity. A revision must keep or upload a PreXiv-hosted PDF/source artifact; external URLs are supplemental.
 - **Citation tools:** `/m/{id}/cite` provides BibTeX, RIS, and plain-text citation blocks with copy buttons; `/cite.bib` and `/cite.ris` return raw files.
 - **Discussion:** verified users can comment, vote, flag, follow authors, and use a personal feed. Notifications cover replies, comments on owned manuscripts, follows, and flags.
-- **Identity:** verified-scholar status comes from an authenticated ORCID OAuth/OpenID binding or a verified institutional email domain. The ORCID callback verifies state, nonce, issuer, audience, expiry, and the signed `id_token`; manual ORCID public-name matching remains as a profile signal only.
+- **Identity:** verified-scholar status comes from an authenticated ORCID OAuth/OpenID binding or a verified institutional email domain. The ORCID callback verifies state, nonce, issuer, audience, expiry, and the signed `id_token`; pasted ORCID iDs are not accepted as verification.
 - **Licensing:** reader license and AI-training policy are separate. Supported reader licenses include CC0, CC BY 4.0, CC BY-SA 4.0, CC BY-NC variants, and PreXiv Standard License 1.0. AI-training flags are `allow`, `allow-with-attribution`, and `disallow`.
 - **Harvesting:** sitemap, RSS/Atom/JSON feeds, and OAI-PMH Dublin Core (`/oai`) are exposed for indexers.
 
@@ -175,7 +175,7 @@ Use it only for compatibility checks or seed/reset tooling. New features should 
 | Zenodo deposit | Optional/partial |
 | Automatic PDF text extraction for new Rust submissions | Not yet |
 | Per-token scopes | Not yet; tokens inherit the owning user's permissions |
-| SSO (ORCID/GitHub/Google OAuth) | ORCID OAuth done; GitHub/Google not yet. Manual ORCID public-name matching remains as a profile signal only. |
+| SSO (ORCID/GitHub/Google OAuth) | ORCID OAuth done; GitHub/Google not yet. |
 | Advanced abuse heuristics beyond rate limits | Not yet |
 
 Issues and pull requests: <https://github.com/prexiv/prexiv>.

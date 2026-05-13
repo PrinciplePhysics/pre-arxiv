@@ -1,27 +1,15 @@
-//! ORCID iD verification.
+//! ORCID OAuth/OpenID Connect binding.
 //!
-//! Fetches the public record from `https://pub.orcid.org/v3.0/{orcid}/record`
-//! (no OAuth required — this is the read-only public mirror) and
-//! compares the registered name against the user's PreXiv display name.
-//! A reasonable match flips `users.orcid_verified` to 1. That field is
-//! deliberately only a public-name-match profile hint.
-//!
-//! This is NOT cryptographic proof that the PreXiv user IS the ORCID
-//! holder — a determined adversary could paste any ORCID iD and the
-//! check would pass if their display name happens to match. The point
-//! is only to display a public profile link with a plausible name
-//! match; it must not be treated as account-ownership proof.
-//!
-//! Ownership-grade verification lives in the ORCID OAuth/OpenID Connect
-//! helpers below. Those use the authorization-code flow, verify the
-//! signed `id_token`, and set `users.orcid_oauth_verified`.
+//! PreXiv treats ORCID as account-ownership proof only when the user
+//! completes ORCID's authorization-code flow. Pasted ORCID iDs and
+//! public-record name matches are intentionally not accepted as a
+//! verified-scholar signal.
 
 use anyhow::{anyhow, bail, Context, Result};
 use jsonwebtoken::jwk::JwkSet;
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::Deserialize;
 
-const ORCID_RECORD_BASE: &str = "https://pub.orcid.org/v3.0";
 const ORCID_DEFAULT_BASE: &str = "https://orcid.org";
 
 #[derive(Debug, Clone)]
@@ -279,65 +267,6 @@ async fn verify_id_token(
     Ok(claims)
 }
 
-/// Reduced view of the ORCID public-record JSON. ORCID's schema is
-/// large; we only pull the bits we need for name comparison.
-#[derive(Debug, Deserialize)]
-pub struct OrcidRecord {
-    #[serde(rename = "person")]
-    pub person: Option<OrcidPerson>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct OrcidPerson {
-    pub name: Option<OrcidName>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct OrcidName {
-    #[serde(rename = "given-names")]
-    pub given_names: Option<OrcidValue>,
-    #[serde(rename = "family-name")]
-    pub family_name: Option<OrcidValue>,
-    #[serde(rename = "credit-name")]
-    pub credit_name: Option<OrcidValue>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct OrcidValue {
-    pub value: Option<String>,
-}
-
-impl OrcidName {
-    /// Canonical "First Last" string assembled from the name parts.
-    /// Falls back to credit-name (the "display the public sees on ORCID")
-    /// when given/family aren't both present.
-    pub fn assembled(&self) -> String {
-        if let Some(c) = self.credit_name.as_ref().and_then(|v| v.value.as_deref()) {
-            if !c.trim().is_empty() {
-                return c.trim().to_string();
-            }
-        }
-        let g = self
-            .given_names
-            .as_ref()
-            .and_then(|v| v.value.as_deref())
-            .unwrap_or("")
-            .trim();
-        let f = self
-            .family_name
-            .as_ref()
-            .and_then(|v| v.value.as_deref())
-            .unwrap_or("")
-            .trim();
-        match (g.is_empty(), f.is_empty()) {
-            (true, true) => String::new(),
-            (true, false) => f.to_string(),
-            (false, true) => g.to_string(),
-            (false, false) => format!("{g} {f}"),
-        }
-    }
-}
-
 /// ORCID iDs are 16 digits in groups of four, with a trailing checksum
 /// digit that can be `X`. Form: `0000-0000-0000-000X`. We accept the
 /// canonical form only — pasting a URL gets normalised to the iD by
@@ -374,67 +303,6 @@ pub fn normalize(raw: &str) -> Option<String> {
         out.push('X');
     }
     Some(out)
-}
-
-/// Fetch the public ORCID record for `orcid` (canonical
-/// `0000-0000-0000-000X` form expected — call [`normalize`] first).
-/// Returns a `Result` so the caller can render a clean error page on
-/// network failure or "iD not found".
-pub async fn fetch_record(orcid: &str) -> Result<OrcidRecord> {
-    let url = format!("{ORCID_RECORD_BASE}/{orcid}/record");
-    let client = reqwest::Client::builder()
-        .user_agent("PreXiv/0.1 (orcid-verify)")
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .context("building ORCID HTTP client")?;
-    let resp = client
-        .get(&url)
-        .header("Accept", "application/json")
-        .send()
-        .await
-        .with_context(|| format!("GET {url}"))?;
-    if !resp.status().is_success() {
-        return Err(anyhow!(
-            "ORCID returned HTTP {} for {orcid}",
-            resp.status().as_u16()
-        ));
-    }
-    let rec = resp
-        .json::<OrcidRecord>()
-        .await
-        .with_context(|| format!("parsing ORCID JSON for {orcid}"))?;
-    Ok(rec)
-}
-
-/// Decide whether the ORCID record name "matches" the user's PreXiv
-/// display name well enough to flip `orcid_verified`. The check is
-/// deliberately forgiving — academic display names vary (initials,
-/// honorifics, "Dr.", maiden names, hyphenated names). The criterion
-/// we use:
-///
-///   1. Lowercase, strip non-letters from both sides.
-///   2. If either is a (whitespace-separated) subset of the other,
-///      it's a match.
-///
-/// So "Jane K. Doe" matches "Jane Doe"; "Doe, Jane" matches "Jane Doe"
-/// after the punctuation strip; "jdoe" alone does NOT match
-/// "Jane Doe". That's the intended behavior: a username-only display
-/// name forces the user to set their real name in `display_name`
-/// before they can prove they own the ORCID.
-pub fn name_matches(orcid_name: &str, display_name: &str) -> bool {
-    let a = token_set(orcid_name);
-    let b = token_set(display_name);
-    if a.is_empty() || b.is_empty() {
-        return false;
-    }
-    a.is_subset(&b) || b.is_subset(&a)
-}
-
-fn token_set(s: &str) -> std::collections::BTreeSet<String> {
-    s.split(|c: char| !c.is_alphabetic())
-        .filter(|t| t.len() >= 2)
-        .map(|t| t.to_ascii_lowercase())
-        .collect()
 }
 
 #[cfg(test)]
@@ -486,25 +354,5 @@ mod tests {
         assert!(url.contains("state=state%20value"));
         assert!(url.contains("nonce=nonce%20value"));
         assert!(url.contains("redirect_uri=https%3A%2F%2Fprexiv.example%2Fauth%2Forcid%2Fcallback"));
-    }
-
-    #[test]
-    fn name_match_basic() {
-        assert!(name_matches("Jane Doe", "Jane Doe"));
-        assert!(name_matches("Jane K. Doe", "Jane Doe"));
-        assert!(name_matches("Doe, Jane", "Jane Doe"));
-    }
-
-    #[test]
-    fn name_match_initial_only() {
-        // Strict mode: a name token has to be ≥2 chars. "J Doe" gives
-        // only {"doe"} which is a subset of {"jane","doe"} → match.
-        assert!(name_matches("J Doe", "Jane Doe"));
-    }
-
-    #[test]
-    fn name_match_username_rejected() {
-        // A username-style display name with no human name doesn't match.
-        assert!(!name_matches("Jane Doe", "jdoe"));
     }
 }

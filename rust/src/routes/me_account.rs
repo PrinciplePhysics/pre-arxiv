@@ -134,7 +134,6 @@ pub async fn export(
         "affiliation":   user.affiliation,
         "bio":           user.bio,
         "orcid":         user.orcid,
-        "orcid_name_matched": user.is_orcid_verified(),
         "orcid_oauth_verified": user.is_orcid_oauth_verified(),
         "orcid_oauth_verified_at": user.orcid_oauth_verified_at,
         "karma":         user.karma.unwrap_or(0),

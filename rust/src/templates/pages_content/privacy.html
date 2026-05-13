@@ -13,7 +13,7 @@
 
   <h2>What we collect</h2>
   <ul>
-    <li><strong>Account data</strong> — username, email address, password (stored only as a bcrypt hash; we never see the plaintext after registration), optional display name, optional affiliation, optional bio, optional ORCID. If you connect ORCID through OAuth, we store the authenticated ORCID iD, verification timestamp, and no ORCID password or long-lived ORCID access token. Set by you on register and editable from your profile.</li>
+    <li><strong>Account data</strong> — username, email address, password (stored only as a bcrypt hash; we never see the plaintext after registration), optional display name, optional affiliation, optional bio, and optional authenticated ORCID iD. If you connect ORCID through OAuth, we store the authenticated ORCID iD, verification timestamp, and no ORCID password or long-lived ORCID access token. Set by you on register and editable from your profile.</li>
     <li><strong>Manuscripts you submit</strong> — title, abstract, authors, category, the PDF you upload (if any), any external URL you provide, conductor metadata (AI model, human conductor name, role) and (optional) auditor metadata. The PDF body is parsed to plain text for full-text search.</li>
     <li><strong>Comments, votes, flags</strong> — what you wrote / how you voted / what you flagged, plus timestamps.</li>
     <li><strong>API tokens</strong> — name, creation/last-used timestamp, and a SHA-256 hash of the token. The plaintext is shown to you exactly once at creation and never persisted.</li>

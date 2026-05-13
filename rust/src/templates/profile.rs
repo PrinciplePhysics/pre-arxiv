@@ -48,21 +48,13 @@ pub fn render(
             div.profile-card-id {
                 div.profile-name-row {
                     h1.profile-name { (real_name) }
-                    @if u.is_orcid_oauth_verified() || u.is_orcid_verified() || u.is_verified_scholar() {
+                    @if u.is_orcid_oauth_verified() || u.is_verified_scholar() {
                         span.profile-name-badges aria-label="Profile trust signals" {
-                            @if u.is_orcid_oauth_verified() || u.is_orcid_verified() {
+                            @if u.is_orcid_oauth_verified() {
                                 @let orcid = u.orcid.as_deref().unwrap_or("");
                                 @let orcid_url = format!("https://orcid.org/{orcid}");
-                                @let orcid_title = if u.is_orcid_oauth_verified() {
-                                    format!("ORCID authenticated · {orcid}")
-                                } else {
-                                    format!("ORCID public-name match · {orcid}")
-                                };
-                                @let orcid_aria = if u.is_orcid_oauth_verified() {
-                                    format!("ORCID authenticated: {orcid}")
-                                } else {
-                                    format!("ORCID public-name match: {orcid}")
-                                };
+                                @let orcid_title = format!("ORCID authenticated · {orcid}");
+                                @let orcid_aria = format!("ORCID authenticated: {orcid}");
                                 a.profile-name-badge.is-orcid
                                   href=(orcid_url)
                                   target="_blank" rel="noopener me"

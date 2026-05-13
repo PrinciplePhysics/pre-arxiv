@@ -37,22 +37,6 @@
     </label>
   </section>
 
-  <section class="form-section">
-    <h2>ORCID <span class="muted">(optional)</span></h2>
-    <p class="muted small">
-      ORCID is a public identifier for researchers (orcid.org). Manually pasted values are profile hints only.
-      Ownership-grade ORCID verification requires the Rust app's Connect with ORCID flow.
-    </p>
-    <label>
-      <span class="label-text">ORCID iD</span>
-      <input type="text" name="orcid" maxlength="19"
-             pattern="\d{4}-\d{4}-\d{4}-\d{3}[\dX]"
-             value="<%= escapeHtml(values.orcid || '') %>"
-             placeholder="0000-0002-1825-0097">
-      <span class="hint">Format: <code>XXXX-XXXX-XXXX-XXXX</code> (last char may be X).</span>
-    </label>
-  </section>
-
   <div class="form-submit">
     <button type="submit" class="btn-primary big">Save changes</button>
     <a class="btn-secondary" href="/u/<%= encodeURIComponent(user.username) %>">Cancel</a>

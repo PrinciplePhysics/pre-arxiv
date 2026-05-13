@@ -157,7 +157,7 @@ pub fn render(
                             div.advisory-banner role="note" {
                                 span {
                                     span.advisory-title { "Unverified author." }
-                                    " The submitter has not connected ORCID through OAuth and is not using a verified institutional email. Default listings only surface verified-scholar work; ORCID public-name matches are shown on profiles but do not prove account ownership. This submission is reachable via search, "
+                                    " The submitter has not connected ORCID through OAuth and is not using a verified institutional email. Default listings only surface verified-scholar work. This submission is reachable via search, "
                                     code { "/browse" }
                                     ", and direct link."
                                 }

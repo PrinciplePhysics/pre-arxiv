@@ -21,14 +21,13 @@ pub async fn set_flash(session: &Session, msg: impl Into<String>) {
     let _ = session.insert(SESSION_FLASH_KEY, msg.into()).await;
 }
 
-// ─── ORCID-verify inline feedback ─────────────────────────────────────
+// ─── ORCID OAuth inline feedback ──────────────────────────────────────
 //
-// The verify-orcid handler always redirects back to /me/edit. The
+// The ORCID OAuth callbacks always redirect back to /me/edit. The
 // global flash above renders at the top of the page where it's easy
 // to miss when the user is focused on the ORCID section near the
-// middle of the form. We stash verification feedback under a separate
-// session key and render it inline INSIDE the verified-scholar status
-// panel, right next to the input that produced it.
+// middle of the form. We stash ORCID feedback under a separate session
+// key and render it inline INSIDE the verified-scholar status panel.
 //
 // The value is prefixed `ok:` or `err:` so the renderer can paint the
 // success / error states distinctly without a second session lookup.

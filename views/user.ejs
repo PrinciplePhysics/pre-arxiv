@@ -11,12 +11,6 @@
       <h1><%= escapeHtml(profile.username) %></h1>
       <% if (profile.display_name) { %><div class="user-display"><%= escapeHtml(profile.display_name) %></div><% } %>
       <% if (profile.affiliation) { %><div class="user-affil muted"><%= escapeHtml(profile.affiliation) %></div><% } %>
-      <% if (profile.orcid) { %>
-        <div class="user-orcid">
-          <a class="orcid-badge" href="https://orcid.org/<%= encodeURIComponent(profile.orcid) %>" target="_blank" rel="nofollow noopener" title="self-claimed ORCID — unverified">ORCID: <%= escapeHtml(profile.orcid) %></a>
-          <span class="muted small">(self-claimed, unverified)</span>
-        </div>
-      <% } %>
     </div>
     <div class="user-card-actions">
       <% if (typeof user !== 'undefined' && user) { %>

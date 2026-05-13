@@ -153,9 +153,6 @@
         <tr><th>Submitted by</th><td>
           <a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a>
           <% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %>
-          <% if (m.submitter_orcid) { %>
-            <a class="orcid-badge" href="https://orcid.org/<%= encodeURIComponent(m.submitter_orcid) %>" target="_blank" rel="nofollow noopener" title="self-claimed ORCID — unverified">ORCID: <%= escapeHtml(m.submitter_orcid) %></a>
-          <% } %>
           <span class="muted small">— posting only; not responsible for the content</span>
         </td></tr>
         <% if (m.conductor_notes) { %>
@@ -168,9 +165,6 @@
         <tr><th>Human conductor</th><td>
           <strong<%= humanHidden ? ' class="redacted"' : '' %>><%= escapeHtml(humanDisplay) %></strong>
           <% if (!humanHidden) { %> · <span class="role-tag"><%= escapeHtml(m.conductor_role) %></span><% } %>
-          <% if (!humanHidden && typeof conductorOrcid !== 'undefined' && conductorOrcid) { %>
-            <a class="orcid-badge" href="https://orcid.org/<%= encodeURIComponent(conductorOrcid) %>" target="_blank" rel="nofollow noopener" title="self-claimed ORCID — unverified">ORCID: <%= escapeHtml(conductorOrcid) %></a>
-          <% } %>
           <% if (humanHidden && canSeeFull) { %><span class="private-hint">private — public viewers see <em>(undisclosed)</em></span><% } %>
         </td></tr>
         <tr><th>AI co-author</th><td>
@@ -180,9 +174,6 @@
         <tr><th>Submitted by</th><td>
           <a href="/u/<%= escapeHtml(m.submitter_username) %>"><%= escapeHtml(m.submitter_username) %></a>
           <% if (m.submitter_display) { %> (<%= escapeHtml(m.submitter_display) %>)<% } %>
-          <% if (m.submitter_orcid) { %>
-            <a class="orcid-badge" href="https://orcid.org/<%= encodeURIComponent(m.submitter_orcid) %>" target="_blank" rel="nofollow noopener" title="self-claimed ORCID — unverified">ORCID: <%= escapeHtml(m.submitter_orcid) %></a>
-          <% } %>
         </td></tr>
         <% if (m.conductor_notes) { %>
         <tr><th>Notes</th><td><%- renderMarkdown(m.conductor_notes) %></td></tr>

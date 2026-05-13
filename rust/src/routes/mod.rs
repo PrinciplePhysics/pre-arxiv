@@ -107,7 +107,6 @@ pub fn router() -> Router<AppState> {
         .route("/me/tokens", get(me_tokens::show).post(me_tokens::create))
         .route("/me/tokens/{id}/revoke", post(me_tokens::revoke))
         .route("/me/edit", get(me_edit::show).post(me_edit::submit))
-        .route("/me/verify-orcid", post(me_edit::verify_orcid))
         .route("/me/orcid/connect", get(me_edit::connect_orcid))
         .route("/auth/orcid/callback", get(me_edit::orcid_callback))
         .route(

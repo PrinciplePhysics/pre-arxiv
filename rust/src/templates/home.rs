@@ -59,7 +59,7 @@ pub fn mode_toggle(self_path: &str, show_all: bool) -> Markup {
               href=(self_path)
               role="tab"
               aria-selected=(if !show_all { "true" } else { "false" })
-              title="Only show submissions from verified scholars: authenticated ORCID OAuth or verified institutional email. ORCID name-match alone is displayed on profiles but is not ownership proof." {
+              title="Only show submissions from verified scholars: authenticated ORCID OAuth or verified institutional email." {
                 span.mode-pill-dot.is-standard aria-hidden="true" {}
                 "Standard"
             }

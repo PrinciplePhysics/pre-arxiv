@@ -24,10 +24,9 @@ pub struct User {
     /// AES-256-GCM ciphertext of the email. Never sent to clients.
     #[serde(skip)]
     pub email_enc: Option<Vec<u8>>,
-    /// Scholar trust signals — see migration `0013_verified_scholar.sql`.
-    /// ORCID public-name matching is displayed on profiles, but does not
-    /// prove account ownership. Curated-listing status uses either the
-    /// ORCID OAuth fields below or the institutional-email signal.
+    /// Legacy public-record ORCID name match from older deployments.
+    /// Kept for schema compatibility only; the product now treats ORCID
+    /// as verified solely through the OAuth fields below.
     #[serde(default)]
     pub orcid_verified: i64,
     #[serde(default)]
@@ -62,13 +61,10 @@ impl User {
 
     /// `true` if the user has an authenticated ORCID OAuth binding, or
     /// has verified ownership of an institutional-looking email domain.
-    /// ORCID public-name match alone is intentionally excluded.
+    /// Legacy ORCID name matches are intentionally excluded.
     pub fn is_verified_scholar(&self) -> bool {
         self.orcid_oauth_verified != 0
             || (self.email_verified != 0 && self.institutional_email != 0)
-    }
-    pub fn is_orcid_verified(&self) -> bool {
-        self.orcid_verified != 0
     }
     pub fn is_orcid_oauth_verified(&self) -> bool {
         self.orcid_oauth_verified != 0

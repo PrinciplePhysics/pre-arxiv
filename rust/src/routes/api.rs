@@ -110,8 +110,7 @@ async fn get_me(ApiUser(u): ApiUser) -> Json<Value> {
         "display_name": u.display_name, "affiliation": u.affiliation,
         "bio": u.bio, "karma": u.karma.unwrap_or(0),
         "is_admin": u.is_admin(), "email_verified": u.is_verified(),
-        "orcid": u.orcid,
-        "orcid_name_matched": u.is_orcid_verified(),
+        "orcid": if u.is_orcid_oauth_verified() { u.orcid.clone() } else { None },
         "orcid_oauth_verified": u.is_orcid_oauth_verified(),
         "created_at": u.created_at,
     }))

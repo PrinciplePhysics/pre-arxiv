@@ -2848,16 +2848,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   padding: 5px 12px !important;
   letter-spacing: 0.02em;
 }
-.orcid-inline-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 6px 0 2px;
-  flex-wrap: wrap;
-}
-.orcid-inline-actions .muted.small { max-width: 540px; }
-.orcid-inline-actions button,
-.orcid-inline-actions a { white-space: nowrap; }
 .orcid-oauth-card {
   display: flex;
   align-items: center;
@@ -2888,11 +2878,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 
 /* Inline feedback rendered at the top of the verified-scholar status
-   panel after a verify-orcid POST. The global flash banner above the
-   page header is easy to scroll past when the user is focused on the
-   ORCID input; this strip lives right next to that input. Two states:
-   .vsp-flash-ok (green) and .vsp-flash-err (amber, distinct from the
-   plain .flash bar so success looks like success). */
+   panel after the ORCID OAuth round trip. The global flash banner
+   above the page header is easy to scroll past when the user is
+   focused on identity setup. Two states: .vsp-flash-ok (green) and
+   .vsp-flash-err (amber, distinct from the plain .flash bar so success
+   looks like success). */
 .vsp-flash {
   display: flex;
   align-items: flex-start;
