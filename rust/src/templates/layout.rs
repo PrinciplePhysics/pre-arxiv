@@ -71,7 +71,7 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260514g";
+const ASSET_VER: &str = "20260514h";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target {
@@ -87,7 +87,7 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
     // the route didn't supply one, so generic pages still preview
     // reasonably when shared.
     let default_desc =
-        "PreXiv: preprint server for AI-assisted, human-accountable research manuscripts.";
+        "PreXiv: a research manuscript archive with AI-use provenance, hosted artifacts, version history, and optional human audit statements.";
     let og_title = ctx.og.as_ref().map(|o| o.title.as_str()).unwrap_or(title);
     let og_desc = ctx
         .og
@@ -174,7 +174,7 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                                 span.bx { "X" }
                                 span.bi { "iv" }
                             }
-                            span.brand-tagline { "AI-assisted preprints" }
+                            span.brand-tagline { "AI-use provenance archive" }
                         }
                         nav.topnav aria-label="Main navigation" {
                             a href="/"        class=(nav_class(cur, "/"))        { "ranked" }

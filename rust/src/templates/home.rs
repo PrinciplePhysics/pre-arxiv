@@ -15,6 +15,7 @@ pub fn render(
     let logged_in = ctx.user.is_some();
     let body = html! {
         (welcome_modal())
+        (archive_intro(logged_in))
         div.sort-caption.no-katex aria-label="How this listing is sorted" {
             "Ranked by score over age — a Hacker-News-style decay: "
             code { "(score + 1) / (age_hours + 2)\u{00b2}" }
@@ -44,6 +45,41 @@ pub fn render(
         }
     };
     layout("Ranked", ctx, body)
+}
+
+fn archive_intro(logged_in: bool) -> Markup {
+    html! {
+        section.archive-intro aria-labelledby="archive-intro-title" {
+            div.archive-intro-main {
+                p.archive-kicker { "Research manuscript archive" }
+                h1 id="archive-intro-title" { "AI-use provenance, hosted artifacts, version history." }
+                p {
+                    "PreXiv is not peer review and not a publication of record. It is a public archive for research manuscripts where AI use, human responsibility, hosted files, revisions, and optional human audit statements are visible on the record."
+                }
+                div.archive-intro-actions {
+                    a.btn-primary href=(if logged_in { "/submit" } else { "/register" }) {
+                        @if logged_in { "Submit a manuscript" } @else { "Create an account" }
+                    }
+                    a.btn-secondary href="/how-it-works" { "How PreXiv works" }
+                    a.btn-secondary href="/agent-support" { "Agent support" }
+                }
+            }
+            div.archive-principles aria-label="PreXiv trust model" {
+                div.archive-principle {
+                    strong { "Every record declares provenance" }
+                    span { "Human-conducted or autonomous agent, precise AI model names, and optional private display controls." }
+                }
+                div.archive-principle {
+                    strong { "Artifacts are hosted and versioned" }
+                    span { "PreXiv keeps public PDF/source downloads, watermarks PDFs, and preserves version history." }
+                }
+                div.archive-principle {
+                    strong { "Trust signals are separated" }
+                    span { "Email, ORCID, institutional email, audit status, and hosted-source status are distinct reader signals." }
+                }
+            }
+        }
+    }
 }
 
 /// Two-pill segmented control: **Standard** (verified-scholar only)
@@ -127,18 +163,18 @@ fn welcome_modal() -> Markup {
                 button.welcome-close type="button" data-welcome-dismiss="1" aria-label="Close welcome message" { "×" }
                 h2 #welcome-title.welcome-title { "Welcome to PreXiv" }
                 div #welcome-body.welcome-body {
-                    p.welcome-lede { "A preprint archive for the AGI age." }
+                    p.welcome-lede { "A research manuscript archive with explicit AI-use provenance." }
                     p {
-                        "AI is already part of scientific writing and reasoning. PreXiv accepts these manuscripts only when every submission openly declares its provenance and human responsibility."
+                        "AI is already part of scientific writing and reasoning. PreXiv accepts manuscripts only when the record includes a hosted artifact, visible provenance, and a responsible submitting account."
                     }
                     p {
                         "Each manuscript names its "
                         strong { "conductor" }
-                        " (the human or authorized agent who produced it), the "
+                        " (the human who directed the workflow, or an autonomous agent production mode), the "
                         strong { "AI model" }
                         " that drafted it, and — when one exists — a named "
                         strong { "auditor" }
-                        " who has read the work and signed a scoped correctness statement. No auditor, no green check. Readers see at a glance who staked their name on what."
+                        " who has read the work and signed a scoped statement. No auditor, no audit badge. Readers see the difference between identity, provenance, artifact, and review signals."
                     }
                     p {
                         "The same API is open to humans and CLI agents. After signing in, open "

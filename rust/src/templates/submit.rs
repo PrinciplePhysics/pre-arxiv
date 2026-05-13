@@ -596,6 +596,21 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                             li { strong { "AI training: " } span id="review-training" { "Allowed under the selected reader-license terms." } }
                         }
                     }
+                    div.review-card.review-card-wide {
+                        h3 { "Responsibility confirmations" }
+                        label.checkbox.review-check {
+                            input type="checkbox" name="responsibility_ack" required;
+                            span { "I am responsible for lawful posting, accurate metadata, and choosing license/training terms I have authority to grant." }
+                        }
+                        label.checkbox.review-check {
+                            input type="checkbox" name="artifact_ack" required;
+                            span { "I understand PreXiv will host the uploaded artifact as the public record; external URLs are supplemental links." }
+                        }
+                        label.checkbox.review-check {
+                            input type="checkbox" name="provenance_ack" required;
+                            span { "I have accurately disclosed AI model/agent use and will not list an auditor unless that person has actually reviewed and approved the statement." }
+                        }
+                    }
                 }
             }
 

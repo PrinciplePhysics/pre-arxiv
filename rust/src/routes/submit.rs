@@ -293,6 +293,17 @@ pub async fn do_submit(
         }
     }
 
+    if !bearer_authenticated
+        && !(fields.responsibility_ack && fields.artifact_ack && fields.provenance_ack)
+    {
+        return Ok(err_page(
+            &session,
+            maybe_user,
+            "Before submitting, confirm responsibility, hosted-artifact, and provenance/audit disclosure in the Review & submit section.",
+        )
+        .await);
+    }
+
     // All validation passed → now (and only now) persist files and (for
     // tex) run the compiler.
     let upload_dir = upload_dir();
@@ -675,6 +686,9 @@ struct SubmitFields {
     ai_training: String,
     /// "tex" / "pdf"
     source_type: String,
+    responsibility_ack: bool,
+    artifact_ack: bool,
+    provenance_ack: bool,
 }
 
 impl Default for SubmitFields {
@@ -704,6 +718,9 @@ impl Default for SubmitFields {
             license: String::new(),
             ai_training: String::new(),
             source_type: String::new(),
+            responsibility_ack: false,
+            artifact_ack: false,
+            provenance_ack: false,
         }
     }
 }
@@ -735,6 +752,9 @@ impl SubmitFields {
             "auditor_orcid" => self.auditor_orcid = v,
             "license" => self.license = v,
             "ai_training" => self.ai_training = v,
+            "responsibility_ack" => self.responsibility_ack = is_truthy(&v),
+            "artifact_ack" => self.artifact_ack = is_truthy(&v),
+            "provenance_ack" => self.provenance_ack = is_truthy(&v),
             _ => {}
         }
     }
