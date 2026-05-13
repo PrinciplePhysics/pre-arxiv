@@ -11,9 +11,9 @@
 
 set -euo pipefail
 
-DATA_DIR="${DATA_DIR:-/var/lib/prexiv/current}"
 PID_FILE="${PID_FILE:-$HOME/prexiv-deploy/prexiv-rust.pid}"
 REPO="${REPO:-$HOME/prexiv-deploy/prexiv}"
+DATA_DIR="${DATA_DIR:-$REPO/data}"
 START_SCRIPT="${START_SCRIPT:-$REPO/scripts/start-rust.sh}"
 
 ARCHIVE="${1:-}"

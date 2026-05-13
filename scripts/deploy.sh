@@ -9,9 +9,9 @@
 #
 # The script assumes:
 #   • The repo is checked out at $HOME/prexiv-deploy/prexiv (override REPO).
-#   • The data lives at /var/lib/prexiv/current (override DATA_DIR).
+#   • The data lives at $REPO/data (override DATA_DIR).
 #   • Backups go to /var/lib/prexiv/backups (override BACKUP_ROOT).
-#   • The Rust binary writes its PID to $DATA_DIR/../prexiv-rust.pid
+#   • The Rust binary writes its PID to $HOME/prexiv-deploy/prexiv-rust.pid
 #     (override PID_FILE).
 #
 # What we do, in order — each step aborts if it fails:
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 REPO="${REPO:-$HOME/prexiv-deploy/prexiv}"
-DATA_DIR="${DATA_DIR:-/var/lib/prexiv/current}"
+DATA_DIR="${DATA_DIR:-$REPO/data}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/lib/prexiv/backups}"
 PID_FILE="${PID_FILE:-$HOME/prexiv-deploy/prexiv-rust.pid}"
 LOG_FILE="${LOG_FILE:-$HOME/prexiv-deploy/prexiv-rust.log}"

@@ -7,7 +7,6 @@
 set -euo pipefail
 
 REPO="${REPO:-$HOME/prexiv-deploy/prexiv}"
-DATA_DIR="${DATA_DIR:-/var/lib/prexiv/current}"
 PID_FILE="${PID_FILE:-$HOME/prexiv-deploy/prexiv-rust.pid}"
 LOG_FILE="${LOG_FILE:-$HOME/prexiv-deploy/prexiv-rust.log}"
 
@@ -30,8 +29,12 @@ if [ -r /etc/prexiv/smtp.env ]; then
 fi
 
 export PORT="${PORT:-3000}"
-export DATA_DIR="${DATA_DIR:-/var/lib/prexiv/current}"
-export UPLOAD_DIR="${UPLOAD_DIR:-$DATA_DIR/uploads}"
+if [ -n "${DATA_DIR:-}" ]; then
+  export DATA_DIR
+fi
+if [ -n "${UPLOAD_DIR:-}" ]; then
+  export UPLOAD_DIR
+fi
 export APP_URL="${APP_URL:-https://victoria.tail921ea4.ts.net}"
 export NODE_ENV="${NODE_ENV:-production}"
 export RUST_LOG="${RUST_LOG:-info,sqlx=warn,tower_http=info}"
