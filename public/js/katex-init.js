@@ -5,6 +5,51 @@
 (function () {
   'use strict';
 
+  // Custom-macro globals. PreXiv manuscripts use a handful of common
+  // LaTeX-source `\newcommand`s and `\DeclareMathOperator`s in their
+  // bodies; titles and abstracts get rendered by KaTeX without the
+  // preamble, so we have to teach the renderer what these mean.
+  // Extend liberally — false-positive expansions are harmless because
+  // KaTeX only triggers on `\name` followed by non-letter.
+  const macros = {
+    // Operators (named functions, upright text)
+    '\\Var':   '\\operatorname{Var}',
+    '\\Cov':   '\\operatorname{Cov}',
+    '\\Tr':    '\\operatorname{Tr}',
+    '\\tr':    '\\operatorname{tr}',
+    '\\xc':    '\\operatorname{xc}',
+    '\\diag':  '\\operatorname{diag}',
+    '\\rank':  '\\operatorname{rank}',
+    '\\supp':  '\\operatorname{supp}',
+    '\\sgn':   '\\operatorname{sgn}',
+    '\\Re':    '\\operatorname{Re}',
+    '\\Im':    '\\operatorname{Im}',
+    '\\limsupop': '\\operatorname*{lim\\,sup}',
+    '\\liminfop': '\\operatorname*{lim\\,inf}',
+
+    // Number sets / blackboard letters
+    '\\R':     '\\mathbb{R}',
+    '\\N':     '\\mathbb{N}',
+    '\\Z':     '\\mathbb{Z}',
+    '\\Q':     '\\mathbb{Q}',
+    '\\C':     '\\mathbb{C}',
+    '\\E':     '\\mathbb{E}',
+    '\\P':     '\\mathbb{P}',
+
+    // Differential element — common in physics body text
+    '\\dd':    '\\,\\mathrm{d}',
+    '\\diff':  '\\,\\mathrm{d}',
+
+    // Calligraphic shortcuts the math-phys batch uses
+    '\\cK':    '\\mathcal{K}',
+    '\\cQ':    '\\mathcal{Q}',
+    '\\cR':    '\\mathcal{R}',
+    '\\cL':    '\\mathcal{L}',
+    '\\cN':    '\\mathcal{N}',
+    '\\cF':    '\\mathcal{F}',
+    '\\cG':    '\\mathcal{G}',
+  };
+
   const opts = {
     delimiters: [
       { left: '$$', right: '$$', display: true  },
@@ -12,6 +57,7 @@
       { left: '$',  right: '$',  display: false },
       { left: '\\(', right: '\\)', display: false },
     ],
+    macros: macros,
     throwOnError: false,
     ignoredTags:    ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'],
     ignoredClasses: ['no-katex'],
