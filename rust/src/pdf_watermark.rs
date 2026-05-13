@@ -97,14 +97,14 @@ fn watermark_postscript(manuscript_id: &str, category: &str, app_url: &str) -> S
   exch pop
   2 eq {{ false }} {{
     gsave
-      /Helvetica findfont 7 scalefont setfont
+      /Helvetica findfont 14 scalefont setfont
       0.55 setgray
-      18 72 translate
+      30 190 translate
       90 rotate
       0 0 moveto
       PreXivWatermark show
     grestore
-    [ /Rect [ 14 68 58 724 ]
+    [ /Rect [ 22 184 56 640 ]
       /Border [ 0 0 0 ]
       /Action << /Subtype /URI /URI PreXivHref >>
       /Subtype /Link
