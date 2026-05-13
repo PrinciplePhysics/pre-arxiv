@@ -2651,46 +2651,39 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   border-top: 1px solid var(--rule);
 }
 .revision-url-field { display: block; margin: 0; }
-.revision-artifact-actions {
-  display: flex;
+.revision-file-cleanup {
+  margin-top: 10px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+}
+.revision-file-cleanup summary {
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-top: 12px;
+  gap: 5px;
+  list-style-position: inside;
+}
+.revision-file-cleanup summary:hover { color: var(--brand); }
+.revision-file-cleanup-body {
+  margin-top: 8px;
   padding: 10px 12px;
   border: 1px solid var(--rule);
   border-radius: 5px;
   background: var(--bg-card);
 }
-.revision-artifact-action-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  color: var(--ink-soft);
-  font-family: var(--sans);
-  font-size: 13px;
-  line-height: 1.35;
-}
-.revision-artifact-action-copy strong {
-  color: var(--ink);
-  font-size: 13.5px;
-}
 .revision-remove-artifacts {
   display: inline-flex;
   gap: 8px;
-  align-items: center;
-  flex: 0 0 auto;
-  padding: 7px 10px;
+  align-items: flex-start;
   margin: 0;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--bg-card-alt);
   font-family: var(--sans);
   color: var(--ink-soft);
-  white-space: nowrap;
+  line-height: 1.4;
 }
-.revision-remove-artifacts input { margin: 0; }
+.revision-remove-artifacts input { margin: 2px 0 0; }
+.revision-remove-artifacts strong { color: var(--ink); font-weight: 600; }
+.revision-file-cleanup-body p { margin: 6px 0 0 25px; }
 .disclosure-options {
   display: grid;
   gap: 10px;
@@ -2716,8 +2709,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 @media (max-width: 860px) {
   .revision-upload-grid { grid-template-columns: 1fr; }
   .revision-artifact-heading { flex-direction: column; gap: 4px; }
-  .revision-artifact-actions { flex-direction: column; align-items: stretch; }
-  .revision-remove-artifacts { white-space: normal; align-items: flex-start; }
 }
 
 @media (max-width: 560px) {

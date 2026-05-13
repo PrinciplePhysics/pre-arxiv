@@ -161,16 +161,18 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                         }
                     }
                     @if m.pdf_path.is_some() || m.source_path.is_some() {
-                        div.revision-artifact-actions {
-                            div.revision-artifact-action-copy {
-                                strong { "Stored PreXiv artifact" }
-                                span.muted.small { " Leave this alone to keep the current PDF/source downloads." }
-                            }
-                            label.checkbox.revision-remove-artifacts {
-                                input type="checkbox" name="remove_pdf" value="1";
-                                span {
-                                    "Remove stored PDF/source"
-                                    span.muted.small { " and rely on External URL only" }
+                        details.revision-file-cleanup {
+                            summary { "Advanced: remove current PreXiv-hosted files" }
+                            div.revision-file-cleanup-body {
+                                label.checkbox.revision-remove-artifacts {
+                                    input type="checkbox" name="remove_pdf" value="1";
+                                    span {
+                                        strong { "Remove the current PDF/source downloads from this PreXiv record." }
+                                        " Use this only if the External URL above is the copy readers should use."
+                                    }
+                                }
+                                p.muted.small {
+                                    "Leave unchecked to keep the existing PreXiv-hosted PDF/source downloads."
                                 }
                             }
                         }
