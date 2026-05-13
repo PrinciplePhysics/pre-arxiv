@@ -154,8 +154,9 @@ function manuscriptFieldsSchema({ allRequired }) {
     category: { type: 'string', description: 'Category id from /categories, e.g. `cs.LG`, `hep-th`, `math.NT`.' },
     external_url: { type: 'string', format: 'uri', description: 'External URL where the manuscript PDF/preprint lives. Required because MCP cannot upload files.' },
     conductor_type: { type: 'string', enum: ['human-ai', 'ai-agent'], description: '`human-ai` = a named human directed an AI; `ai-agent` = autonomous AI agent.' },
-    conductor_ai_model: { type: 'string', description: 'AI model that produced the manuscript, e.g. `Claude Opus 4.7`.' },
-    conductor_ai_model_private: { type: 'boolean', description: 'If true, the AI model is hidden from the public manuscript page.' },
+    conductor_ai_model: { type: 'string', description: 'Legacy single-model shape. Comma-separated string acceptable: `Claude Opus 4.7, GPT-5.5 Pro`. Prefer `conductor_ai_models` (array) for new submissions.' },
+    conductor_ai_models: { type: 'array', items: { type: 'string' }, description: 'Preferred shape for multi-AI co-authorship. Each entry is one precise model+version string, e.g. `["Claude Opus 4.7", "GPT-5.5 Pro", "Gemini 3 Pro"]`. List every model that actually contributed.' },
+    conductor_ai_model_private: { type: 'boolean', description: 'If true, ALL AI model names are hidden from the public manuscript page (the flag is per-manuscript, not per-model).' },
     conductor_human: { type: 'string', description: 'Required when conductor_type=human-ai. Display name of the human conductor.' },
     conductor_human_private: { type: 'boolean', description: 'If true, the human conductor name is hidden from the public manuscript page.' },
     conductor_role: { type: 'string', enum: ROLES, description: 'Required when conductor_type=human-ai. The conductor\'s role.' },
@@ -168,8 +169,12 @@ function manuscriptFieldsSchema({ allRequired }) {
     auditor_statement: { type: 'string', minLength: 20, description: 'Required when has_auditor=true. Signed correctness statement (≥20 chars).' },
     no_auditor_ack: { type: 'boolean', description: 'Required true when has_auditor=false and conductor_type=human-ai — acknowledgement that the work is unaudited.' },
   };
+  // `conductor_ai_model` and `conductor_ai_models` are alternatives.
+  // The server-side validator accepts either, so we mark neither as
+  // strictly required in JSON Schema; downstream `required` collapses
+  // them via a custom check rather than a schema-level requirement.
   const required = allRequired
-    ? ['title', 'abstract', 'authors', 'category', 'external_url', 'conductor_type', 'conductor_ai_model']
+    ? ['title', 'abstract', 'authors', 'category', 'external_url', 'conductor_type']
     : [];
   return {
     type: 'object',

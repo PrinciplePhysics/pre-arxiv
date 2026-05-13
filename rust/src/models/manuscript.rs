@@ -122,11 +122,55 @@ impl Manuscript {
     pub fn is_withdrawn(&self) -> bool {
         self.withdrawn != 0
     }
+
+    /// Split the comma-separated `conductor_ai_model` field into the
+    /// list of distinct AI models. Returns one element when only a
+    /// single model was named (the common case). Trims surrounding
+    /// whitespace and drops empty elements.
+    pub fn ai_models(&self) -> Vec<&str> {
+        split_models(&self.conductor_ai_model)
+    }
+}
+
+fn split_models(s: &str) -> Vec<&str> {
+    s.split(',')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect()
+}
+
+/// Canonicalize an incoming "Claude Opus 4.7, GPT-5.5 Pro" string from
+/// the submit form / API into a clean, dedup'd, joined string suitable
+/// for the DB column. Comma-separated, single space after each comma,
+/// no surrounding whitespace, no empty elements, first-occurrence
+/// wins (so the user's input order is preserved). Used by both
+/// `routes::submit` and `routes::api::post_manuscript`.
+pub fn normalize_ai_models(raw: &str) -> String {
+    let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut out: Vec<&str> = Vec::new();
+    for p in raw.split(',') {
+        let t = p.trim();
+        if t.is_empty() {
+            continue;
+        }
+        // Dedup case-insensitively to defeat "Claude Opus 4.7" vs
+        // "claude opus 4.7" duplicates while preserving the casing
+        // of the first occurrence.
+        let key = t.to_ascii_lowercase();
+        if seen.insert(key) {
+            out.push(t);
+        }
+    }
+    out.join(", ")
 }
 
 impl ManuscriptListItem {
     pub fn is_withdrawn(&self) -> bool {
         self.withdrawn != 0
+    }
+
+    pub fn ai_models(&self) -> Vec<&str> {
+        split_models(&self.conductor_ai_model)
     }
 
     /// Display string for the conductor: "Alice + GPT-4" / "Autonomous: GPT-4" /

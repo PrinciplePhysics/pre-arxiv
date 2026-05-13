@@ -280,7 +280,14 @@ pub struct ManuscriptIn {
     pub external_url: Option<String>,
 
     pub conductor_type: Option<String>,    // "human-ai" (default) or "ai-agent"
+    /// Single-model legacy form. Either this OR `conductor_ai_models`
+    /// must be present. If both are given, `conductor_ai_models` wins.
+    #[serde(default)]
     pub conductor_ai_model: String,
+    /// Preferred shape: array of one-or-more model identifiers, e.g.
+    /// `["Claude Opus 4.7", "GPT-5.5 Pro"]`.
+    #[serde(default)]
+    pub conductor_ai_models: Vec<String>,
     pub conductor_ai_model_public: Option<bool>,   // default true
     pub conductor_human: Option<String>,
     pub conductor_human_public: Option<bool>,      // default true
@@ -306,7 +313,17 @@ async fn post_manuscript(
     if v.r#abstract.trim().len() < 100 { errors.push("abstract must be at least 100 chars"); }
     if v.authors.trim().is_empty() { errors.push("authors is required"); }
     if v.category.trim().is_empty() { errors.push("category is required"); }
-    if v.conductor_ai_model.trim().is_empty() { errors.push("conductor_ai_model is required"); }
+    // Normalize multi-AI input: `conductor_ai_models: [...]` wins; if
+    // missing we fall back to splitting the legacy `conductor_ai_model`
+    // string on commas. Either path must produce ≥1 non-empty model.
+    let ai_models_joined: String = if !v.conductor_ai_models.is_empty() {
+        crate::models::manuscript::normalize_ai_models(&v.conductor_ai_models.join(", "))
+    } else {
+        crate::models::manuscript::normalize_ai_models(&v.conductor_ai_model)
+    };
+    if ai_models_joined.is_empty() {
+        errors.push("conductor_ai_models is required (at least one model name)");
+    }
     let conductor_type = v.conductor_type.as_deref().unwrap_or("human-ai");
     if !matches!(conductor_type, "human-ai" | "ai-agent") {
         errors.push("conductor_type must be 'human-ai' or 'ai-agent'");
@@ -369,7 +386,7 @@ async fn post_manuscript(
         .bind(v.category.trim())
         .bind(v.external_url.as_deref())
         .bind(conductor_type)
-        .bind(v.conductor_ai_model.trim())
+        .bind(&ai_models_joined)
         .bind(if model_public { 1i64 } else { 0 })
         .bind(if conductor_type == "human-ai" { v.conductor_human.as_deref() } else { None })
         .bind(if human_public { 1i64 } else { 0 })
@@ -878,13 +895,20 @@ fn openapi_spec() -> Value {
 // ─── redaction ─────────────────────────────────────────────────────────────
 
 fn redact_list_item(m: &ManuscriptListItem) -> Value {
-    let ai = if m.conductor_ai_model_public != 0 { m.conductor_ai_model.clone() } else { "(undisclosed)".to_string() };
+    let public = m.conductor_ai_model_public != 0;
+    let ai_models: Vec<String> = if public {
+        m.ai_models().into_iter().map(String::from).collect()
+    } else {
+        vec!["(undisclosed)".to_string()]
+    };
+    let ai_joined = if public { m.conductor_ai_model.clone() } else { "(undisclosed)".to_string() };
     let human = if m.conductor_human_public != 0 { m.conductor_human.clone() } else { Some("(undisclosed)".to_string()) };
     json!({
         "id": m.id, "arxiv_like_id": m.arxiv_like_id, "doi": m.doi,
         "title": m.title, "authors": m.authors, "category": m.category,
         "conductor_type": m.conductor_type,
-        "conductor_ai_model": ai,
+        "conductor_ai_model":  ai_joined,   // legacy comma-joined string
+        "conductor_ai_models": ai_models,   // preferred array shape
         "conductor_human": human,
         "score": m.score.unwrap_or(0),
         "comment_count": m.comment_count.unwrap_or(0),
@@ -894,7 +918,13 @@ fn redact_list_item(m: &ManuscriptListItem) -> Value {
 }
 
 fn redact_manuscript(m: &Manuscript) -> Value {
-    let ai = if m.conductor_ai_model_public != 0 { m.conductor_ai_model.clone() } else { "(undisclosed)".to_string() };
+    let public = m.conductor_ai_model_public != 0;
+    let ai_models: Vec<String> = if public {
+        m.ai_models().into_iter().map(String::from).collect()
+    } else {
+        vec!["(undisclosed)".to_string()]
+    };
+    let ai_joined = if public { m.conductor_ai_model.clone() } else { "(undisclosed)".to_string() };
     let human = if m.conductor_human_public != 0 { m.conductor_human.clone() } else { Some("(undisclosed)".to_string()) };
     json!({
         "id": m.id, "arxiv_like_id": m.arxiv_like_id, "doi": m.doi,
@@ -903,7 +933,8 @@ fn redact_manuscript(m: &Manuscript) -> Value {
         "pdf_path": m.pdf_path, "external_url": m.external_url,
         "source_path": m.source_path,
         "conductor_type": m.conductor_type,
-        "conductor_ai_model": ai,
+        "conductor_ai_model":  ai_joined,
+        "conductor_ai_models": ai_models,
         "conductor_human": human,
         "conductor_role": m.conductor_role,
         "conductor_notes": m.conductor_notes,

@@ -86,10 +86,21 @@ pub fn render(
                         }
                     } @else {
                         @if m.conductor_type == "ai-agent" {
+                            @let ai_list = m.ai_models();
                             div.agent-banner {
                                 strong { "AI agent (autonomous)." }
                                 " This manuscript was produced by "
-                                @if m.conductor_ai_model_public != 0 { (m.conductor_ai_model) } @else { "(undisclosed)" }
+                                @if m.conductor_ai_model_public != 0 {
+                                    @if ai_list.len() <= 1 {
+                                        (m.conductor_ai_model)
+                                    } @else {
+                                        "multiple AI models — "
+                                        @for (i, name) in ai_list.iter().enumerate() {
+                                            @if i > 0 { ", " }
+                                            (name)
+                                        }
+                                    }
+                                } @else { "(undisclosed)" }
                                 " acting on its own, without ongoing human direction."
                                 @if m.has_auditor == 0 {
                                     " " strong { "No human" } " — including the submitter — takes responsibility for its conduct or contents."
@@ -165,18 +176,28 @@ pub fn render(
                             p.muted.small { "No human conductor. Produced by an AI agent acting autonomously." }
                             table.kv {
                                 tr { th { "Mode" } td { span.role-tag.agent-tag { "AI agent (autonomous)" } } }
-                                tr { th { "AI agent" } td {
-                                    strong {
-                                        @if m.conductor_ai_model_public != 0 { (m.conductor_ai_model) }
-                                        @else { "(undisclosed)" }
+                                @let ai_list_a = m.ai_models();
+                                tr {
+                                    th { (if ai_list_a.len() > 1 { "AI agents" } else { "AI agent" }) }
+                                    td {
+                                        @if m.conductor_ai_model_public != 0 {
+                                            span.ai-model-pills {
+                                                @for name in &ai_list_a {
+                                                    span.ai-model-pill { (name) }
+                                                }
+                                            }
+                                        } @else {
+                                            strong { "(undisclosed)" }
+                                        }
                                     }
-                                } }
+                                }
                                 @if let Some(f) = &m.agent_framework { tr { th { "Framework" } td { (f) } } }
                                 @if let Some(notes) = &m.conductor_notes { tr { th { "Notes" } td.markdown { (md(notes)) } } }
                             }
                         } @else {
+                            @let ai_list_h = m.ai_models();
                             table.kv {
-                                tr { th { "Mode" } td { span.role-tag { "Human + AI co-author" } } }
+                                tr { th { "Mode" } td { span.role-tag { "Human + AI co-author" @if ai_list_h.len() > 1 { "s" } } } }
                                 tr { th { "Conductor (human)" } td {
                                     strong {
                                         @if m.conductor_human_public != 0 {
@@ -187,12 +208,20 @@ pub fn render(
                                         " · " span.muted { (role) }
                                     }
                                 } }
-                                tr { th { "AI co-author" } td {
-                                    em {
-                                        @if m.conductor_ai_model_public != 0 { (m.conductor_ai_model) }
-                                        @else { "(undisclosed)" }
+                                tr {
+                                    th { (if ai_list_h.len() > 1 { "AI co-authors" } else { "AI co-author" }) }
+                                    td {
+                                        @if m.conductor_ai_model_public != 0 {
+                                            span.ai-model-pills {
+                                                @for name in &ai_list_h {
+                                                    span.ai-model-pill { (name) }
+                                                }
+                                            }
+                                        } @else {
+                                            em { "(undisclosed)" }
+                                        }
                                     }
-                                } }
+                                }
                                 @if let Some(notes) = &m.conductor_notes { tr { th { "Notes" } td.markdown { (md(notes)) } } }
                             }
                         }

@@ -108,8 +108,16 @@ pub async fn do_submit(
     if fields.authors.trim().is_empty() {
         return Ok(err_page(&session, maybe_user, "At least one author required.").await);
     }
-    if fields.conductor_ai_model.trim().is_empty() {
-        return Ok(err_page(&session, maybe_user, "Conductor AI model required.").await);
+    // Allow multiple AI co-authors — the form joins them with commas in
+    // a hidden input. Normalize to a clean, dedup'd, comma+space-joined
+    // string for storage; require at least one non-empty entry.
+    let ai_models_joined =
+        crate::models::manuscript::normalize_ai_models(&fields.conductor_ai_model);
+    if ai_models_joined.is_empty() {
+        return Ok(err_page(
+            &session, maybe_user,
+            "At least one AI model is required. Type the model name and press Enter / comma.",
+        ).await);
     }
     if fields.conductor_type == "human-ai" && fields.conductor_human.trim().is_empty() {
         return Ok(err_page(&session, maybe_user, "Human conductor name required for Human + AI submissions.").await);
@@ -312,7 +320,7 @@ pub async fn do_submit(
         .bind(opt(&fields.external_url))
         .bind(source_path.as_deref())
         .bind(&fields.conductor_type)
-        .bind(fields.conductor_ai_model.trim())
+        .bind(&ai_models_joined)
         .bind(if fields.conductor_ai_model_public { 1i64 } else { 0 })
         .bind(opt(&fields.conductor_human))
         .bind(if fields.conductor_human_public { 1i64 } else { 0 })

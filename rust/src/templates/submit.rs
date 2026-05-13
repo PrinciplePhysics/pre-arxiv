@@ -308,17 +308,36 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 }
 
                 div.field {
-                    label for="conductor_ai_model" { span.label-text { "AI model " span.req { "*" } } }
-                    input id="conductor_ai_model" type="text" name="conductor_ai_model" required maxlength="200"
-                          list="ai-models-list" autocomplete="off"
-                          placeholder="Type or pick — Claude Opus 4.7, GPT-5, Gemini 3 Pro, …";
+                    label for="ai-model-typer" {
+                        span.label-text { "AI model(s) " span.req { "*" } }
+                    }
+                    // Tag/chip input. The hidden field is the source of
+                    // truth; `ai-model-typer` is just an entry box, and
+                    // `ai-model-chips` renders the current selection.
+                    // Inline JS at the bottom of the form wires:
+                    //   * Enter or comma in the typer  → add a chip + sync hidden
+                    //   * Click × on a chip            → remove + sync hidden
+                    //   * Form submit                  → flush whatever's still
+                    //                                    in the typer into a chip
+                    div.tag-input id="ai-model-tag-input" {
+                        input type="hidden" id="conductor_ai_model" name="conductor_ai_model" value="";
+                        div.tag-chips id="ai-model-chips" aria-live="polite" {}
+                        input #ai-model-typer.tag-typer type="text"
+                              list="ai-models-list" autocomplete="off"
+                              maxlength="200"
+                              placeholder="Type a model name, press Enter or comma to add. e.g. Claude Opus 4.7";
+                    }
                     datalist id="ai-models-list" {
                         @for m in AI_MODELS { option value=(m); }
                     }
-                    span.hint.no-katex { "Pick from the dropdown for the current flagships, or type any precise model+version string." }
+                    span.hint.no-katex {
+                        "Pick from the dropdown, or type any precise model+version string. "
+                        "Press " strong { "Enter" } " or " strong { "," }
+                        " after each model. Add as many as actually contributed."
+                    }
                     label.checkbox-inline {
                         input type="checkbox" name="conductor_ai_model_public" value="0";
-                        span { "Keep this private. Public viewers will see " em { "(undisclosed)" } "; you and admins still see the value." }
+                        span { "Keep these private. Public viewers will see " em { "(undisclosed)" } "; you and admins still see the value." }
                     }
                 }
 
@@ -521,6 +540,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
         // styled card honest — no orphan native "No file chosen" label.
         script { (PreEscaped(r#"
 (function(){
+  // ─── Upload-dropzone filename echo ──────────────────────────────
   document.querySelectorAll('.upload-dropzone').forEach(function(zone){
     var inp = zone.querySelector('.upload-input');
     var out = document.getElementById(zone.dataset.boundName);
@@ -537,6 +557,79 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
       }
     });
   });
+
+  // ─── AI-model tag input ────────────────────────────────────────
+  // Source of truth is the hidden #conductor_ai_model field
+  // (comma-joined string). Chips are visual. Typer just accumulates.
+  var root  = document.getElementById('ai-model-tag-input');
+  if(!root) return;
+  var hidden = document.getElementById('conductor_ai_model');
+  var chips  = document.getElementById('ai-model-chips');
+  var typer  = document.getElementById('ai-model-typer');
+
+  function uniqAppend(list, item){
+    var lower = item.toLowerCase();
+    for(var i=0;i<list.length;i++){ if(list[i].toLowerCase() === lower) return list; }
+    list.push(item);
+    return list;
+  }
+  function parseModels(){
+    return (hidden.value || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  }
+  function syncFromList(list){
+    hidden.value = list.join(', ');
+    chips.innerHTML = '';
+    list.forEach(function(name, idx){
+      var c = document.createElement('span');
+      c.className = 'tag-chip';
+      var lbl = document.createElement('span');
+      lbl.className = 'tag-chip-label';
+      lbl.textContent = name;
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'tag-chip-x';
+      x.setAttribute('aria-label', 'Remove ' + name);
+      x.textContent = '×';
+      x.addEventListener('click', function(){
+        var cur = parseModels();
+        cur.splice(idx, 1);
+        syncFromList(cur);
+        typer.focus();
+      });
+      c.appendChild(lbl);
+      c.appendChild(x);
+      chips.appendChild(c);
+    });
+  }
+  function addFromTyper(){
+    var raw = (typer.value || '').trim();
+    if(!raw) return;
+    var pieces = raw.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    var cur = parseModels();
+    pieces.forEach(function(p){ uniqAppend(cur, p); });
+    syncFromList(cur);
+    typer.value = '';
+  }
+  typer.addEventListener('keydown', function(e){
+    if(e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addFromTyper();
+    } else if(e.key === 'Backspace' && !typer.value){
+      var cur = parseModels();
+      if(cur.length){
+        typer.value = cur.pop();
+        syncFromList(cur);
+      }
+    }
+  });
+  typer.addEventListener('blur', addFromTyper);
+  // Final flush on form submit, in case the user typed a name and
+  // clicked Submit without pressing Enter.
+  var form = typer.closest('form');
+  if(form) form.addEventListener('submit', addFromTyper);
+  // Initial render: in case the server re-served the form with
+  // existing values after a validation error.
+  syncFromList(parseModels());
 })();
 "#)) }
     };
