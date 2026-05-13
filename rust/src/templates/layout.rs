@@ -236,6 +236,8 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                             span.footer-sep aria-hidden="true" { "·" }
                             a href="/licenses"   { "Licenses" }
                             span.footer-sep aria-hidden="true" { "·" }
+                            a href="/permissions" { "Permissions" }
+                            span.footer-sep aria-hidden="true" { "·" }
                             a href="/dmca"       { "DMCA" }
                             span.footer-sep aria-hidden="true" { "·" }
                             a href="/policies"   { "Policies" }

@@ -24,6 +24,10 @@ pub async fn follow(
         set_flash(&session, "Form expired — please try again.").await;
         return Ok(Redirect::to(&format!("/u/{username}")).into_response());
     }
+    if !me.is_verified_or_admin() {
+        set_flash(&session, "Verify your email before following users.").await;
+        return Ok(Redirect::to(&format!("/u/{username}")).into_response());
+    }
     let target: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE username = ?")
         .bind(&username)
         .fetch_optional(&state.pool)

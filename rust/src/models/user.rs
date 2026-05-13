@@ -39,6 +39,9 @@ impl User {
     pub fn is_verified(&self) -> bool {
         self.email_verified != 0
     }
+    pub fn is_verified_or_admin(&self) -> bool {
+        self.is_verified() || self.is_admin()
+    }
     pub fn display(&self) -> &str {
         self.display_name.as_deref().unwrap_or(&self.username)
     }

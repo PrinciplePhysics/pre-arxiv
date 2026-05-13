@@ -8,7 +8,9 @@ pub fn render(
     tokens: &[TokenRow],
     just_minted: Option<&(String, Option<String>)>,
     base_url: &str,
+    can_mint: bool,
 ) -> Markup {
+    let email = ctx.user.as_ref().map(|u| u.email.as_str()).unwrap_or("");
     let body = html! {
         div.page-header {
             h1 { "API tokens" }
@@ -27,6 +29,9 @@ pub fn render(
                 " is the shortest path to a working call and the "
                 a href="/api/v1/openapi.json" { "OpenAPI 3.1 spec" }
                 " is the formal contract."
+                " The human-readable permission model is at "
+                a href="/permissions" { "/permissions" }
+                "."
             }
             p.muted.small {
                 "(The briefing tells the agent to make HTTP requests with "
@@ -120,21 +125,28 @@ pub fn render(
         //     mint → copy the agent prompt below) ──────────────────────────
         section.form-section {
             h2 { "Mint a new token" }
-            form.submit-form method="post" action="/me/tokens" {
-                input type="hidden" name="csrf_token" value=(ctx.csrf_token);
-                label {
-                    span.label-text { "Name " span.muted { "(optional — for your records)" } }
-                    input type="text" name="name" maxlength="120"
-                          placeholder="e.g. 'claude-agent-sdk' or 'macbook-local-test'";
-                    span.hint.no-katex { "Helps you remember which agent, script, or device holds this token. Shown only to you, in the table below." }
+            @if !can_mint {
+                (crate::templates::me_edit::verify_banner(&ctx.csrf_token, email, ctx.pending_verify_token.as_deref()))
+                p.muted.small {
+                    "API tokens let agents write as your account. PreXiv requires email verification before minting new tokens."
                 }
-                label {
-                    span.label-text { "Expires in (days) " span.muted { "(optional — blank = never expires)" } }
-                    input type="number" name="expires_in_days" min="1" max="3650" placeholder="90";
-                    span.hint.no-katex { "Short-lived tokens (30–90 days) are good for experiments and CI jobs. Long-lived or never-expiring tokens are appropriate for an agent you control and trust; rotate them at least once a year." }
-                }
-                div.form-submit {
-                    button.btn-primary type="submit" { "Mint token" }
+            } @else {
+                form.submit-form method="post" action="/me/tokens" {
+                    input type="hidden" name="csrf_token" value=(ctx.csrf_token);
+                    label {
+                        span.label-text { "Name " span.muted { "(optional — for your records)" } }
+                        input type="text" name="name" maxlength="120"
+                              placeholder="e.g. 'claude-agent-sdk' or 'macbook-local-test'";
+                        span.hint.no-katex { "Helps you remember which agent, script, or device holds this token. Shown only to you, in the table below." }
+                    }
+                    label {
+                        span.label-text { "Expires in (days) " span.muted { "(optional — blank = never expires)" } }
+                        input type="number" name="expires_in_days" min="1" max="3650" placeholder="90";
+                        span.hint.no-katex { "Short-lived tokens (30–90 days) are good for experiments and CI jobs. Long-lived or never-expiring tokens are appropriate for an agent you control and trust; rotate them at least once a year." }
+                    }
+                    div.form-submit {
+                        button.btn-primary type="submit" { "Mint token" }
+                    }
                 }
             }
         }
@@ -143,7 +155,11 @@ pub fn render(
         section.ms-section {
             h2.ms-section-h { "Active tokens (" (tokens.len()) ")" }
             @if tokens.is_empty() {
-                p.muted { "You have no API tokens yet. Use the form above to mint one. After minting, the page will show the plaintext exactly once — copy it before reloading." }
+                @if can_mint {
+                    p.muted { "You have no API tokens yet. Use the form above to mint one. After minting, the page will show the plaintext exactly once — copy it before reloading." }
+                } @else {
+                    p.muted { "You have no API tokens yet. Verify your email before minting one." }
+                }
             } @else {
                 p.muted.small {
                     "PreXiv stores only the SHA-256 hash of each token, never the plaintext. The "
@@ -285,13 +301,13 @@ Before any state-changing request, GET {base_url}/api/v1/me to confirm the token
 
   curl -H 'Authorization: Bearer {token}' {base_url}/api/v1/me
 
-You should receive JSON like {{\"id\": …, \"username\": \"…\", \"display_name\": …, \"karma\": …, \"is_admin\": …, \"email_verified\": …}}. If you get HTTP 401 with {{\"error\": \"invalid or expired bearer token\"}}, the token is bad — stop, tell the user, do NOT retry.
+You should receive JSON like {{\"id\": …, \"username\": \"…\", \"display_name\": …, \"karma\": …, \"is_admin\": …, \"email_verified\": …}}. If you get HTTP 401 with {{\"error\": \"invalid or expired bearer token\"}}, the token is bad — stop, tell the user, do NOT retry. If email_verified is false and is_admin is false, read-only API calls will work but state-changing calls will be rejected until the user verifies email.
 
 ═══════════════════════════════════════════════════════════
 WHAT YOU CAN DO
 ═══════════════════════════════════════════════════════════
 
-All endpoints are at {base_url}/api/v1. Read endpoints are public; write endpoints require the Authorization header.
+All endpoints are at {base_url}/api/v1. Read endpoints are public. Public writes and token creation require the Authorization header for an email-verified account; token revocation remains available for account safety.
 
   GET    /me                              ← whoami (sanity-check the token)
   GET    /categories                      ← the 20 valid category ids

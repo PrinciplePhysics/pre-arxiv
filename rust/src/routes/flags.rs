@@ -10,11 +10,10 @@
 //!   POST /c/{id}/flag    — flag a comment by its DB id
 //!
 //! Both require a logged-in account (RequireUser) and CSRF. Reason is
-//! free-form text capped at 500 chars. We don't gate on email-verified
-//! here — flagging is a low-trust action and the rate limiter caps
-//! abuse from a single IP. Anonymous reports are not supported, by
-//! design: every flag carries a reporter we can trace if the system
-//! is abused.
+//! free-form text capped at 500 chars. We require email verification
+//! because flags create moderator workload. Anonymous reports are not
+//! supported, by design: every flag carries a reporter we can trace if
+//! the system is abused.
 
 use axum::extract::{Form, Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
@@ -76,6 +75,10 @@ pub async fn flag_manuscript(
         set_flash(&session, "Form expired — please try again.").await;
         return Ok(Redirect::to(&back).into_response());
     }
+    if !user.is_verified_or_admin() {
+        set_flash(&session, "Verify your email before flagging content.").await;
+        return Ok(Redirect::to(&back).into_response());
+    }
 
     let reason = clean_reason(&form.reason);
     insert_flag(&state.pool, "manuscript", manuscript_id, user.id, &reason).await?;
@@ -132,6 +135,10 @@ pub async fn flag_comment(
 
     if !verify_csrf(&session, &form.csrf_token).await {
         set_flash(&session, "Form expired — please try again.").await;
+        return Ok(Redirect::to(&back).into_response());
+    }
+    if !user.is_verified_or_admin() {
+        set_flash(&session, "Verify your email before flagging content.").await;
         return Ok(Redirect::to(&back).into_response());
     }
 

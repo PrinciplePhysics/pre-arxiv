@@ -40,6 +40,10 @@ pub async fn vote(
         set_flash(&session, "Form expired — please try again.").await;
         return Ok(Redirect::to(&back).into_response());
     }
+    if !user.is_verified_or_admin() {
+        set_flash(&session, "Verify your email before voting.").await;
+        return Ok(Redirect::to(&back).into_response());
+    }
     if !matches!(form.target_type.as_str(), "manuscript" | "comment") {
         return Ok(Redirect::to(&back).into_response());
     }

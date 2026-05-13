@@ -27,6 +27,10 @@ pub async fn post_comment(
         set_flash(&session, "Form expired — please try again.").await;
         return Ok(Redirect::to(&format!("/m/{id}")).into_response());
     }
+    if !user.is_verified_or_admin() {
+        set_flash(&session, "Verify your email before commenting.").await;
+        return Ok(Redirect::to(&format!("/m/{id}")).into_response());
+    }
     let content = form.content.trim();
     if content.is_empty() {
         set_flash(&session, "Comment cannot be empty.").await;

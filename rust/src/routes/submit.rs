@@ -100,7 +100,7 @@ pub async fn do_submit(
     if !bearer_authenticated && !verify_csrf(&session, &fields.csrf_token).await {
         return Ok(err_page(&session, maybe_user, "Form expired — please try again.").await);
     }
-    if !user.is_verified() {
+    if !user.is_verified_or_admin() {
         return Ok(err_page(
             &session, maybe_user,
             "Your email isn't verified yet. Check your inbox for the verification link, or go to /me/edit to resend it. Submission is gated on verification to deter spam.",

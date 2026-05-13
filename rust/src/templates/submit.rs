@@ -68,7 +68,7 @@ const ROLES: &[&str] = &[
 use crate::categories::{self as cats};
 
 pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
-    let unverified = ctx.user.as_ref().map(|u| !u.is_verified()).unwrap_or(false);
+    let unverified = ctx.user.as_ref().map(|u| !u.is_verified_or_admin()).unwrap_or(false);
     let email = ctx.user.as_ref().map(|u| u.email.as_str()).unwrap_or("");
     let body = html! {
         div.page-header {

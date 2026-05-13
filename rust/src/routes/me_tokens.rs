@@ -48,7 +48,13 @@ pub async fn show(
         .ok()
         .flatten();
     let base = state.app_url.as_deref().unwrap_or("http://localhost:3001");
-    Ok(Html(templates::me_tokens::render(&ctx, &rows, just_minted.as_ref(), base).into_string()))
+    Ok(Html(templates::me_tokens::render(
+        &ctx,
+        &rows,
+        just_minted.as_ref(),
+        base,
+        user.is_verified_or_admin(),
+    ).into_string()))
 }
 
 #[derive(Deserialize)]
@@ -68,6 +74,10 @@ pub async fn create(
 ) -> AppResult<Response> {
     if !verify_csrf(&session, &form.csrf_token).await {
         set_flash(&session, "Form expired — please try again.").await;
+        return Ok(Redirect::to("/me/tokens").into_response());
+    }
+    if !user.is_verified_or_admin() {
+        set_flash(&session, "Verify your email before minting API tokens.").await;
         return Ok(Redirect::to("/me/tokens").into_response());
     }
     let name = form.name.trim();

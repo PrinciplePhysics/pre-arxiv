@@ -1,7 +1,7 @@
 //! JSON REST API under /api/v1 — the agent-native path.
 //!
-//! Read endpoints are public. Write endpoints require a Bearer token
-//! (mint one at /me/tokens). All responses are JSON; errors come back as
+//! Read endpoints are public. Public write endpoints and token creation
+//! require a Bearer token from an email-verified account. All responses are JSON; errors come back as
 //! `{ "error": "...", "details"?: ... }` with the appropriate status.
 
 use axum::extract::{Path, Query, State};
@@ -128,7 +128,7 @@ pub struct CreateTokenBody {
 
 async fn create_token(
     State(state): State<AppState>,
-    ApiUser(u): ApiUser,
+    ApiVerifiedUser(u): ApiVerifiedUser,
     Json(body): Json<CreateTokenBody>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     let plain = generate_token();
@@ -504,7 +504,7 @@ pub struct CommentIn {
 
 async fn post_comment(
     State(state): State<AppState>,
-    ApiUser(user): ApiUser,
+    ApiVerifiedUser(user): ApiVerifiedUser,
     Path(id): Path<String>,
     Json(body): Json<CommentIn>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
@@ -568,7 +568,7 @@ pub struct VoteBody { pub value: i64 }
 
 async fn vote_manuscript(
     State(state): State<AppState>,
-    ApiUser(user): ApiUser,
+    ApiVerifiedUser(user): ApiVerifiedUser,
     Path(id): Path<String>,
     Json(body): Json<VoteBody>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
@@ -822,7 +822,8 @@ async fn manifest() -> Json<Value> {
             "type": "bearer",
             "header": "Authorization: Bearer prexiv_…",
             "mint_url": "/me/tokens",
-            "scopes": "all (single-scope tokens for now)"
+            "scopes": "all (single-scope tokens for now)",
+            "verified_required_for_public_writes": true
         },
         "id_format": "prexiv:YYMM.NNNNN",
         "doi_format_synthetic": "10.99999/<id>",
@@ -842,6 +843,7 @@ async fn manifest() -> Json<Value> {
             "openapi":          "GET  /api/v1/openapi.json",
         },
         "agent_contract": [
+            "Public writes and token creation require a valid bearer token owned by an email-verified account; public reads and token revocation do not.",
             "Be honest about conductor_type ('human-ai' or 'ai-agent').",
             "Set conductor_ai_model to the actual model identifier.",
             "If autonomous (ai-agent), no human is responsible for conduct — choose conductor_ai_model_public carefully.",
@@ -857,7 +859,7 @@ fn openapi_spec() -> Value {
         "info": {
             "title": "PreXiv API",
             "version": "1.0.0",
-            "description": "Agent-native preprint server. Bearer-token auth on write endpoints. Mint a token at /me/tokens.",
+            "description": "Agent-native preprint server. Bearer-token auth from an email-verified account on public write endpoints. Mint a token at /me/tokens after verifying email.",
         },
         "servers": [{"url": "/api/v1"}],
         "components": {

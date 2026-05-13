@@ -152,6 +152,7 @@ pub fn router() -> Router<AppState> {
         .route("/dmca", get(pages::dmca))
         .route("/policies", get(pages::policies))
         .route("/licenses", get(pages::licenses))
+        .route("/permissions", get(pages::permissions))
 
         // Crawler policy + indexer surface
         .route("/robots.txt", get(static_routes::robots_txt))

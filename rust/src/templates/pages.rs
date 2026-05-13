@@ -24,3 +24,4 @@ pub const PRIVACY: &str = include_str!("pages_content/privacy.html");
 pub const DMCA: &str = include_str!("pages_content/dmca.html");
 pub const POLICIES: &str = include_str!("pages_content/policies.html");
 pub const LICENSES: &str = include_str!("pages_content/licenses.html");
+pub const PERMISSIONS: &str = include_str!("pages_content/permissions.html");

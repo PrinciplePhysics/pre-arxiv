@@ -87,6 +87,10 @@ pub async fn show(
         set_flash(&session, "Only the submitter (or an admin) may revise a manuscript.").await;
         return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
     }
+    if !user.is_verified_or_admin() {
+        set_flash(&session, "Verify your email before revising a manuscript.").await;
+        return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
+    }
     if m.is_withdrawn() {
         set_flash(&session, "This manuscript is withdrawn and can't be revised.").await;
         return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
@@ -109,6 +113,10 @@ pub async fn submit(
     let m = load_manuscript(&state, &id).await?;
     if m.submitter_id != user.id && !user.is_admin() {
         set_flash(&session, "Only the submitter (or an admin) may revise a manuscript.").await;
+        return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
+    }
+    if !user.is_verified_or_admin() {
+        set_flash(&session, "Verify your email before revising a manuscript.").await;
         return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
     }
     if m.is_withdrawn() {
