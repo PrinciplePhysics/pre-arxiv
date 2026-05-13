@@ -201,6 +201,12 @@ pub async fn do_submit(
             }
         }
         "pdf" => {
+            if !fields.conductor_ai_model_public
+                || (fields.conductor_type == "human-ai" && !fields.conductor_human_public)
+            {
+                return Ok(err_page(&session, maybe_user,
+                    "Private conductor/model fields require a LaTeX source upload so PreXiv can black out the public source and compiled PDF.").await);
+            }
             if pdf_buf.is_none() {
                 return Ok(err_page(&session, maybe_user,
                     "PDF upload is required for the 'PDF directly' option.").await);
@@ -229,7 +235,11 @@ pub async fn do_submit(
     let mut pdf_path: Option<String> = None;
     let mut source_path: Option<String> = None;
 
-    if let Some((safe, data)) = &pdf_buf {
+    if source_type == "pdf" {
+        let Some((safe, data)) = &pdf_buf else {
+            return Ok(err_page(&session, maybe_user,
+                "PDF upload is required for the 'PDF directly' option.").await);
+        };
         // Direct-PDF path: no compilation.
         let stored = format!("{stamp}-{rnd}-{safe}");
         let full = upload_dir.join(&stored);
@@ -240,18 +250,39 @@ pub async fn do_submit(
         pdf_path = Some(stored);
     }
 
-    if let Some((safe, data)) = &source_buf {
-        // Persist the source archive.
-        let stored_src = format!("{stamp}-{rnd}-src-{safe}");
+    if source_type == "tex" {
+        let Some((safe, data)) = &source_buf else {
+            return Ok(err_page(&session, maybe_user,
+                "LaTeX source upload is required.").await);
+        };
+        let redaction = crate::compile::RedactionOptions {
+            hide_human: fields.conductor_type == "human-ai" && !fields.conductor_human_public,
+            hide_ai_model: !fields.conductor_ai_model_public,
+            human_name: opt(&fields.conductor_human).map(str::to_string),
+            ai_models: ai_models_joined
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect(),
+        };
+        let prepared = match crate::compile::prepare_source(safe, data, &redaction) {
+            Ok(prepared) => prepared,
+            Err(e) => return Ok(err_page(&session, maybe_user, &format!("LaTeX source preparation failed: {e}")).await),
+        };
+
+        // Persist only the source artifact that will be offered publicly.
+        // For private conductor/model fields, this is the blacked-out source.
+        let stored_src = format!("{stamp}-{rnd}-src-{}", sanitize_filename(&prepared.filename));
         let full_src = upload_dir.join(&stored_src);
         let mut f = fs::File::create(&full_src).await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
-        f.write_all(data).await
+        f.write_all(&prepared.data).await
             .map_err(|e| crate::error::AppError::Other(e.into()))?;
         source_path = Some(stored_src);
 
         // Compile.
-        match crate::compile::compile(safe, data).await {
+        match crate::compile::compile(&prepared.filename, &prepared.data).await {
             Ok(compiled) => {
                 let pdf_name = format!("{stamp}-{rnd}-compiled.pdf");
                 let pdf_full = upload_dir.join(&pdf_name);
@@ -458,7 +489,6 @@ async fn err_page(session: &Session, maybe_user: MaybeUser, msg: &str) -> Respon
     Html(templates::submit::render(&ctx, Some(msg)).into_string()).into_response()
 }
 
-#[derive(Default)]
 struct SubmitFields {
     csrf_token: String,
     title: String,
@@ -486,6 +516,37 @@ struct SubmitFields {
     ai_training: String,
     /// "tex" / "pdf" / "url"
     source_type: String,
+}
+
+impl Default for SubmitFields {
+    fn default() -> Self {
+        Self {
+            csrf_token: String::new(),
+            title: String::new(),
+            r#abstract: String::new(),
+            authors: String::new(),
+            category: String::new(),
+            external_url: String::new(),
+            conductor_type: String::new(),
+            conductor_ai_model: String::new(),
+            conductor_ai_model_public: true,
+            conductor_human: String::new(),
+            conductor_human_public: true,
+            conductor_role: String::new(),
+            conductor_notes: String::new(),
+            agent_framework: String::new(),
+            audit_status: String::new(),
+            self_audit_statement: String::new(),
+            auditor_name: String::new(),
+            auditor_affiliation: String::new(),
+            auditor_role: String::new(),
+            auditor_statement: String::new(),
+            auditor_orcid: String::new(),
+            license: String::new(),
+            ai_training: String::new(),
+            source_type: String::new(),
+        }
+    }
 }
 
 impl SubmitFields {

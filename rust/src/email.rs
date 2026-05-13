@@ -102,9 +102,12 @@ const INSTITUTIONAL_DOMAINS: &[&str] = &[
 pub fn is_institutional(email: &str) -> bool {
     let lower = email.trim().to_ascii_lowercase();
     let domain = match lower.split_once('@') {
-        Some((_, d)) if !d.is_empty() => d,
+        Some((local, d)) if !local.is_empty() && !d.is_empty() => d,
         _ => return false,
     };
+    if domain.split('.').any(str::is_empty) {
+        return false;
+    }
     // Exact match or subdomain match against the curated list.
     for cur in INSTITUTIONAL_DOMAINS {
         if domain == *cur || domain.ends_with(&format!(".{cur}")) {

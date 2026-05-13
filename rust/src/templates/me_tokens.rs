@@ -20,11 +20,9 @@ pub fn render(
                 " header, lets an AI agent, script, or any non-browser client do everything you can do in the website — submit manuscripts, comment, vote, search, fetch your feed. Tokens belong to you and are scoped to your account."
             }
             p.muted {
-                "The headline use case is "
-                a href="#agent-prompt" { "the agent prompt below" }
-                " — a self-contained briefing you give to an "
+                "After you mint a token, PreXiv shows a one-time agent prompt with that token inlined. Paste it into an "
                 strong { "agentic CLI" }
-                " (Claude Code, Codex, Gemini CLI, Aider, Cursor agent mode, etc.) or to a programmatic agent (Anthropic Agent SDK, OpenAI Assistants), alongside the token, and the agent can act on PreXiv on your behalf without further setup. For writing your own client by hand, the "
+                " (Claude Code, Codex, Gemini CLI, Aider, Cursor agent mode, etc.) or a programmatic agent (Anthropic Agent SDK, OpenAI Assistants), and the agent can act on PreXiv on your behalf without further setup. For writing your own client by hand, the "
                 a href="/api/v1/manifest" { "agent manifest" }
                 " is the shortest path to a working call and the "
                 a href="/api/v1/openapi.json" { "OpenAPI 3.1 spec" }
@@ -99,7 +97,7 @@ pub fn render(
             }
 
             // ─── Agent prompt — the actual headline feature for this token ──
-            section.form-section style="margin-top: 18px" {
+            section.form-section id="agent-prompt" style="margin-top: 18px" {
                 h2 { "Agent prompt — paste this to your AI" }
                 p.muted.small {
                     "Copy the entire block below and paste it into a chat with Claude, GPT, Gemini, or any LLM. Tell the model what you want done in the same message (or the next one). The block contains everything the model needs to know about PreXiv's API, its submission contract, and your access token — no extra setup, no second message to attach context."
@@ -137,38 +135,6 @@ pub fn render(
                 }
                 div.form-submit {
                     button.btn-primary type="submit" { "Mint token" }
-                }
-            }
-        }
-
-        // ─── Agent prompt — always visible (template with placeholder).
-        //     When a token was JUST minted, the same content appears
-        //     above inside the banner with the actual token inlined.
-        section.ms-section id="agent-prompt" {
-            h2.ms-section-h { "Agent prompt — paste this to your AI" }
-            @if just_minted.is_some() {
-                p.muted.small {
-                    "↑ The version above inside the green banner has your actual token already inlined; copy that one. The version below is the same briefing but with a "
-                    code { "<paste-your-token-here>" }
-                    " placeholder — useful as a reference, or to embed in documentation."
-                }
-            } @else {
-                p.muted.small {
-                    "This is a self-contained briefing you give to an "
-                    strong { "agentic CLI" }
-                    " — Claude Code, Codex CLI, Gemini CLI, Aider, Cursor in agent mode, the Anthropic Agent SDK, OpenAI Assistants, or any environment where the model can run shell commands. The briefing tells the agent to make "
-                    code { "curl" }
-                    " requests, so its runtime needs network + shell access; pure web chat surfaces (claude.ai, chatgpt.com, gemini.google.com) cannot use it on their own. "
-                    strong { "Mint a token above" }
-                    " to get a version with your token already inlined; or copy this template and replace "
-                    code { "<paste-your-token-here>" }
-                    " with a saved token before pasting."
-                }
-            }
-            div.copy-pre-wrap {
-                button.copy-pre-btn type="button" { "Copy prompt" }
-                pre style="user-select:all; font-size:13px; padding:14px; background:var(--code-bg); border-radius:4px; line-height:1.5; word-break:break-word; white-space:pre-wrap" {
-                    (agent_prompt("<paste-your-token-here>", base_url))
                 }
             }
         }

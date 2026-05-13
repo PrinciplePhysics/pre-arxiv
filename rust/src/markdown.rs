@@ -6,7 +6,8 @@
 //!
 //! ## KaTeX-aware
 //!
-//! `$…$` (inline) and `$$…$$` (display) math are common in PreXiv content.
+//! `$…$`, `\(...\)` (inline) and `$$…$$`, `\[...\]` (display) math are
+//! common in PreXiv content.
 //! Plain markdown rendering ruins them: CommonMark's `_emphasis_` rule
 //! happily opens an italic at the underscore inside `\mathrm{Var}_\Psi`,
 //! and then keeps it open until it finds a closing `_` elsewhere on the
@@ -14,8 +15,8 @@
 //! block. The text in between is eaten as italic and the `$` boundaries
 //! become stray dollar signs that KaTeX can't pair up.
 //!
-//! Fix: before markdown runs, scan the input and lift every `$…$` and
-//! `$$…$$` region out into a side buffer, leaving an ASCII placeholder
+//! Fix: before markdown runs, scan the input and lift every math region
+//! out into a side buffer, leaving an ASCII placeholder
 //! token (`\u{FDD0}MATH<n>\u{FDD1}`, a private-use codepoint pair that
 //! cannot occur in normal text and that pulldown-cmark + ammonia both
 //! pass through verbatim). Run markdown + ammonia, then splice the math
@@ -71,10 +72,10 @@ pub fn render(input: &str) -> String {
     restore_math(sanitized, &math)
 }
 
-const PLACE_OPEN:  char = '\u{FDD0}';
+const PLACE_OPEN: char = '\u{FDD0}';
 const PLACE_CLOSE: char = '\u{FDD1}';
 
-/// Walk the input, lifting `$…$` and `$$…$$` regions out. Returns the
+/// Walk the input, lifting TeX math-delimited regions out. Returns the
 /// substituted text (with placeholders) and the ordered list of math
 /// fragments. Each fragment retains its original delimiters so the
 /// browser-side KaTeX auto-render finds them as written.
@@ -85,6 +86,36 @@ fn extract_math(input: &str) -> (String, Vec<String>) {
 
     while let Some(c) = chars.next() {
         if c == '\\' {
+            if let Some(open) = chars.peek().copied().filter(|c| matches!(c, '(' | '[')) {
+                chars.next();
+                let close = if open == '(' { ')' } else { ']' };
+                let mut content = String::new();
+                let mut closed = false;
+                while let Some(d) = chars.next() {
+                    if d == '\\' {
+                        if chars.peek() == Some(&close) {
+                            chars.next();
+                            closed = true;
+                            break;
+                        }
+                        content.push(d);
+                        if let Some(next) = chars.next() {
+                            content.push(next);
+                        }
+                        continue;
+                    }
+                    content.push(d);
+                }
+                if closed {
+                    push_placeholder(&mut out, math.len());
+                    math.push(format!("\\{open}{content}\\{close}"));
+                } else {
+                    out.push('\\');
+                    out.push(open);
+                    out.push_str(&content);
+                }
+                continue;
+            }
             // Verbatim copy the next char so `\$` doesn't accidentally
             // open a math region. (Authors who *want* a literal $ in
             // prose write \$.)
@@ -202,6 +233,22 @@ mod tests {
         let src = r"see $$E_{\mathrm{xc}}(\Psi) \ge -\int F(\rho)\,dx$$ end";
         let out = render(src);
         assert!(out.contains(r"$$E_{\mathrm{xc}}(\Psi) \ge -\int F(\rho)\,dx$$"));
+    }
+
+    #[test]
+    fn latex_paren_math_survives_markdown_escaping() {
+        let src = r"Let \(\rho_\Psi(x)\) and \(T_\Psi(x)\) denote densities.";
+        let out = render(src);
+        assert!(out.contains(r"\(\rho_\Psi(x)\)"));
+        assert!(out.contains(r"\(T_\Psi(x)\)"));
+        assert!(!out.contains(r"(\rho_\Psi(x))"));
+    }
+
+    #[test]
+    fn latex_bracket_math_survives_markdown_escaping() {
+        let src = r"Display \[ C_{\mathrm{cell}}:=\tfrac{3}{5} \] done";
+        let out = render(src);
+        assert!(out.contains(r"\[ C_{\mathrm{cell}}:=\tfrac{3}{5} \]"));
     }
 
     #[test]

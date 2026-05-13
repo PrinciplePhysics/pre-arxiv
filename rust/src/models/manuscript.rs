@@ -51,10 +51,10 @@ pub struct Manuscript {
     /// category ids; the primary stays in `category`. Optional.
     #[sqlx(default)]
     pub secondary_categories: Option<String>,
-    /// Path (under UPLOAD_DIR) to the original LaTeX source archive
-    /// when the manuscript was submitted as LaTeX source rather than as
-    /// a direct PDF. `pdf_path` continues to hold the served (compiled)
-    /// PDF; `source_path` is the .tex/.zip/.tar.gz the user uploaded.
+    /// Path (under UPLOAD_DIR) to the served LaTeX source artifact when
+    /// the manuscript was submitted as LaTeX source rather than as a
+    /// direct PDF. If conductor/model privacy was requested, this points
+    /// to the blacked-out source used to compile the served PDF.
     #[sqlx(default)]
     pub source_path: Option<String>,
 }
