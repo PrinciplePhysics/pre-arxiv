@@ -2619,51 +2619,44 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   border-radius: 3px;
 }
 
-/* ─── Profile verified-scholar markers ────────────────────────────
-   Quiet inline labels rather than chunky pills — a single ✓ glyph
-   in the brand-green check color, label in muted ink, value in
-   subdued mono with no underline (the whole label is the link). The
-   row reads as a small annotation under the affiliation, not as a
-   competing UI element. */
-.profile-verified-badges {
+/* ─── Profile verified-scholar pictorial badges ───────────────────
+   Small circular icons under the name (ORCID green + institutional
+   slate-blue), Twitter-verified-style. The whole badge is clickable
+   when it's a link; non-link badges (institutional) hover-emphasize
+   without a destination. Pure SVG inline — no icon fonts, no remote
+   image dependency. */
+.profile-name-badges {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 16px;
-  margin: 6px 0 0;
-  font-size: 12.5px;
-  color: var(--ink-soft);
-  line-height: 1.5;
+  gap: 8px;
+  margin: 8px 0 2px;
 }
-.profile-vbadge {
+.profile-name-badge {
   display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  font-weight: 500;
-}
-.profile-vbadge::before {
-  content: "\2713"; /* ✓ */
-  color: #2e9a47;
-  font-weight: 700;
-  font-size: 12px;
-  line-height: 1;
-}
-.profile-vbadge .vbadge-label {
-  color: var(--ink-soft);
-  letter-spacing: 0.005em;
-}
-.profile-vbadge a,
-.profile-vbadge code {
-  color: var(--muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   text-decoration: none;
-  font-family: var(--mono, ui-monospace, "SF Mono", Menlo, monospace);
-  font-size: 11.5px;
-  background: rgba(20, 16, 8, 0.04);
-  padding: 1px 5px;
-  border-radius: 3px;
-  letter-spacing: 0.01em;
+  box-shadow: var(--shadow-xs);
+  transition: transform 0.18s var(--ease-out, ease),
+              box-shadow 0.18s var(--ease-out, ease);
+  cursor: default;
 }
-.profile-vbadge a:hover {
-  color: var(--brand);
-  background: var(--brand-bg);
+a.profile-name-badge { cursor: pointer; }
+.profile-name-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.profile-name-badge svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+}
+.profile-name-badge.is-orcid:hover svg {
+  /* small ORCID-green halo on hover */
+  filter: drop-shadow(0 0 0.5px #A6CE39);
+}
+.profile-name-badge.is-inst:hover svg {
+  filter: drop-shadow(0 0 0.5px #3a6f9c);
 }

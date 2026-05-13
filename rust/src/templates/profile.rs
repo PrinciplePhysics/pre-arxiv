@@ -1,10 +1,24 @@
-use maud::{html, Markup};
+use maud::{html, Markup, PreEscaped};
 
 use crate::models::{ManuscriptListItem, User};
 
 use super::home::manuscript_row;
 use super::layout::{layout, PageCtx};
 use crate::routes::profile::ProfileStats;
+
+/// ORCID iD official mark — green circle with "iD" lettering plus the
+/// signature green-dot tittle on the lowercase i. Public-domain
+/// vector from the ORCID brand pack; we inline rather than load
+/// from a CDN so the badge renders even when the user is offline or
+/// pub.orcid.org is unreachable. `aria-hidden` so screen readers
+/// rely on the parent anchor's aria-label instead.
+const ORCID_BADGE_SVG: &str = r##"<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="128" cy="128" r="128" fill="#A6CE39"/><g fill="#fff"><path d="M86.3 186.2H70.9V79.1h15.4v107.1z"/><path d="M108.9 79.1h41.6c39.6 0 57 28.3 57 53.6 0 27.5-21.5 53.6-56.8 53.6h-41.8V79.1zm15.4 93.3h24.5c34.9 0 42.9-26.5 42.9-39.7 0-21.5-13.7-39.7-43.7-39.7h-23.7v79.4z"/><circle cx="78.6" cy="56.8" r="10.1"/></g></svg>"##;
+
+/// Institutional-email badge — slate-blue circle, white classical
+/// columns (a pediment on five fluted columns). Reads as "this person
+/// is at an institution." Drawn fresh rather than borrowing an icon
+/// font so nothing extra has to load.
+const INST_BADGE_SVG: &str = r##"<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="128" cy="128" r="128" fill="#3a6f9c"/><g fill="#fff"><path d="M128 60 L62 96 L194 96 Z"/><rect x="58" y="100" width="140" height="9"/><rect x="68" y="114" width="12" height="56"/><rect x="92" y="114" width="12" height="56"/><rect x="116" y="114" width="12" height="56"/><rect x="140" y="114" width="12" height="56"/><rect x="164" y="114" width="12" height="56"/><rect x="58" y="174" width="140" height="11"/><rect x="50" y="188" width="156" height="6"/></g></svg>"##;
 
 pub fn render(
     ctx: &PageCtx,
@@ -25,6 +39,30 @@ pub fn render(
         header.profile-card {
             div.profile-card-id {
                 h1.profile-name { (real_name) }
+                @if u.is_verified_scholar() {
+                    div.profile-name-badges aria-label="Verified-scholar credentials" {
+                        @if u.is_orcid_verified() {
+                            @let orcid = u.orcid.as_deref().unwrap_or("");
+                            @let orcid_url = format!("https://orcid.org/{orcid}");
+                            @let orcid_title = format!("ORCID iD verified · {orcid}");
+                            @let orcid_aria  = format!("ORCID iD verified: {orcid}");
+                            a.profile-name-badge.is-orcid
+                              href=(orcid_url)
+                              target="_blank" rel="noopener me"
+                              title=(orcid_title)
+                              aria-label=(orcid_aria) {
+                                (PreEscaped(ORCID_BADGE_SVG))
+                            }
+                        }
+                        @if u.is_institutional_email() {
+                            span.profile-name-badge.is-inst
+                              title="Verified email on an institutional / R&D-org domain"
+                              aria-label="Verified institutional email" {
+                                (PreEscaped(INST_BADGE_SVG))
+                            }
+                        }
+                    }
+                }
                 @if has_display_name {
                     p.profile-handle { "@" (u.username) }
                 }
@@ -56,24 +94,6 @@ pub fn render(
                     p.profile-affiliation {
                         span.profile-affiliation-label { "Affiliation" }
                         " · " (a)
-                    }
-                }
-            }
-            @if u.is_verified_scholar() {
-                p.profile-verified-badges.no-katex {
-                    @if u.is_orcid_verified() {
-                        @let orcid = u.orcid.as_deref().unwrap_or("");
-                        span.profile-vbadge title="ORCID iD verified — the public ORCID record's name matches this user's display name." {
-                            span.vbadge-label { "ORCID" }
-                            @if !orcid.is_empty() {
-                                a href={ "https://orcid.org/" (orcid) } target="_blank" rel="noopener" { (orcid) }
-                            }
-                        }
-                    }
-                    @if u.is_institutional_email() {
-                        span.profile-vbadge title="Verified email on an institutional / R&D-org domain." {
-                            span.vbadge-label { "Institutional email" }
-                        }
                     }
                 }
             }
