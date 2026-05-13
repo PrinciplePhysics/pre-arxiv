@@ -3,6 +3,7 @@
 use maud::{Markup, PreEscaped, html};
 
 use super::layout::{PageCtx, layout};
+use crate::categories::{self as cats};
 use crate::models::Manuscript;
 
 const UPLOAD_ICON_SVG: &str = r##"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5v11"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M4.5 14.5v3.25A2.25 2.25 0 0 0 6.75 20h10.5a2.25 2.25 0 0 0 2.25-2.25V14.5"/></svg>"##;
@@ -77,11 +78,18 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                 label {
                     span.label-text { "Category " span.req { "*" } }
                     select name="category" required {
-                        @for cat in crate::categories::CATEGORIES {
-                            option value=(cat.id) selected[m.category == cat.id] {
-                                (cat.id) " \u{2014} " (cat.name)
+                        @for g in cats::GROUPS {
+                            optgroup label=(g) {
+                                @for c in cats::in_group(g) {
+                                    option value=(c.id) selected[m.category == c.id] {
+                                        (c.id) " \u{2014} " (c.name)
+                                    }
+                                }
                             }
                         }
+                    }
+                    span.hint.no-katex {
+                        "Grouped by subject area, matching the submit form. Pick the most specific category that still honestly fits the revised manuscript."
                     }
                 }
 
