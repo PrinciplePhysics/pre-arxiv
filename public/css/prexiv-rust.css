@@ -1300,6 +1300,164 @@ select:focus-visible {
   color: var(--muted);
 }
 
+/* ── G2. Browse index — compact subject dashboard ────────────────── */
+.browse-header {
+  max-width: 860px;
+  margin-bottom: 14px;
+}
+.browse-header h1 {
+  letter-spacing: 0;
+}
+.browse-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 12px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 10px 0;
+}
+.browse-stat {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.browse-stat strong {
+  font-family: var(--serif);
+  font-size: 25px;
+  line-height: 1;
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.browse-stat span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+.browse-taxonomy-note {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.browse-taxonomy-note code {
+  white-space: nowrap;
+}
+.browse-domains {
+  display: grid;
+  gap: 18px;
+  margin-top: 8px;
+}
+.browse-domain {
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+}
+.browse-domain-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.browse-domain-head h2 {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--muted);
+  font-weight: 800;
+}
+.browse-domain-head span {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.browse-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+.browse-category {
+  display: grid;
+  grid-template-columns: minmax(58px, auto) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--bg-card);
+  color: var(--ink);
+  text-decoration: none;
+  box-shadow: var(--shadow);
+}
+.browse-category:hover {
+  color: var(--ink);
+  border-color: var(--brand-soft);
+  background: var(--bg-card-alt);
+  text-decoration: none;
+}
+.browse-cat-id {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--brand);
+  white-space: nowrap;
+}
+.browse-cat-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.browse-cat-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.browse-footnote {
+  margin: 22px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+@media (max-width: 720px) {
+  .browse-overview {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 9px 0;
+  }
+  .browse-stat {
+    justify-content: space-between;
+  }
+  .browse-stat strong {
+    font-size: 22px;
+  }
+  .browse-domain-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .browse-category-grid {
+    grid-template-columns: 1fr;
+  }
+  .browse-category {
+    grid-template-columns: minmax(56px, auto) minmax(0, 1fr);
+  }
+  .browse-cat-count {
+    grid-column: 2;
+  }
+}
+
 /* ── H. Forms — focus / spacing micro-polish ─────────────────────── */
 .submit-form input[type="text"],
 .submit-form input[type="email"],
