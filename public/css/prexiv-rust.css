@@ -2646,25 +2646,46 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   border-radius: 8px;
 }
 .revision-url-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  gap: 16px;
-  align-items: end;
   padding-top: 14px;
   margin-top: 14px;
   border-top: 1px solid var(--rule);
 }
-.revision-remove-artifacts {
-  align-self: center;
-  display: inline-flex;
-  gap: 8px;
+.revision-url-field { display: block; margin: 0; }
+.revision-artifact-actions {
+  display: flex;
   align-items: center;
-  min-height: 38px;
-  padding: 9px 12px;
-  margin: 0;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 10px 12px;
   border: 1px solid var(--rule);
   border-radius: 5px;
   background: var(--bg-card);
+}
+.revision-artifact-action-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.revision-artifact-action-copy strong {
+  color: var(--ink);
+  font-size: 13.5px;
+}
+.revision-remove-artifacts {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  margin: 0;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--bg-card-alt);
   font-family: var(--sans);
   color: var(--ink-soft);
   white-space: nowrap;
@@ -2693,9 +2714,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .disclosure-redaction-note strong { color: var(--brand); }
 
 @media (max-width: 860px) {
-  .revision-upload-grid,
-  .revision-url-row { grid-template-columns: 1fr; }
+  .revision-upload-grid { grid-template-columns: 1fr; }
   .revision-artifact-heading { flex-direction: column; gap: 4px; }
+  .revision-artifact-actions { flex-direction: column; align-items: stretch; }
   .revision-remove-artifacts { white-space: normal; align-items: flex-start; }
 }
 

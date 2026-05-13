@@ -153,17 +153,24 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                     }
 
                     div.revision-url-row {
-                        label {
+                        label.revision-url-field {
                             span.label-text { "External URL " span.muted { "(optional)" } }
                             input type="url" name="external_url" maxlength="500" value=(m.external_url.clone().unwrap_or_default())
                                   placeholder="https://\u{2026}";
                             span.hint.no-katex { "Canonical hosted copy elsewhere (arXiv, GitHub, journal site). Readers see this link alongside any stored PDF/source." }
                         }
-                        @if m.pdf_path.is_some() || m.source_path.is_some() {
+                    }
+                    @if m.pdf_path.is_some() || m.source_path.is_some() {
+                        div.revision-artifact-actions {
+                            div.revision-artifact-action-copy {
+                                strong { "Stored PreXiv artifact" }
+                                span.muted.small { " Leave this alone to keep the current PDF/source downloads." }
+                            }
                             label.checkbox.revision-remove-artifacts {
                                 input type="checkbox" name="remove_pdf" value="1";
                                 span {
-                                    "Remove stored PDF/source and rely on External URL only"
+                                    "Remove stored PDF/source"
+                                    span.muted.small { " and rely on External URL only" }
                                 }
                             }
                         }
