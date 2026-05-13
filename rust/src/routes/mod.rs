@@ -1,3 +1,4 @@
+use axum::extract::DefaultBodyLimit;
 use axum::http::{StatusCode, Uri};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
@@ -5,6 +6,8 @@ use axum::{Json, Router};
 
 use crate::error::render_error_page;
 use crate::state::AppState;
+
+const UPLOAD_BODY_LIMIT: usize = 35 * 1024 * 1024;
 
 /// Axum fallback for unmatched routes. HTML 404 for browser paths,
 /// JSON 404 for `/api/*` so machine clients don't have to parse HTML
@@ -77,7 +80,12 @@ pub fn router() -> Router<AppState> {
         // /m/{id}/comment POST is in write_post_router() (rate-limited)
         .route("/m/{id}/cite", get(cite::cite))
         .route("/m/{id}/withdraw", post(withdraw::withdraw))
-        .route("/m/{id}/revise", get(revise::show).post(revise::submit))
+        .route(
+            "/m/{id}/revise",
+            get(revise::show)
+                .post(revise::submit)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_LIMIT)),
+        )
         .route("/m/{id}/versions", get(manuscript_versions::list_versions))
         .route("/m/{id}/v/{n}", get(manuscript_versions::show_version))
         .route("/m/{id}/diff/{a}/{b}", get(versions_diff::show))
@@ -168,7 +176,10 @@ pub fn auth_post_router() -> Router<AppState> {
 /// with write_layer in main.rs.
 pub fn write_post_router() -> Router<AppState> {
     Router::new()
-        .route("/submit", post(submit::do_submit))
+        .route(
+            "/submit",
+            post(submit::do_submit).layer(DefaultBodyLimit::max(UPLOAD_BODY_LIMIT)),
+        )
         .route("/vote", post(votes::vote))
         .route("/m/{id}/comment", post(comments::post_comment))
         .route("/c/{id}/delete", post(comments::delete_comment))
