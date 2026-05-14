@@ -370,7 +370,7 @@ pub fn render(
                             }
                         }
                         @if let Some(doi) = &m.doi {
-                            li class="bx-stat-long" {
+                            li class="bx-stat-long bx-stat-doi" {
                                 span.lbl { "DOI" }
                                 span.val.mono { (doi) }
                             }

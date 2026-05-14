@@ -101,6 +101,25 @@
   margin-top: 2px;
   line-height: 1.22;
 }
+.bx-stats li.bx-stat-doi {
+  padding: 7px 0 8px;
+}
+.bx-stats li.bx-stat-doi .lbl {
+  font-size: 0.9em;
+}
+.bx-stats li.bx-stat-doi .val {
+  margin-top: 5px;
+  padding: 6px 8px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-soft);
+  font-size: 0.82em;
+  font-weight: 650;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 .bx-actions {
   display: flex;
