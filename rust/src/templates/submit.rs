@@ -224,7 +224,6 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                                     strong.upload-prompt { "Click to choose, or drop your archive here" }
                                     span.upload-filename #source-name data-empty="No file selected" { "No file selected" }
                                 }
-                                span.upload-button { "Browse" }
                             }
                         }
                         ul.upload-hint-list.no-katex {
@@ -267,7 +266,6 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                                     strong.upload-prompt { "Click to choose, or drop your PDF here" }
                                     span.upload-filename #pdf-name data-empty="No file selected" { "No file selected" }
                                 }
-                                span.upload-button { "Browse" }
                             }
                         }
                         ul.upload-hint-list.no-katex {

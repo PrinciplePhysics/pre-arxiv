@@ -122,7 +122,6 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                                             "No replacement source selected"
                                         }
                                     }
-                                    span.upload-button { "Browse" }
                                 }
                             }
                             span.hint.no-katex {
@@ -144,7 +143,6 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                                             "No replacement PDF selected"
                                         }
                                     }
-                                    span.upload-button { "Browse" }
                                 }
                             }
                             span.hint.no-katex {

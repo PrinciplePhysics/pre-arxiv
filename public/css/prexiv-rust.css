@@ -3096,28 +3096,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   font-weight: 600;
 }
 
-.upload-button {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 16px;
-  background: #fff;
-  color: var(--brand);
-  font-family: var(--sans);
-  font-weight: 600;
-  font-size: 13px;
-  border: 1px solid rgba(184, 67, 10, 0.40);
-  border-radius: var(--r-md, 6px);
-  letter-spacing: 0.01em;
-  transition: background 0.15s var(--ease-out, ease), color 0.15s var(--ease-out, ease);
-}
-.upload-dropzone:hover .upload-button,
-.upload-input:focus-visible + .upload-target .upload-button {
-  background: var(--brand);
-  color: #fff;
-  border-color: var(--brand);
-}
-
 /* Hint chips — replace the long single-line caption with a compact
    key/value grid so each constraint is easy to scan. */
 .upload-hint-list {
