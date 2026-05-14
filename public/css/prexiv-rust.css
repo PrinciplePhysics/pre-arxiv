@@ -101,24 +101,23 @@
   margin-top: 2px;
   line-height: 1.22;
 }
-.bx-stats li.bx-stat-doi { align-items: flex-start; }
-.bx-stats li.bx-stat-doi .lbl { padding-top: 1px; }
+.bx-stats li.bx-stat-doi { align-items: center; }
 .bx-stats li.bx-stat-doi .val {
-  max-width: 195px;
-  color: var(--ink-soft);
-  font-size: 0.72em;
-  font-weight: 650;
-  line-height: 1.18;
-  overflow-wrap: normal;
-  word-break: normal;
-}
-.bx-stats li.bx-stat-doi .doi-prefix {
-  color: var(--muted);
-  font-weight: 600;
-}
-.bx-stats li.bx-stat-doi .doi-tail {
-  color: var(--ink);
+  max-width: 210px;
+  font-size: 0.86em;
+  font-weight: 700;
+  line-height: 1.1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bx-stats li.bx-stat-doi .val a {
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+.bx-stats li.bx-stat-doi .val a:hover {
+  color: var(--brand);
+  text-decoration: underline;
 }
 
 .bx-actions {

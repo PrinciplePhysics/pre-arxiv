@@ -15,6 +15,23 @@ fn md_inline(s: &str) -> PreEscaped<String> {
     PreEscaped(markdown::render_inline(s))
 }
 
+fn compact_doi(doi: &str) -> String {
+    if doi.chars().count() <= 26 {
+        return doi.to_string();
+    }
+    if let Some((prefix, tail)) = doi.split_once('/') {
+        let tail_chars: Vec<char> = tail.chars().collect();
+        if tail_chars.len() > 13 {
+            let suffix: String = tail_chars[tail_chars.len() - 13..].iter().collect();
+            return format!("{prefix}/...{suffix}");
+        }
+    }
+    let chars: Vec<char> = doi.chars().collect();
+    let head: String = chars.iter().take(13).collect();
+    let tail: String = chars[chars.len().saturating_sub(10)..].iter().collect();
+    format!("{head}...{tail}")
+}
+
 fn trust_badge(label: &str, detail: &str) -> Markup {
     html! {
         details.trust-badge {
@@ -370,16 +387,12 @@ pub fn render(
                             }
                         }
                         @if let Some(doi) = &m.doi {
-                            @let doi_parts = doi.split_once('/');
+                            @let doi_short = compact_doi(doi);
                             li.bx-stat-doi {
                                 span.lbl { "DOI" }
                                 span.val.mono {
-                                    @if let Some((prefix, suffix)) = doi_parts {
-                                        span.doi-prefix { (prefix) "/" }
-                                        br;
-                                        span.doi-tail { (suffix) }
-                                    } @else {
-                                        (doi)
+                                    a href={ "https://doi.org/" (doi) } target="_blank" rel="noopener" title=(doi) aria-label={ "DOI " (doi) } {
+                                        (doi_short)
                                     }
                                 }
                             }
