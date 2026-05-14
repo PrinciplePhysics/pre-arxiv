@@ -124,12 +124,13 @@ pub async fn oai(
 
 async fn identify(state: &AppState) -> String {
     let base_url = base(state);
-    let earliest: Option<(NaiveDateTime,)> =
-        sqlx::query_as("SELECT MIN(created_at) FROM manuscripts WHERE created_at IS NOT NULL")
-            .fetch_optional(&state.pool)
-            .await
-            .ok()
-            .flatten();
+    let earliest: Option<(NaiveDateTime,)> = sqlx::query_as(crate::db::pg(
+        "SELECT MIN(created_at) FROM manuscripts WHERE created_at IS NOT NULL",
+    ))
+    .fetch_optional(&state.pool)
+    .await
+    .ok()
+    .flatten();
     let earliest_str = earliest
         .map(|(t,)| iso(&t))
         .unwrap_or_else(|| "2026-01-01T00:00:00Z".to_string());
@@ -296,12 +297,12 @@ fn header_xml(r: &DbRow) -> String {
 }
 
 async fn fetch_rows(state: &AppState, set: Option<&str>, limit: usize) -> Vec<DbRow> {
-    let sql = match set {
+    let sql = crate::db::pg_dynamic(match set {
         Some(_) => "SELECT arxiv_like_id, title, abstract, authors, category, created_at, license, doi, withdrawn, withdrawn_at
-                    FROM manuscripts WHERE category = ? ORDER BY id DESC LIMIT ?".to_string(),
+                    FROM manuscripts WHERE category = ? ORDER BY id DESC LIMIT ?",
         None => "SELECT arxiv_like_id, title, abstract, authors, category, created_at, license, doi, withdrawn, withdrawn_at
-                 FROM manuscripts ORDER BY id DESC LIMIT ?".to_string(),
-    };
+                 FROM manuscripts ORDER BY id DESC LIMIT ?",
+    });
     let q = sqlx::query_as::<
         _,
         (
@@ -410,8 +411,8 @@ async fn get_record(state: &AppState, q: &OaiQuery) -> String {
         None => return error("idDoesNotExist", "Unknown identifier prefix", &base_url),
     };
     let row: Option<DbRow> = sqlx::query_as::<_, (Option<String>, String, String, String, String, Option<NaiveDateTime>, Option<String>, Option<String>, i64, Option<NaiveDateTime>)>(
-        "SELECT arxiv_like_id, title, abstract, authors, category, created_at, license, doi, withdrawn, withdrawn_at
-         FROM manuscripts WHERE arxiv_like_id = ? LIMIT 1",
+        crate::db::pg("SELECT arxiv_like_id, title, abstract, authors, category, created_at, license, doi, withdrawn, withdrawn_at
+         FROM manuscripts WHERE arxiv_like_id = ? LIMIT 1"),
     )
     .bind(slug)
     .fetch_optional(&state.pool)

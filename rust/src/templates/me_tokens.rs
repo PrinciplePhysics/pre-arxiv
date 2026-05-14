@@ -314,7 +314,7 @@ All endpoints are at {base_url}/api/v1. Read endpoints are public. Public writes
                                           ← list (mode: ranked|new|top|audited)
   GET    /manuscripts/{{id}}              ← read one (id is prexiv:YYMMDD.xxxxxx)
   GET    /manuscripts/{{id}}/comments     ← thread
-  GET    /search?q=…                      ← FTS5 over title+abstract+authors+pdf_text
+  GET    /search?q=…                      ← full-text search over title+abstract+authors+pdf_text
   POST   /manuscripts                     ← submit (see Schema below)
   POST   /manuscripts/{{id}}/comments     ← comment (body: {{\"content\": \"…\"}})
   POST   /manuscripts/{{id}}/vote         ← vote   (body: {{\"value\": 1 or -1}})

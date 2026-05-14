@@ -60,7 +60,7 @@ pub async fn ris(State(state): State<AppState>, Path(id): Path<String>) -> AppRe
 }
 
 async fn load_manuscript(state: &AppState, id: &str) -> AppResult<Manuscript> {
-    let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
+    let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(crate::db::pg(
         r#"
         SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
                pdf_path, external_url,
@@ -76,7 +76,7 @@ async fn load_manuscript(state: &AppState, id: &str) -> AppResult<Manuscript> {
         WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
         LIMIT 1
         "#,
-    )
+    ))
     .bind(id)
     .bind(id)
     .fetch_optional(&state.pool)

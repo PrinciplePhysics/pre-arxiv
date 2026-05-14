@@ -42,7 +42,7 @@ pub async fn post_comment(
     }
 
     let m: Option<(i64, String, i64)> = sqlx::query_as::<_, (i64, String, i64)>(
-        "SELECT id, COALESCE(arxiv_like_id, CAST(id AS TEXT)), withdrawn FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
+        crate::db::pg("SELECT id, COALESCE(arxiv_like_id, CAST(id AS TEXT)), withdrawn FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"),
     )
     .bind(&id)
     .bind(&id)
@@ -63,34 +63,33 @@ pub async fn post_comment(
     }
 
     let mut tx = state.pool.begin().await?;
-    let res = sqlx::query(
-        "INSERT INTO comments (manuscript_id, author_id, parent_id, content) VALUES (?, ?, ?, ?)",
+    let (cid,): (i64,) = sqlx::query_as(
+        crate::db::pg("INSERT INTO comments (manuscript_id, author_id, parent_id, content) VALUES (?, ?, ?, ?) RETURNING id"),
     )
     .bind(manuscript_id)
     .bind(user.id)
     .bind(form.parent_id)
     .bind(content)
-    .execute(&mut *tx)
+    .fetch_one(&mut *tx)
     .await?;
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "UPDATE manuscripts SET comment_count = COALESCE(comment_count, 0) + 1 WHERE id = ?",
-    )
+    ))
     .bind(manuscript_id)
     .execute(&mut *tx)
     .await?;
-    let cid = res.last_insert_rowid();
-
     // Look up the manuscript submitter and (if reply) the parent comment
     // author, so we can fire notifications. notify() short-circuits if
     // recipient == actor.
-    let submitter: Option<(i64,)> =
-        sqlx::query_as("SELECT submitter_id FROM manuscripts WHERE id = ?")
-            .bind(manuscript_id)
-            .fetch_optional(&mut *tx)
-            .await?;
+    let submitter: Option<(i64,)> = sqlx::query_as(crate::db::pg(
+        "SELECT submitter_id FROM manuscripts WHERE id = ?",
+    ))
+    .bind(manuscript_id)
+    .fetch_optional(&mut *tx)
+    .await?;
     let parent_author: Option<(i64,)> = match form.parent_id {
         Some(pid) => {
-            sqlx::query_as("SELECT author_id FROM comments WHERE id = ?")
+            sqlx::query_as(crate::db::pg("SELECT author_id FROM comments WHERE id = ?"))
                 .bind(pid)
                 .fetch_optional(&mut *tx)
                 .await?
@@ -151,12 +150,12 @@ pub async fn delete_comment(
     Path(comment_id): Path<i64>,
     Form(form): Form<DeleteForm>,
 ) -> AppResult<Response> {
-    let row: Option<(i64, i64, String)> = sqlx::query_as::<_, (i64, i64, String)>(
+    let row: Option<(i64, i64, String)> = sqlx::query_as::<_, (i64, i64, String)>(crate::db::pg(
         "SELECT c.author_id, c.manuscript_id,
                 COALESCE(m.arxiv_like_id, CAST(m.id AS TEXT)) AS slug
            FROM comments c JOIN manuscripts m ON m.id = c.manuscript_id
           WHERE c.id = ?",
-    )
+    ))
     .bind(comment_id)
     .fetch_optional(&state.pool)
     .await?;
@@ -181,15 +180,15 @@ pub async fn delete_comment(
     }
 
     let mut tx = state.pool.begin().await?;
-    sqlx::query("DELETE FROM comments WHERE id = ?")
+    sqlx::query(crate::db::pg("DELETE FROM comments WHERE id = ?"))
         .bind(comment_id)
         .execute(&mut *tx)
         .await?;
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "UPDATE manuscripts
             SET comment_count = (SELECT COUNT(*) FROM comments WHERE manuscript_id = ?)
           WHERE id = ?",
-    )
+    ))
     .bind(manuscript_id)
     .bind(manuscript_id)
     .execute(&mut *tx)

@@ -8,9 +8,9 @@
 //! original action (the comment, the follow) has already happened and
 //! we don't want notifications to roll back business logic.
 
+use crate::db::DbPool;
 use anyhow::Result;
 use chrono::NaiveDateTime;
-use sqlx::SqlitePool;
 
 pub const KIND_COMMENT_ON_MY_MANUSCRIPT: &str = "comment_on_my_manuscript";
 pub const KIND_REPLY_TO_MY_COMMENT: &str = "reply_to_my_comment";
@@ -38,7 +38,7 @@ pub struct NotificationRow {
 }
 
 pub async fn notify(
-    pool: &SqlitePool,
+    pool: &DbPool,
     recipient_id: i64,
     actor_id: Option<i64>,
     kind: &str,
@@ -50,10 +50,10 @@ pub async fn notify(
     if Some(recipient_id) == actor_id {
         return Ok(());
     }
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "INSERT INTO notifications (recipient_id, actor_id, kind, target_type, target_id, detail)
          VALUES (?, ?, ?, ?, ?, ?)",
-    )
+    ))
     .bind(recipient_id)
     .bind(actor_id)
     .bind(kind)
@@ -65,19 +65,19 @@ pub async fn notify(
     Ok(())
 }
 
-pub async fn unread_count(pool: &SqlitePool, user_id: i64) -> Result<i64> {
-    let (n,): (i64,) = sqlx::query_as(
+pub async fn unread_count(pool: &DbPool, user_id: i64) -> Result<i64> {
+    let (n,): (i64,) = sqlx::query_as(crate::db::pg(
         "SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND read_at IS NULL",
-    )
+    ))
     .bind(user_id)
     .fetch_one(pool)
     .await?;
     Ok(n)
 }
 
-pub async fn list_for(pool: &SqlitePool, user_id: i64, limit: i64) -> Result<Vec<NotificationRow>> {
+pub async fn list_for(pool: &DbPool, user_id: i64, limit: i64) -> Result<Vec<NotificationRow>> {
     let rows = sqlx::query_as::<_, NotificationRow>(
-        r#"SELECT n.id, n.kind, n.target_type,
+        crate::db::pg(r#"SELECT n.id, n.kind, n.target_type,
                   n.target_id, n.detail, n.read_at, n.created_at,
                   u.username AS actor_username,
                   u.display_name AS actor_display,
@@ -91,7 +91,7 @@ pub async fn list_for(pool: &SqlitePool, user_id: i64, limit: i64) -> Result<Vec
                 (n.target_type = 'comment' AND m.id = (SELECT c.manuscript_id FROM comments c WHERE c.id = n.target_id))
            WHERE n.recipient_id = ?
            ORDER BY n.read_at IS NULL DESC, n.id DESC
-           LIMIT ?"#,
+           LIMIT ?"#),
     )
     .bind(user_id)
     .bind(limit)
@@ -100,11 +100,11 @@ pub async fn list_for(pool: &SqlitePool, user_id: i64, limit: i64) -> Result<Vec
     Ok(rows)
 }
 
-pub async fn mark_read(pool: &SqlitePool, user_id: i64, notification_id: i64) -> Result<()> {
-    sqlx::query(
+pub async fn mark_read(pool: &DbPool, user_id: i64, notification_id: i64) -> Result<()> {
+    sqlx::query(crate::db::pg(
         "UPDATE notifications SET read_at = CURRENT_TIMESTAMP
          WHERE id = ? AND recipient_id = ? AND read_at IS NULL",
-    )
+    ))
     .bind(notification_id)
     .bind(user_id)
     .execute(pool)
@@ -112,11 +112,11 @@ pub async fn mark_read(pool: &SqlitePool, user_id: i64, notification_id: i64) ->
     Ok(())
 }
 
-pub async fn mark_all_read(pool: &SqlitePool, user_id: i64) -> Result<()> {
-    sqlx::query(
+pub async fn mark_all_read(pool: &DbPool, user_id: i64) -> Result<()> {
+    sqlx::query(crate::db::pg(
         "UPDATE notifications SET read_at = CURRENT_TIMESTAMP
          WHERE recipient_id = ? AND read_at IS NULL",
-    )
+    ))
     .bind(user_id)
     .execute(pool)
     .await?;

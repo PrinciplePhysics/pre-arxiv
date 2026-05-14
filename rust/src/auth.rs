@@ -6,6 +6,7 @@
 
 use std::time::Duration;
 
+use crate::db::DbPool;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
@@ -13,7 +14,6 @@ use axum::response::{IntoResponse, Redirect, Response};
 use axum::Json;
 use serde_json::json;
 use sha1::{Digest, Sha1};
-use sqlx::SqlitePool;
 use tower_sessions::Session;
 
 use crate::api_auth::{extract_bearer, find_user_by_bearer, BearerToken};
@@ -146,14 +146,14 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     diff == 0
 }
 
-pub async fn load_user(pool: &SqlitePool, user_id: i64) -> Result<Option<User>, sqlx::Error> {
-    let mut u = sqlx::query_as::<_, User>(
+pub async fn load_user(pool: &DbPool, user_id: i64) -> Result<Option<User>, sqlx::Error> {
+    let mut u = sqlx::query_as::<_, User>(crate::db::pg(
         r#"SELECT id, username, email, display_name, affiliation, bio,
                   karma, is_admin, email_verified, orcid, created_at,
                   email_enc, orcid_verified, institutional_email,
                   orcid_oauth_verified, orcid_oauth_verified_at, orcid_oauth_sub
            FROM users WHERE id = ?"#,
-    )
+    ))
     .bind(user_id)
     .fetch_optional(pool)
     .await?;

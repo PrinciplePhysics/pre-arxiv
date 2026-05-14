@@ -59,21 +59,19 @@ pub async fn index(
     //     doesn't approach 0 right after submission.
     //   * Gravity 2 — we expand the square inline as
     //     `(age_hours + 2) * (age_hours + 2)` so we don't need the
-    //     SQLite `pow()` function (which sqlx's bundled libsqlite
-    //     isn't compiled with). A power-of-2 decay is slightly more
+    //     database-specific exponent function. A power-of-2 decay is slightly more
     //     aggressive than HN's 1.8; for preprints — where freshness
     //     matters less than for news — this is still gentler than
     //     a strict chronological sort and reads well in practice.
     //
-    // `julianday('now') - julianday(created_at)` returns the age in
-    // days; we multiply by 24 to get hours. Withdrawn submissions are
-    // excluded; the verified-scholar / restricted-category filters
-    // above still apply.
+    // PostgreSQL's `EXTRACT(EPOCH FROM interval)` returns seconds; we
+    // divide by 3600 to get hours. Withdrawn submissions are excluded;
+    // the verified-scholar / restricted-category filters above still apply.
     let rank_order = r#"ORDER BY
         (CAST(COALESCE(score, 0) AS REAL) + 1.0)
         /
-        ( ((julianday('now') - julianday(created_at)) * 24.0 + 2.0)
-        * ((julianday('now') - julianday(created_at)) * 24.0 + 2.0) )
+        ( ((EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 3600.0) + 2.0)
+        * ((EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 3600.0) + 2.0) )
         DESC,
         created_at DESC"#;
 

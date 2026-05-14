@@ -69,7 +69,10 @@ const SLIM_COLS: &str = r#"id, arxiv_like_id, doi, title, authors, category,
     has_auditor, auditor_name,
     score, comment_count, withdrawn, created_at"#;
 
-async fn fetch(pool: &sqlx::SqlitePool, sql: &str) -> Result<Vec<ManuscriptListItem>, sqlx::Error> {
+async fn fetch(
+    pool: &crate::db::DbPool,
+    sql: &str,
+) -> Result<Vec<ManuscriptListItem>, sqlx::Error> {
     sqlx::query_as::<_, ManuscriptListItem>(sql)
         .fetch_all(pool)
         .await
@@ -185,12 +188,12 @@ pub async fn browse_index(
     maybe_user: MaybeUser,
 ) -> AppResult<Html<String>> {
     let counts: Vec<BrowseCount> = sqlx::query_as::<_, BrowseCount>(
-        "SELECT category, COUNT(*) AS total,
-                COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0) AS new_this_week
+        crate::db::pg("SELECT category, COUNT(*) AS total,
+                COALESCE(SUM(CASE WHEN created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 ELSE 0 END), 0) AS new_this_week
            FROM manuscripts
           WHERE withdrawn = 0
           GROUP BY category
-          ORDER BY category"
+          ORDER BY category")
     )
     .fetch_all(&state.pool)
     .await?;
@@ -275,12 +278,12 @@ pub async fn browse_category(
     // " <cat> " inside the whitespace-padded secondary_categories
     // string so we don't false-match `cs.L` against `cs.LG`.
     let pattern = format!("% {} %", cat);
-    let sql = format!(
+    let sql = crate::db::pg_dynamic(&format!(
         "SELECT {SLIM_COLS} FROM manuscripts
          WHERE category = ?
             OR (' ' || COALESCE(secondary_categories, '') || ' ') LIKE ?
          ORDER BY created_at DESC LIMIT 50"
-    );
+    ));
     let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(&sql)
         .bind(&cat)
         .bind(&pattern)

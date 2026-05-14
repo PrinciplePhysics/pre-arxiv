@@ -71,10 +71,12 @@ pub async fn submit_delete(
         )
         .await);
     }
-    let hash: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
-        .bind(user.id)
-        .fetch_optional(&state.pool)
-        .await?;
+    let hash: Option<(String,)> = sqlx::query_as(crate::db::pg(
+        "SELECT password_hash FROM users WHERE id = ?",
+    ))
+    .bind(user.id)
+    .fetch_optional(&state.pool)
+    .await?;
     if !verify_password_timing_safe(&form.current_password, hash.as_ref().map(|(h,)| h.as_str())) {
         return Ok(render_err("Current password is incorrect.", maybe_user).await);
     }
@@ -82,32 +84,38 @@ pub async fn submit_delete(
     // Anonymize then delete. We do everything in one transaction so a
     // failure rolls back cleanly.
     let mut tx = state.pool.begin().await?;
-    let (placeholder_id,): (i64,) = sqlx::query_as(
+    let (placeholder_id,): (i64,) = sqlx::query_as(crate::db::pg(
         r#"INSERT INTO users (username, email, password_hash, display_name, email_verified)
-           VALUES ('[deleted]', '[deleted]@prexiv.local', '!', '[deleted]', 0)
+           VALUES ('[deleted]', '', '!', '[deleted]', 0)
            ON CONFLICT(username) DO UPDATE SET email = excluded.email
            RETURNING id"#,
-    )
+    ))
     .fetch_one(&mut *tx)
     .await?;
 
-    sqlx::query("UPDATE manuscripts SET submitter_id = ? WHERE submitter_id = ?")
-        .bind(placeholder_id)
-        .bind(user.id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("UPDATE comments SET author_id = ? WHERE author_id = ?")
-        .bind(placeholder_id)
-        .bind(user.id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("UPDATE audit_log SET actor_user_id = NULL WHERE actor_user_id = ?")
-        .bind(user.id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(crate::db::pg(
+        "UPDATE manuscripts SET submitter_id = ? WHERE submitter_id = ?",
+    ))
+    .bind(placeholder_id)
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(crate::db::pg(
+        "UPDATE comments SET author_id = ? WHERE author_id = ?",
+    ))
+    .bind(placeholder_id)
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(crate::db::pg(
+        "UPDATE audit_log SET actor_user_id = NULL WHERE actor_user_id = ?",
+    ))
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await?;
     // Everything else (tokens, follows, votes, notifications, etc.)
     // cascades via FKs in the migrations.
-    sqlx::query("DELETE FROM users WHERE id = ?")
+    sqlx::query(crate::db::pg("DELETE FROM users WHERE id = ?"))
         .bind(user.id)
         .execute(&mut *tx)
         .await?;
@@ -160,12 +168,12 @@ pub async fn export(
         Option<chrono::NaiveDateTime>,
         Option<String>,
         Option<String>,
-    )> = sqlx::query_as(
+    )> = sqlx::query_as(crate::db::pg(
         "SELECT id, arxiv_like_id, doi, title, abstract, authors, category,
                     pdf_path, external_url, created_at, updated_at,
                     withdrawn, withdrawn_at, withdrawn_reason, conductor_notes
              FROM manuscripts WHERE submitter_id = ? ORDER BY id",
-    )
+    ))
     .bind(user.id)
     .fetch_all(&state.pool)
     .await?;
@@ -185,10 +193,10 @@ pub async fn export(
 
     // Comments you wrote.
     let comments: Vec<(i64, i64, Option<i64>, String, Option<chrono::NaiveDateTime>)> =
-        sqlx::query_as(
+        sqlx::query_as(crate::db::pg(
             "SELECT id, manuscript_id, parent_id, content, created_at
              FROM comments WHERE author_id = ? ORDER BY id",
-        )
+        ))
         .bind(user.id)
         .fetch_all(&state.pool)
         .await?;
@@ -198,7 +206,7 @@ pub async fn export(
 
     // Votes.
     let votes: Vec<(String, i64, i64, Option<chrono::NaiveDateTime>)> = sqlx::query_as(
-        "SELECT target_type, target_id, value, created_at FROM votes WHERE user_id = ? ORDER BY id",
+        crate::db::pg("SELECT target_type, target_id, value, created_at FROM votes WHERE user_id = ? ORDER BY id"),
     )
     .bind(user.id)
     .fetch_all(&state.pool)
@@ -214,11 +222,11 @@ pub async fn export(
 
     // Follows.
     let following: Vec<(String,)> = sqlx::query_as(
-        "SELECT u.username FROM follows f JOIN users u ON u.id = f.followee_id WHERE f.follower_id = ? ORDER BY u.username"
+        crate::db::pg("SELECT u.username FROM follows f JOIN users u ON u.id = f.followee_id WHERE f.follower_id = ? ORDER BY u.username")
     )
     .bind(user.id).fetch_all(&state.pool).await?;
     let followers: Vec<(String,)> = sqlx::query_as(
-        "SELECT u.username FROM follows f JOIN users u ON u.id = f.follower_id WHERE f.followee_id = ? ORDER BY u.username"
+        crate::db::pg("SELECT u.username FROM follows f JOIN users u ON u.id = f.follower_id WHERE f.followee_id = ? ORDER BY u.username")
     )
     .bind(user.id).fetch_all(&state.pool).await?;
 
@@ -229,10 +237,10 @@ pub async fn export(
         Option<chrono::NaiveDateTime>,
         Option<chrono::NaiveDateTime>,
         Option<chrono::NaiveDateTime>,
-    )> = sqlx::query_as(
+    )> = sqlx::query_as(crate::db::pg(
         "SELECT id, name, last_used_at, created_at, expires_at
              FROM api_tokens WHERE user_id = ? ORDER BY id",
-    )
+    ))
     .bind(user.id)
     .fetch_all(&state.pool)
     .await?;

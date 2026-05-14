@@ -15,9 +15,9 @@ PreXiv stores three classes of data, in strict descending order of value:
 
 | Class | What | Where | Recoverable if lost? |
 |---|---|---|---|
-| **Tier 1 — user content** | Manuscripts, authors, abstracts, conductor metadata, auditor statements, comments, votes, follows, flags, accounts (bcrypt hashes, authenticated ORCID iD, display names, bio, affiliation), API tokens (hashed), audit log | `DATA_DIR/prearxiv.db` (SQLite) + `UPLOAD_DIR` (uploaded PDF/source artifacts) | **No.** This is the entire reason PreXiv exists. |
-| **Tier 2 — session state** | Active logins, CSRF tokens, flash messages, the one-shot just-minted-token state | SQLite session tables managed by `tower-sessions` in the app database | Yes — losing it just logs everyone out and rotates CSRF tokens. |
-| **Tier 3 — derivable** | FTS5 search index, view counts, per-manuscript computed scores, the `data/prearxiv.seed.db` snapshot | Inside `prearxiv.db` | Yes — rebuilt from the source data. |
+| **Tier 1 — user content** | Manuscripts, authors, abstracts, conductor metadata, auditor statements, comments, votes, follows, flags, accounts (bcrypt hashes, encrypted email, encrypted TOTP secrets, authenticated ORCID iD, display names, bio, affiliation), API tokens (hashed), audit log | PostgreSQL database named by `DATABASE_URL` + `UPLOAD_DIR` (uploaded PDF/source artifacts) | **No.** This is the entire reason PreXiv exists. |
+| **Tier 2 — session state** | Active logins, CSRF tokens, flash messages, the one-shot just-minted-token state | PostgreSQL session tables managed by `tower-sessions` in the app database | Yes — losing it just logs everyone out and rotates CSRF tokens. |
+| **Tier 3 — derivable** | PostgreSQL full-text search vectors, view counts, per-manuscript computed scores, the legacy `data/prearxiv.seed.db` snapshot used only for development seeding | Inside PostgreSQL or legacy dev fixtures | Yes — rebuilt from the source data. |
 
 **The invariant:** Tier 1 data is preserved no matter what happens to the
 source tree, the binary, the cache, or the migration system. A `git reset
@@ -27,13 +27,9 @@ a botched deploy — none of those touch Tier 1 data.
 ## 2. Where data lives (production layout)
 
 ```
-/var/lib/prexiv/                       (root: 0755 dbai:dbai)
-├── current/                           (the data the running binary uses)
-│   ├── prearxiv.db                   ← Tier 1, the SQLite database
-│   ├── prearxiv.db-wal               ← SQLite WAL (commits land here first)
-│   ├── prearxiv.db-shm               ← SQLite shared-memory
-│   ├── uploads/                      ← Tier 1, uploaded PDFs and source artifacts
-│   └── prearxiv.seed.db              ← Tier 3, optional demo seed snapshot
+/var/lib/prexiv/                       (root: 0755 prexiv:prexiv)
+├── current/                           (non-database runtime data)
+│   └── uploads/                       ← Tier 1, uploaded PDFs and source artifacts
 └── backups/
     ├── pre-deploy/                   ← snapshot before every deploy, kept ≥ 30
     │   └── 2026-05-12T00-15-22.tar.gz
@@ -45,26 +41,22 @@ a botched deploy — none of those touch Tier 1 data.
 **Critical rules:**
 
 1. **Data never lives inside the source-tree clone.** The repo is at
-   `~/prexiv-deploy/prexiv/`; the data is at `/var/lib/prexiv/current/`. The
-   binary reads it via `DATA_DIR=/var/lib/prexiv/current` and
-   `UPLOAD_DIR=/var/lib/prexiv/current/uploads`. A `rm -rf
-   ~/prexiv-deploy/prexiv` does not touch user data.
+   `/home/prexiv/` (or another deployment checkout); uploads live under
+   `/var/lib/prexiv/current/uploads` or another explicit `UPLOAD_DIR`, and the
+   PostgreSQL database lives outside the source tree. A `rm -rf` of the checkout
+   does not touch user data.
 
 2. **The deploy script always snapshots Tier 1 before touching the binary.**
    `scripts/deploy.sh` runs `scripts/backup.sh pre-deploy <reason>` as its
    first action; only after the snapshot is on disk does it pull, build,
    restart. If anything fails, the pre-deploy snapshot is still there.
 
-3. **Snapshots use SQLite's atomic backup (`.backup` command), not `cp`.**
-   `cp` of a live WAL-mode database can capture a torn read. `.backup` is
-   the supported online-backup API and produces a consistent snapshot
-   regardless of concurrent writes.
+3. **Snapshots use PostgreSQL logical dumps, not filesystem copies.**
+   `scripts/backup.sh` runs `pg_dump --format=custom` and verifies the dump
+   catalog with `pg_restore --list`. This avoids copying database internals
+   directly and produces a restoreable logical archive.
 
-4. **WAL mode is on.** `journal_mode=WAL`, `synchronous=NORMAL`. The WAL
-   file is part of the database — both `prearxiv.db` and `prearxiv.db-wal`
-   are snapshotted together when we tar the directory.
-
-5. **Migrations are append-only by convention.** No migration drops a
+4. **Migrations are append-only by convention.** No migration drops a
    column or renames a table without an explicit, reviewed exception. New
    columns get added with `ALTER TABLE ... ADD COLUMN ... DEFAULT ...` so
    legacy rows get safe defaults instead of being orphaned.
@@ -79,8 +71,8 @@ cd ~/prexiv-deploy/prexiv
 
 What `scripts/deploy.sh` does, in order:
 
-1. **Snapshot** the live database + uploads to `/var/lib/prexiv/backups/pre-deploy/<timestamp>.tar.gz`, using `sqlite3 ... '.backup'` for the DB (atomic) and tar for the uploads dir.
-2. **Sanity-check** the snapshot: `sqlite3 <snapshot> 'PRAGMA integrity_check;'` must print `ok`. If it doesn't, ABORT — do not proceed with the deploy.
+1. **Snapshot** the live PostgreSQL database + uploads to `/var/lib/prexiv/backups/pre-deploy/<timestamp>.tar.gz[.age]`, using `pg_dump --format=custom` for the DB and tar for the uploads dir.
+2. **Sanity-check** the snapshot: `pg_restore --list <dump>` must be able to read the embedded dump. If it cannot, ABORT — do not proceed with the deploy.
 3. **Fetch + reset** the source tree to `origin/main`.
 4. **Build** the release binary. If `cargo build --release` fails, ABORT (no need to roll back — the running binary hasn't been touched).
 5. **Stop** the old binary by sending SIGTERM (`kill $(cat prexiv-rust.pid)`).
@@ -93,7 +85,7 @@ If any step from 2 onward fails, the pre-deploy snapshot at step 1 is the recove
 
 `scripts/backup.sh [hourly|daily|weekly|pre-deploy] [reason]`:
 
-- Atomic SQLite snapshot via `.backup`, then tarred with the uploads dir.
+- PostgreSQL custom-format dump via `pg_dump`, then tarred with the uploads dir.
 - Output: `/var/lib/prexiv/backups/<tier>/<ISO-timestamp>.tar.gz`.
 - Rotation policy (per directory):
   - `pre-deploy/` — keep 30 most recent
@@ -115,9 +107,9 @@ What it does:
 2. Stops the running binary (graceful, then forceful).
 3. Moves the current Tier 1 data to `/var/lib/prexiv/current.<timestamp>.replaced` (never deleted — paranoia).
 4. Extracts the tarball into `/var/lib/prexiv/current/`.
-5. Runs `sqlite3 prearxiv.db 'PRAGMA integrity_check;'` — must print `ok`.
+5. Runs a PostgreSQL sanity query against the restored database.
 6. Starts the binary back up.
-7. Tells you the path of the replaced directory so you can `diff` it if needed.
+7. Tells you the path of the rollback copy so you can inspect it if needed.
 
 Step 3 is the safety net: even a wrong restore leaves the previous live data intact under `current.<timestamp>.replaced`. Operator can rename it back if the restore was wrong.
 
@@ -137,13 +129,13 @@ Personal data on PreXiv falls into four categories. Treating them all the same w
 |---|---|---|---|
 | **Irrecoverable by design** | `users.password_hash` (bcrypt cost 10); `api_tokens.token_hash` (SHA-256 hex) | The plaintext is never persisted. Bcrypt hashes are intentionally slow one-way functions; SHA-256 of a 27-byte random token has no practical preimage. | **Stronger than encryption.** Encryption implies a key holder can recover the plaintext; coercing the operator or compromising the key gets that plaintext back. With irrecoverable hashes, *no one* can derive the original — not the operator, not a court order, not a database leaker. The user is the only one who ever knew the plaintext. |
 | **Intentionally public** | `users.username`, `display_name`, `affiliation`, `bio`, `orcid`; manuscript title/abstract/authors/conductor; comments; votes | Plaintext on disk and on the wire. | Public by user choice. The user filled in these fields *to be seen*; encrypting them would prevent the only legitimate use. |
-| **Encrypted at rest** | `users.email` (login + verification) | Column-level **AES-256-GCM** with a server-side master key in `PREXIV_DATA_KEY` (32 random bytes, hex- or base64-encoded), plus a deterministic 32-byte HMAC-SHA256 *blind index* `email_hash` so we can `WHERE email_hash = ?` without decrypting every row. Implementation: `rust/src/crypto.rs`; schema in migration `0012_email_at_rest_encryption.sql`; backfill on app startup is idempotent. | A DB dump alone yields ciphertext + an opaque hash. To reverse to a known email address an attacker needs the master key, which lives only in the systemd-managed env file (mode 0600). Future-extendable to `totp_secret` and webhook signing secrets with the same primitives. |
-| **Pending encryption** | `users.totp_secret` (2FA); `webhooks.secret` (HMAC signing key) | Plaintext today. | Same threat profile as email; same `crypto.rs` primitives apply. Tracked as the next encryption pass after `users.email` proves itself in production. |
-| **Backup tarballs leaving the box** | The tar.gz that bundles the DB + sessions + uploads, snapshotted before every deploy and on cron schedules | **age-encrypted** via X25519 to a recipient public key. The plaintext never touches disk; backup.sh pipes `tar -cz` straight through `age -r <pub>` into the final `.tar.gz.age`. | Backups are the most-portable copies of all user data: they get rsynced off-machine, sit in cron-driven archive directories, and may end up in places the live DB never goes. Encrypting *them* specifically defends the threat model where the box itself stays trusted but a backup copy gets out. |
+| **Encrypted at rest** | `users.email_enc` (login + verification), `pending_email_changes.new_email_enc`, `user_totp.secret` | Column-level **AES-256-GCM** with a server-side master key in `PREXIV_DATA_KEY` (32 random bytes, hex- or base64-encoded). Email lookup uses a deterministic 32-byte HMAC-SHA256 *blind index* `email_hash` so we can `WHERE email_hash = ?` without decrypting every row. Implementation: `rust/src/crypto.rs`; active schema in `rust/pg_migrations/0001_postgres_schema.sql`. | A DB dump alone yields ciphertext + opaque hashes. To reverse to a known email address or TOTP secret an attacker needs the master key, which lives only in the deployment env file (mode 0600). |
+| **Pending encryption** | Future webhook signing secrets, if webhooks are enabled in production | Not currently part of the main production product surface. | Use the same `crypto.rs` primitives before treating webhook secrets as production user data. |
+| **Backup tarballs leaving the box** | The tar.gz stream that bundles the PostgreSQL dump + uploads, snapshotted before deploys and on cron schedules | Prefer **age-encrypted** X25519 public-key archives (`.tar.gz.age`). Small single-host deployments may use GPG symmetric AES256 with `PREXIV_BACKUP_PASSPHRASE_FILE` (`.tar.gz.gpg`). In production, `backup.sh` refuses plaintext unless explicitly overridden. | Backups are the most-portable copies of all user data: they get rsynced off-machine, sit in cron-driven archive directories, and may end up in places the live DB never goes. Encrypting *them* specifically defends the threat model where the box itself stays trusted but a backup copy gets out. |
 
 ### Key management for `PREXIV_DATA_KEY` (column-level encryption)
 
-The master key for `users.email` (and future encrypted columns) is loaded once at app startup from `PREXIV_DATA_KEY`.
+The master key for encrypted account columns is loaded once at app startup from `PREXIV_DATA_KEY`.
 
 - **Format**: 32 bytes encoded as either 64 hex chars or 44 base64 chars (standard alphabet, padded). Anything else exits non-zero before the server binds the port.
 
@@ -155,25 +147,21 @@ The master key for `users.email` (and future encrypted columns) is loaded once a
   head -c 32 /dev/urandom | base64        # produces a 44-char base64 string
   ```
 
-- **Where it lives on victoria**: `/etc/default/prexiv` (mode 0600, owned `root:dbai`) as the line `PREXIV_DATA_KEY=…`. systemd loads `/etc/default/prexiv` via `EnvironmentFile=` in the unit. Never check this value into git. Never `echo` it. It does not appear in `tracing` output (the crypto module hands it directly to AES + HMAC and never logs the bytes).
+- **Where it lives in production**: the service env file, normally `/home/prexiv/.env` or `/etc/default/prexiv`, mode 0600 and owned by the service account or root. Never check this value into git. Never print it. It does not appear in `tracing` output; the crypto module hands it directly to AES + HMAC and never logs the bytes.
 
-- **Loss consequences**: an irretrievable loss of `PREXIV_DATA_KEY` bricks every encrypted column. The `email_enc` ciphertext becomes undecryptable, login-by-email stops working (the blind index is also keyed by the master key, so an attacker who steals only the DB can't link rows to known emails, but neither can a legit operator after key loss). Usernames + password hashes survive — users can still log in with their username and the password they remember. Plan accordingly: keep an off-line copy of this key the same way you keep the age backup private key.
+- **Loss consequences**: an irretrievable loss of `PREXIV_DATA_KEY` bricks every encrypted column. The `email_enc` and TOTP ciphertexts become undecryptable, login-by-email stops working, and two-factor validation must be reset by account recovery. Usernames + password hashes survive — users can still log in with their username and the password they remember if 2FA is not enabled. Plan accordingly: keep an off-line copy of this key the same way you keep the age backup private key.
 
 - **Rotation** (TODO; not yet implemented): on rotation, the server would dual-key for one deploy cycle (accept both old and new key for decryption, write only with the new key), re-encrypt every row using a startup pass, then drop the old key. Until that lands, treat `PREXIV_DATA_KEY` as set-once-and-keep-forever.
 
-- **Compromise**: leaking `PREXIV_DATA_KEY` alone does not directly compromise user accounts — passwords are bcrypt-hashed, session cookies are server-side. It does, however, allow an attacker who *also* gets a DB dump to recover every email address. Treat it as confidential-tier secret material.
+- **Compromise**: leaking `PREXIV_DATA_KEY` alone does not directly compromise user accounts — passwords are bcrypt-hashed, API tokens are hash-only, and session cookies are server-side. It does, however, allow an attacker who *also* gets a DB dump to recover encrypted email addresses and TOTP seeds. Treat it as confidential-tier secret material.
 
-- **Operator hardening pass** (do after the first deploy proves stable): once you've watched a few logins/registrations work end-to-end on the encrypted path, run
-
-  ```sql
-  UPDATE users SET email = '' WHERE email_hash IS NOT NULL;
-  ```
-
-  to clear the plaintext `email` column. Reads already prefer `email_enc`, so this is invisible to users. The plaintext column is *kept by the migration as a rollback safety net*; clearing it removes the last on-disk plaintext copy without dropping the column shape.
+- **Legacy plaintext columns**: the PostgreSQL schema keeps compatibility text columns such as `users.email`, but new writes store an empty string there and put the real value only in encrypted `BYTEA` columns. Operators should not populate those legacy fields.
 
 ### Key management for backup encryption
 
-- **Algorithm**: age 1.x — X25519 + ChaCha20-Poly1305 + scrypt for passphrase variants. Audited; widely deployed. We use the file-keyfile mode (not passphrase) so backups can be encrypted by an unattended cron job and decrypted by deploy.sh without interaction.
+- **Preferred algorithm**: age 1.x — X25519 + ChaCha20-Poly1305. We use public-key mode so backups can be encrypted by unattended cron without exposing the decrypt key.
+
+- **Fallback algorithm**: GPG symmetric AES256 using a mode-0600 passphrase file named by `PREXIV_BACKUP_PASSPHRASE_FILE`. This is acceptable for small deployments that cannot install age yet, but the passphrase should be copied off-machine and moved to root-owned storage when operations mature.
 
 - **Private key**: lives at `/etc/prexiv/backup-key.txt` on victoria, mode 0640 owned `root:dbai`. Readable by the `dbai` service account *and* by root. Not readable by anyone else on the box.
 
@@ -189,9 +177,9 @@ The master key for `users.email` (and future encrypted columns) is loaded once a
 
 ### Fallback for local dev
 
-If the recipient file (`/etc/prexiv/backup.pub`) doesn't exist, `backup.sh` falls back to writing plaintext `.tar.gz` and prints a warning. This is intentional: local dev boxes don't necessarily need encryption set up, and forcing a key-management story on every developer would be friction with no real protection (a local dev DB has no real users in it). Production deploys should always have the recipient file present.
+If neither age nor `PREXIV_BACKUP_PASSPHRASE_FILE` is configured, `backup.sh` falls back to plaintext only outside production. In production it exits non-zero unless `PREXIV_ALLOW_PLAINTEXT_BACKUP=1` is explicitly set. Local dev boxes don't necessarily need encryption set up; production does.
 
-`restore.sh` and `deploy.sh` handle both extensions — they decrypt `.tar.gz.age` with the private key and treat `.tar.gz` as plaintext.
+`restore.sh` and `deploy.sh` handle `.tar.gz.age`, `.tar.gz.gpg`, and local-dev plaintext `.tar.gz`.
 
 ## 7. Code-level security audit — findings to date
 
@@ -206,8 +194,8 @@ Audit run 2026-05-12 (re-audited same day). Grepped for known antipatterns; veri
 | **S-3.** Defense-in-depth: dynamic table name in `routes/votes.rs` | Informational | **FIXED** |
 | **S-4.** Missing rate limiting in the Rust port | Medium (abuse-aid) | **FIXED** — `tower-governor` protects auth and public-write/API-write routes with per-IP token buckets |
 | **S-5.** No off-machine backup | High (durability) | **FIXED** — `scripts/offmachine-backup.sh` rsyncs encrypted snapshots to `$PREXIV_OFFMACHINE_DEST` after every `backup.sh`; see §6 |
-| **S-6.** Backup tarballs plaintext on disk | Medium (leakage) | **FIXED** — age-encrypted to /etc/prexiv/backup.pub, see §6a |
-| **S-7.** `users.email` plaintext in DB | Medium (leakage) | **FIXED for email** — AES-256-GCM column-level encryption with HMAC-SHA256 blind index; `rust/src/crypto.rs`, migration `0012_email_at_rest_encryption.sql`, app-startup backfill. `totp_secret` and `webhooks.secret` still pending — see §6a |
+| **S-6.** Backup tarballs plaintext on disk | Medium (leakage) | **FIXED** — production backups must be age-encrypted or GPG-encrypted; plaintext requires an explicit override, see §6a |
+| **S-7.** Recoverable account secrets stored as plaintext | Medium (leakage) | **FIXED for email, pending email changes, and TOTP** — AES-256-GCM column-level encryption with HMAC-SHA256 blind index for email lookup; `rust/src/crypto.rs`, active PostgreSQL schema in `rust/pg_migrations/0001_postgres_schema.sql` |
 | **S-8.** Session fixation: `login_session` did not rotate the session id, so a planted pre-login cookie remained valid post-login | High | **FIXED** — `auth.rs` now calls `session.cycle_id().await` before writing `user_id` |
 | **S-9.** PDF written to disk *before* CSRF check on `/submit` — a forged multipart POST left an orphan upload | High | **FIXED** — `routes/submit.rs` buffers the PDF in memory, validates CSRF + all fields, only then writes to disk |
 | **S-10.** User-enumeration: `/login` returned different messages for "no such user" vs "wrong password", and the no-such-user branch returned in microseconds vs bcrypt-time for wrong-password | Medium | **FIXED** — `verify_password_timing_safe` runs bcrypt against a fixed dummy hash when the user is missing; both branches return the same `"Incorrect username/email or password."` message |
@@ -239,12 +227,14 @@ Audit run 2026-05-12 (re-audited same day). Grepped for known antipatterns; veri
 
 ## 8. Operator runbook
 
-**Routine deploy:** `ssh victoria && cd ~/prexiv-deploy/prexiv && ./scripts/deploy.sh`. Watch the script's output — it tells you which snapshot it took and which step it's on. If it aborts, the previous binary is still running and the data is still in `current/`.
+**Routine deploy to prexiv.net:** sync the source tree to `/home/prexiv` with the `connect-prexiv-server` workflow, build `rust/target/release/prexiv` on the server, restart `prexiv.service`, and verify `/readyz`. The `/home/prexiv` production copy is an rsync target, not a git checkout.
+
+**Git-checkout deploys:** where the server copy is a real git checkout, `./scripts/deploy.sh` snapshots PostgreSQL/uploads first, verifies the dump, pulls `origin/main`, builds, restarts, and health-checks. If it aborts, the previous binary is still running and the PostgreSQL/uploads backup is available.
 
 **Manual snapshot before risky work:** `./scripts/backup.sh pre-deploy "before-Y"`.
 
-**Restore:** `./scripts/restore.sh /var/lib/prexiv/backups/pre-deploy/<timestamp>.tar.gz`. The script keeps your current data under `current.<timestamp>.replaced` so a wrong restore is still recoverable.
+**Restore:** `./scripts/restore.sh /var/lib/prexiv/backups/pre-deploy/<timestamp>.tar.gz.age`. The script writes a rollback PostgreSQL dump and copies current uploads under `current.<timestamp>.replaced` before applying the requested snapshot.
 
-**Daily integrity check:** `sqlite3 /var/lib/prexiv/current/prearxiv.db 'PRAGMA integrity_check;'` should print exactly `ok`. Anything else means file corruption or a SQLite bug — restore from the most recent good backup and investigate.
+**Daily readiness check:** `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc 'SELECT 1;'` should return `1`, and `/readyz` should report `{"database":"ok"}`. Restore from the most recent good backup if the database is unavailable or corrupt.
 
-**See what data lives there right now:** `du -sh /var/lib/prexiv/current/*` and `sqlite3 /var/lib/prexiv/current/prearxiv.db 'SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM manuscripts;'`.
+**See what data lives there right now:** `du -sh /var/lib/prexiv/current/uploads` and `psql "$DATABASE_URL" -tAc 'SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM manuscripts;'`.

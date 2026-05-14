@@ -29,12 +29,14 @@ pub async fn show(
     let page = q.page.unwrap_or(1).max(1);
     let offset = (page - 1) * per;
 
-    let following: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM follows WHERE follower_id = ?")
-        .bind(user.id)
-        .fetch_one(&state.pool)
-        .await?;
+    let following: (i64,) = sqlx::query_as(crate::db::pg(
+        "SELECT COUNT(*) FROM follows WHERE follower_id = ?",
+    ))
+    .bind(user.id)
+    .fetch_one(&state.pool)
+    .await?;
 
-    let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(
+    let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(crate::db::pg(
         r#"SELECT m.id, m.arxiv_like_id, m.doi, m.title, m.authors, m.category,
                   m.conductor_type, m.conductor_ai_model, m.conductor_ai_model_public,
                   m.conductor_human, m.conductor_human_public,
@@ -44,7 +46,7 @@ pub async fn show(
            JOIN follows f ON f.followee_id = m.submitter_id
            WHERE f.follower_id = ?
            ORDER BY m.created_at DESC LIMIT ? OFFSET ?"#,
-    )
+    ))
     .bind(user.id)
     .bind(per)
     .bind(offset)

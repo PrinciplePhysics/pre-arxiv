@@ -30,20 +30,19 @@ pub async fn search(
 
     let fts_query = build_fts_query(q);
 
-    let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(
+    let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(crate::db::pg(
         r#"
         SELECT m.id, m.arxiv_like_id, m.doi, m.title, m.authors, m.category,
                m.conductor_type, m.conductor_ai_model, m.conductor_ai_model_public,
                m.conductor_human, m.conductor_human_public,
                m.has_auditor, m.auditor_name,
                m.score, m.comment_count, m.withdrawn, m.created_at
-        FROM manuscripts m
-        JOIN manuscripts_fts f ON f.rowid = m.id
-        WHERE manuscripts_fts MATCH ?
-        ORDER BY rank
+        FROM manuscripts m, (SELECT to_tsquery('english', ?) AS q) query
+        WHERE m.search_vector @@ query.q
+        ORDER BY ts_rank(m.search_vector, query.q) DESC, m.created_at DESC
         LIMIT 100
         "#,
-    )
+    ))
     .bind(&fts_query)
     .fetch_all(&state.pool)
     .await?;
@@ -57,10 +56,10 @@ fn build_fts_query(q: &str) -> String {
     let tokens: Vec<String> = q
         .split(|c: char| !c.is_alphanumeric())
         .filter(|t| !t.is_empty())
-        .map(|t| format!("{}*", t))
+        .map(|t| format!("{}:*", t))
         .collect();
     if tokens.is_empty() {
-        return "zzzznonexistentzzz".to_string();
+        return "zzzznonexistentzzz:*".to_string();
     }
-    tokens.join(" ")
+    tokens.join(" & ")
 }

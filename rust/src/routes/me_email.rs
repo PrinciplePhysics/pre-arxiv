@@ -103,10 +103,12 @@ pub async fn submit(
 
     // Verify current password (fetch fresh hash — RequireUser's snapshot
     // omits it). Use the timing-safe wrapper just like /me/password.
-    let row: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
-        .bind(user.id)
-        .fetch_optional(&state.pool)
-        .await?;
+    let row: Option<(String,)> = sqlx::query_as(crate::db::pg(
+        "SELECT password_hash FROM users WHERE id = ?",
+    ))
+    .bind(user.id)
+    .fetch_optional(&state.pool)
+    .await?;
     let current_hash = row.map(|(h,)| h);
     if !verify_password_timing_safe(&form.current_password, current_hash.as_deref()) {
         return Ok(render_err("Current password is incorrect.", maybe_user).await);
@@ -114,12 +116,13 @@ pub async fn submit(
 
     // Reject if the new email already belongs to someone else.
     let new_hash = crate::crypto::email_hash(&new_email).to_vec();
-    let taken: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM users WHERE email_hash = ? AND id != ? LIMIT 1")
-            .bind(&new_hash)
-            .bind(user.id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let taken: Option<(i64,)> = sqlx::query_as(crate::db::pg(
+        "SELECT id FROM users WHERE email_hash = ? AND id != ? LIMIT 1",
+    ))
+    .bind(&new_hash)
+    .bind(user.id)
+    .fetch_optional(&state.pool)
+    .await?;
     if taken.is_some() {
         return Ok(render_err(
             "That email address is already in use on another account.",

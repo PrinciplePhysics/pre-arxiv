@@ -124,23 +124,24 @@ pub async fn queue(
     RequireAdmin(_admin): RequireAdmin,
 ) -> AppResult<Html<String>> {
     let dashboard = load_dashboard(&state).await?;
-    let raw: Vec<(i64, String, i64, String, String, Option<NaiveDateTime>)> = sqlx::query_as(
-        r#"SELECT f.id, f.target_type, f.target_id, f.reason,
+    let raw: Vec<(i64, String, i64, String, String, Option<NaiveDateTime>)> =
+        sqlx::query_as(crate::db::pg(
+            r#"SELECT f.id, f.target_type, f.target_id, f.reason,
                   u.username AS reporter_username, f.created_at
            FROM flag_reports f JOIN users u ON u.id = f.reporter_id
            WHERE f.resolved = 0
            ORDER BY f.created_at DESC LIMIT 200"#,
-    )
-    .fetch_all(&state.pool)
-    .await?;
+        ))
+        .fetch_all(&state.pool)
+        .await?;
 
     let mut flags: Vec<FlagRow> = Vec::with_capacity(raw.len());
     for (id, target_type, target_id, reason, reporter_username, created_at) in raw {
         let (target_label, target_url, target_withdrawn) = match target_type.as_str() {
             "manuscript" => {
-                let m: Option<(Option<String>, String, i64)> = sqlx::query_as(
+                let m: Option<(Option<String>, String, i64)> = sqlx::query_as(crate::db::pg(
                     "SELECT arxiv_like_id, title, withdrawn FROM manuscripts WHERE id = ?",
-                )
+                ))
                 .bind(target_id)
                 .fetch_optional(&state.pool)
                 .await?;
@@ -157,13 +158,13 @@ pub async fn queue(
                 }
             }
             "comment" => {
-                let c: Option<(String, String, Option<String>)> = sqlx::query_as(
+                let c: Option<(String, String, Option<String>)> = sqlx::query_as(crate::db::pg(
                     r#"SELECT u.username, SUBSTR(c.content, 1, 200), m.arxiv_like_id
                        FROM comments c
                        JOIN manuscripts m ON m.id = c.manuscript_id
                        JOIN users u ON u.id = c.author_id
                        WHERE c.id = ?"#,
-                )
+                ))
                 .bind(target_id)
                 .fetch_optional(&state.pool)
                 .await?;
@@ -226,9 +227,9 @@ pub async fn resolve(
         Some(note.to_string())
     };
     sqlx::query(
-        r#"UPDATE flag_reports
+        crate::db::pg(r#"UPDATE flag_reports
            SET resolved = 1, resolved_by_id = ?, resolved_at = CURRENT_TIMESTAMP, resolution_note = ?
-           WHERE id = ?"#,
+           WHERE id = ?"#),
     )
     .bind(admin.id)
     .bind(note_opt.as_deref())
@@ -238,7 +239,7 @@ pub async fn resolve(
 
     // Audit log entry.
     let _ = sqlx::query(
-        "INSERT INTO audit_log (actor_user_id, action, target_type, target_id, detail) VALUES (?, 'flag_resolve', 'flag', ?, ?)",
+        crate::db::pg("INSERT INTO audit_log (actor_user_id, action, target_type, target_id, detail) VALUES (?, 'flag_resolve', 'flag', ?, ?)"),
     )
     .bind(admin.id)
     .bind(id)
@@ -280,18 +281,18 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         stored_pdfs,
         stored_sources,
     ): (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
-        r#"SELECT
+        crate::db::pg(r#"SELECT
               COUNT(*),
               COALESCE(SUM(CASE WHEN withdrawn = 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN withdrawn != 0 THEN 1 ELSE 0 END), 0),
-              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
-              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN created_at >= CURRENT_TIMESTAMP - INTERVAL '1 day' THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN has_auditor != 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN conductor_type = 'human-ai' AND conductor_human_public = 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN conductor_ai_model_public = 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN pdf_path IS NOT NULL AND pdf_path <> '' THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN source_path IS NOT NULL AND source_path <> '' THEN 1 ELSE 0 END), 0)
-           FROM manuscripts"#,
+           FROM manuscripts"#),
     )
     .fetch_one(&state.pool)
     .await?;
@@ -306,7 +307,7 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         new_users_7d,
         new_users_24h,
     ): (i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
-        r#"SELECT
+        crate::db::pg(r#"SELECT
               COUNT(*),
               COALESCE(SUM(CASE WHEN email_verified != 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN is_admin != 0 THEN 1 ELSE 0 END), 0),
@@ -316,28 +317,28 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
                   THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN orcid_oauth_verified != 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN email_verified != 0 AND institutional_email != 0 THEN 1 ELSE 0 END), 0),
-              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0),
-              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0)
-           FROM users"#,
+              COALESCE(SUM(CASE WHEN created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN created_at >= CURRENT_TIMESTAMP - INTERVAL '1 day' THEN 1 ELSE 0 END), 0)
+           FROM users"#),
     )
     .fetch_one(&state.pool)
     .await?;
 
     let (total_comments, comments_24h, comments_7d): (i64, i64, i64) = sqlx::query_as(
-        r#"SELECT
+        crate::db::pg(r#"SELECT
               COUNT(*),
-              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
-              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0)
-           FROM comments"#,
+              COALESCE(SUM(CASE WHEN created_at >= CURRENT_TIMESTAMP - INTERVAL '1 day' THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 ELSE 0 END), 0)
+           FROM comments"#),
     )
     .fetch_one(&state.pool)
     .await?;
 
     let (total_votes, votes_7d): (i64, i64) = sqlx::query_as(
-        r#"SELECT
+        crate::db::pg(r#"SELECT
               COUNT(*),
-              COALESCE(SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0)
-           FROM votes"#,
+              COALESCE(SUM(CASE WHEN created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 ELSE 0 END), 0)
+           FROM votes"#),
     )
     .fetch_one(&state.pool)
     .await?;
@@ -350,39 +351,37 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         oldest_open_flag_at,
     ): (i64, i64, i64, i64, Option<NaiveDateTime>) =
         sqlx::query_as(
-            r#"SELECT
+            crate::db::pg(r#"SELECT
                   COALESCE(SUM(CASE WHEN resolved = 0 THEN 1 ELSE 0 END), 0),
-                  COALESCE(SUM(CASE WHEN resolved = 0 AND created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
-                  COALESCE(SUM(CASE WHEN resolved != 0 AND resolved_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0),
-                  COALESCE(SUM(CASE WHEN resolved = 0 AND created_at < datetime('now', '-1 day') THEN 1 ELSE 0 END), 0),
+                  COALESCE(SUM(CASE WHEN resolved = 0 AND created_at >= CURRENT_TIMESTAMP - INTERVAL '1 day' THEN 1 ELSE 0 END), 0),
+                  COALESCE(SUM(CASE WHEN resolved != 0 AND resolved_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 ELSE 0 END), 0),
+                  COALESCE(SUM(CASE WHEN resolved = 0 AND created_at < CURRENT_TIMESTAMP - INTERVAL '1 day' THEN 1 ELSE 0 END), 0),
                   MIN(CASE WHEN resolved = 0 THEN created_at ELSE NULL END)
-               FROM flag_reports"#,
+               FROM flag_reports"#),
         )
         .fetch_one(&state.pool)
         .await?;
 
     let (active_tokens, tokens_used_7d): (i64, i64) = sqlx::query_as(
-        r#"SELECT
+        crate::db::pg(r#"SELECT
               COUNT(*),
-              COALESCE(SUM(CASE WHEN last_used_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0)
+              COALESCE(SUM(CASE WHEN last_used_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 ELSE 0 END), 0)
            FROM api_tokens
-           WHERE expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP"#,
+           WHERE expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP"#),
     )
     .fetch_one(&state.pool)
     .await?;
 
     let moderation_trend_raw: Vec<(String, i64, i64)> = sqlx::query_as(
-        r#"WITH RECURSIVE days(day) AS (
-              SELECT date('now', '-6 days')
-              UNION ALL
-              SELECT date(day, '+1 day') FROM days WHERE day < date('now')
+        crate::db::pg(r#"WITH days(day) AS (
+              SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day')::date
            )
            SELECT
-              d.day,
-              COALESCE((SELECT COUNT(*) FROM flag_reports f WHERE date(f.created_at) = d.day), 0),
-              COALESCE((SELECT COUNT(*) FROM flag_reports f WHERE f.resolved != 0 AND date(f.resolved_at) = d.day), 0)
+              to_char(d.day, 'YYYY-MM-DD'),
+              COALESCE((SELECT COUNT(*) FROM flag_reports f WHERE f.created_at::date = d.day), 0),
+              COALESCE((SELECT COUNT(*) FROM flag_reports f WHERE f.resolved != 0 AND f.resolved_at::date = d.day), 0)
            FROM days d
-           ORDER BY d.day ASC"#,
+           ORDER BY d.day ASC"#),
     )
     .fetch_all(&state.pool)
     .await?;
@@ -396,17 +395,15 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         .collect();
 
     let user_growth_raw: Vec<(String, i64, i64)> = sqlx::query_as(
-        r#"WITH RECURSIVE days(day) AS (
-              SELECT date('now', '-6 days')
-              UNION ALL
-              SELECT date(day, '+1 day') FROM days WHERE day < date('now')
+        crate::db::pg(r#"WITH days(day) AS (
+              SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day')::date
            )
            SELECT
-              d.day,
-              COALESCE((SELECT COUNT(*) FROM users u WHERE date(u.created_at) = d.day), 0),
-              COALESCE((SELECT COUNT(*) FROM users u WHERE u.email_verified != 0 AND date(u.created_at) = d.day), 0)
+              to_char(d.day, 'YYYY-MM-DD'),
+              COALESCE((SELECT COUNT(*) FROM users u WHERE u.created_at::date = d.day), 0),
+              COALESCE((SELECT COUNT(*) FROM users u WHERE u.email_verified != 0 AND u.created_at::date = d.day), 0)
            FROM days d
-           ORDER BY d.day ASC"#,
+           ORDER BY d.day ASC"#),
     )
     .fetch_all(&state.pool)
     .await?;
@@ -419,8 +416,9 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         })
         .collect();
 
-    let category_raw: Vec<(String, i64, i64, Option<NaiveDateTime>)> = sqlx::query_as(
-        r#"SELECT
+    let category_raw: Vec<(String, i64, i64, Option<NaiveDateTime>)> =
+        sqlx::query_as(crate::db::pg(
+            r#"SELECT
               category,
               COUNT(*) AS total,
               COALESCE(SUM(CASE WHEN withdrawn = 0 THEN 1 ELSE 0 END), 0) AS live,
@@ -429,9 +427,9 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
            GROUP BY category
            ORDER BY total DESC, category ASC
            LIMIT 10"#,
-    )
-    .fetch_all(&state.pool)
-    .await?;
+        ))
+        .fetch_all(&state.pool)
+        .await?;
     let category_stats = category_raw
         .into_iter()
         .map(|(category, total, live, latest_at)| CategoryStatRow {
@@ -450,14 +448,13 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         i64,
         i64,
         i64,
-    )> = sqlx::query_as(
+    )> = sqlx::query_as(crate::db::pg(
         r#"SELECT
               u.username,
               u.display_name,
               u.created_at,
               COALESCE(m.manuscript_count, 0),
               COALESCE(c.comment_count, 0),
-              COALESCE(v.vote_count, 0),
               COALESCE(t.token_count, 0)
            FROM users u
            LEFT JOIN (
@@ -493,7 +490,7 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
                + COALESCE(t.token_count, 0) * 3) DESC,
               u.id DESC
            LIMIT 8"#,
-    )
+    ))
     .fetch_all(&state.pool)
     .await?;
     let unverified_high_activity_users = high_activity_raw
@@ -531,7 +528,7 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         i64,
         i64,
         i64,
-    )> = sqlx::query_as(
+    )> = sqlx::query_as(crate::db::pg(
         r#"SELECT
               m.arxiv_like_id,
               m.title,
@@ -552,7 +549,7 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
            JOIN users u ON u.id = m.submitter_id
            ORDER BY m.created_at DESC
            LIMIT 8"#,
-    )
+    ))
     .fetch_all(&state.pool)
     .await?;
     let recent_submissions = recent_submission_raw
@@ -594,13 +591,13 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         i64,
         i64,
         Option<NaiveDateTime>,
-    )> = sqlx::query_as(
+    )> = sqlx::query_as(crate::db::pg(
         r#"SELECT username, display_name, email_verified, is_admin,
                   orcid_oauth_verified, institutional_email, created_at
            FROM users
            ORDER BY id DESC
            LIMIT 8"#,
-    )
+    ))
     .fetch_all(&state.pool)
     .await?;
     let recent_users = recent_user_raw
@@ -682,13 +679,13 @@ async fn load_audit_rows(state: &AppState, per: i64, offset: i64) -> AppResult<V
         Option<String>,
         Option<NaiveDateTime>,
         Option<String>,
-    )> = sqlx::query_as(
+    )> = sqlx::query_as(crate::db::pg(
         r#"SELECT a.id, a.actor_user_id, a.action, a.target_type, a.target_id,
                       a.detail, a.ip, a.created_at, u.username
                FROM audit_log a
                LEFT JOIN users u ON u.id = a.actor_user_id
                ORDER BY a.id DESC LIMIT ? OFFSET ?"#,
-    )
+    ))
     .bind(per)
     .bind(offset)
     .fetch_all(&state.pool)
@@ -726,7 +723,7 @@ pub async fn audit(
 
     let entries = load_audit_rows(&state, per, offset).await?;
 
-    let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM audit_log")
+    let total: (i64,) = sqlx::query_as(crate::db::pg("SELECT COUNT(*) FROM audit_log"))
         .fetch_one(&state.pool)
         .await?;
 

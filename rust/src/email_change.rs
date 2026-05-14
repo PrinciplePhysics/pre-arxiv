@@ -1,10 +1,10 @@
 //! Email-change tokens — mint, hash, persist, resolve.
 //!
 //! Same shape as `passwords.rs` and `verify.rs`, but the row also
-//! carries the proposed new email address: we don't mutate users.email
-//! until the user confirms by clicking the link we send to that new
-//! address. This proves both that the user typed a real, reachable
-//! address (vs. a typo) and that they currently control it.
+//! carries the proposed new email address encrypted at rest: we don't
+//! mutate the account email until the user confirms by clicking the link
+//! we send to that new address. This proves both that the user typed a
+//! real, reachable address and that they currently control it.
 
 use std::time::Duration as StdDuration;
 
@@ -13,7 +13,8 @@ use base64::Engine;
 use chrono::{Duration, NaiveDateTime, Utc};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
-use sqlx::SqlitePool;
+
+use crate::db::DbPool;
 
 const TOKEN_PREFIX: &str = "prexiv_chgmail_";
 pub const TOKEN_TTL_HOURS: i64 = 24;
@@ -35,22 +36,30 @@ pub fn hash_token(plain: &str) -> String {
 /// change for the same user inside one transaction. Returns the
 /// plaintext token (which the caller embeds into the /confirm-email-
 /// change/{token} URL).
-pub async fn mint_token(pool: &SqlitePool, user_id: i64, new_email: &str) -> Result<String> {
+pub async fn mint_token(pool: &DbPool, user_id: i64, new_email: &str) -> Result<String> {
     let mut tx = pool.begin().await?;
-    sqlx::query("DELETE FROM pending_email_changes WHERE user_id = ?")
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await
-        .context("deleting prior pending_email_changes")?;
+    sqlx::query(crate::db::pg(
+        "DELETE FROM pending_email_changes WHERE user_id = ?",
+    ))
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .context("deleting prior pending_email_changes")?;
 
     let plain = generate_token();
     let hash = hash_token(&plain);
     let expires_at: NaiveDateTime = (Utc::now() + Duration::hours(TOKEN_TTL_HOURS)).naive_utc();
-    sqlx::query(
-        "INSERT INTO pending_email_changes (user_id, new_email, token_hash, expires_at) VALUES (?, ?, ?, ?)",
-    )
+    let (email_hash, email_enc) =
+        crate::crypto::seal_email(new_email).context("sealing pending email-change address")?;
+    let email_hash = email_hash.to_vec();
+    sqlx::query(crate::db::pg(
+        "INSERT INTO pending_email_changes
+             (user_id, new_email, new_email_hash, new_email_enc, token_hash, expires_at)
+         VALUES (?, '', ?, ?, ?, ?)",
+    ))
     .bind(user_id)
-    .bind(new_email)
+    .bind(&email_hash)
+    .bind(&email_enc)
     .bind(&hash)
     .bind(expires_at)
     .execute(&mut *tx)
@@ -61,7 +70,7 @@ pub async fn mint_token(pool: &SqlitePool, user_id: i64, new_email: &str) -> Res
 }
 
 pub async fn mint_and_send(
-    pool: &SqlitePool,
+    pool: &DbPool,
     user_id: i64,
     new_email: &str,
     username: &str,
@@ -75,11 +84,9 @@ pub async fn mint_and_send(
         token
     );
 
-    // Log so the operator can pluck the link while Brevo activation is
-    // still pending. Same fallback strategy as forgot-password.
     tracing::info!(
         target: "prexiv::email_change",
-        %username, %new_email, %link,
+        %username,
         "email-change confirmation link minted"
     );
 
@@ -92,10 +99,10 @@ pub async fn mint_and_send(
         match tokio::time::timeout(StdDuration::from_secs(12), send_fut).await {
             Ok(Ok(())) => {}
             Ok(Err(e)) => {
-                tracing::error!(target: "prexiv::email_change", error = %e, email = %to, username = %username_owned, "email-change confirmation send failed");
+                tracing::error!(target: "prexiv::email_change", error = %e, username = %username_owned, "email-change confirmation send failed");
             }
             Err(_) => {
-                tracing::error!(target: "prexiv::email_change", email = %to, username = %username_owned, "email-change confirmation send timed out after 12s");
+                tracing::error!(target: "prexiv::email_change", username = %username_owned, "email-change confirmation send timed out after 12s");
             }
         }
     });
@@ -104,27 +111,31 @@ pub async fn mint_and_send(
 }
 
 /// Resolve a plaintext token, honouring expiry. Returns (token_row_id,
-/// user_id, new_email) on hit.
-pub async fn resolve_token(pool: &SqlitePool, plain: &str) -> Result<Option<(i64, i64, String)>> {
+/// user_id, decrypted_new_email) on hit.
+pub async fn resolve_token(pool: &DbPool, plain: &str) -> Result<Option<(i64, i64, String)>> {
     let hash = hash_token(plain);
-    let row: Option<(i64, i64, String, NaiveDateTime)> = sqlx::query_as(
-        "SELECT id, user_id, new_email, expires_at FROM pending_email_changes WHERE token_hash = ?",
+    let row: Option<(i64, i64, Vec<u8>, NaiveDateTime)> = sqlx::query_as(
+        crate::db::pg("SELECT id, user_id, new_email_enc, expires_at FROM pending_email_changes WHERE token_hash = ?"),
     )
     .bind(&hash)
     .fetch_optional(pool)
     .await
     .context("looking up pending_email_changes token")?;
 
-    let Some((token_id, user_id, new_email, expires_at)) = row else {
+    let Some((token_id, user_id, new_email_enc, expires_at)) = row else {
         return Ok(None);
     };
     if expires_at < Utc::now().naive_utc() {
-        let _ = sqlx::query("DELETE FROM pending_email_changes WHERE id = ?")
-            .bind(token_id)
-            .execute(pool)
-            .await;
+        let _ = sqlx::query(crate::db::pg(
+            "DELETE FROM pending_email_changes WHERE id = ?",
+        ))
+        .bind(token_id)
+        .execute(pool)
+        .await;
         return Ok(None);
     }
+    let new_email = crate::crypto::open_email(&new_email_enc)
+        .context("decrypting pending email-change address")?;
     Ok(Some((token_id, user_id, new_email)))
 }
 
@@ -134,7 +145,7 @@ pub async fn resolve_token(pool: &SqlitePool, plain: &str) -> Result<Option<(i64
 /// re-check uniqueness — a different user might have claimed this
 /// address between the original request and the click.
 pub async fn consume_and_apply(
-    pool: &SqlitePool,
+    pool: &DbPool,
     token_id: i64,
     user_id: i64,
     new_email: &str,
@@ -144,19 +155,22 @@ pub async fn consume_and_apply(
     let (hash_arr, enc) =
         crate::crypto::seal_email(new_email).context("sealing new email for change")?;
     let new_hash = hash_arr.to_vec();
-    let conflict: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM users WHERE email_hash = ? AND id != ? LIMIT 1")
-            .bind(&new_hash)
-            .bind(user_id)
-            .fetch_optional(&mut *tx)
-            .await
-            .context("checking email uniqueness at consume time")?;
+    let conflict: Option<(i64,)> = sqlx::query_as(crate::db::pg(
+        "SELECT id FROM users WHERE email_hash = ? AND id != ? LIMIT 1",
+    ))
+    .bind(&new_hash)
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .context("checking email uniqueness at consume time")?;
     if conflict.is_some() {
         // Drop the pending row and bail; caller renders an error page.
-        let _ = sqlx::query("DELETE FROM pending_email_changes WHERE id = ?")
-            .bind(token_id)
-            .execute(&mut *tx)
-            .await;
+        let _ = sqlx::query(crate::db::pg(
+            "DELETE FROM pending_email_changes WHERE id = ?",
+        ))
+        .bind(token_id)
+        .execute(&mut *tx)
+        .await;
         tx.commit().await.ok();
         return Ok(false);
     }
@@ -166,13 +180,13 @@ pub async fn consume_and_apply(
     } else {
         0
     };
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "UPDATE users
            SET email = ?, email_hash = ?, email_enc = ?,
                email_verified = 1, institutional_email = ?
          WHERE id = ?",
-    )
-    .bind(new_email)
+    ))
+    .bind("")
     .bind(&new_hash)
     .bind(&enc)
     .bind(inst_email)
@@ -180,21 +194,25 @@ pub async fn consume_and_apply(
     .execute(&mut *tx)
     .await
     .context("updating users.email + crypto fields")?;
-    sqlx::query("DELETE FROM pending_email_changes WHERE id = ?")
-        .bind(token_id)
-        .execute(&mut *tx)
-        .await
-        .context("deleting consumed change token")?;
+    sqlx::query(crate::db::pg(
+        "DELETE FROM pending_email_changes WHERE id = ?",
+    ))
+    .bind(token_id)
+    .execute(&mut *tx)
+    .await
+    .context("deleting consumed change token")?;
     tx.commit().await?;
     Ok(true)
 }
 
-pub async fn invalidate_for_user(pool: &SqlitePool, user_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM pending_email_changes WHERE user_id = ?")
-        .bind(user_id)
-        .execute(pool)
-        .await
-        .context("deleting pending_email_changes for user")?;
+pub async fn invalidate_for_user(pool: &DbPool, user_id: i64) -> Result<()> {
+    sqlx::query(crate::db::pg(
+        "DELETE FROM pending_email_changes WHERE user_id = ?",
+    ))
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .context("deleting pending_email_changes for user")?;
     Ok(())
 }
 
@@ -205,15 +223,22 @@ pub async fn invalidate_for_user(pool: &SqlitePool, user_id: i64) -> Result<()> 
 /// re-render the original link; we just expose the fact that one is
 /// outstanding. The user can re-request to get a fresh link.
 pub async fn pending_for_user(
-    pool: &SqlitePool,
+    pool: &DbPool,
     user_id: i64,
 ) -> Result<Option<(String, NaiveDateTime)>> {
-    let row: Option<(String, NaiveDateTime)> = sqlx::query_as(
-        "SELECT new_email, expires_at FROM pending_email_changes WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+    let row: Option<(Vec<u8>, NaiveDateTime)> = sqlx::query_as(
+        crate::db::pg("SELECT new_email_enc, expires_at FROM pending_email_changes WHERE user_id = ? ORDER BY id DESC LIMIT 1"),
     )
     .bind(user_id)
     .fetch_optional(pool)
     .await
     .context("loading pending_email_changes for user")?;
-    Ok(row.filter(|(_, exp)| *exp > Utc::now().naive_utc()))
+    let Some((enc, exp)) = row else {
+        return Ok(None);
+    };
+    if exp <= Utc::now().naive_utc() {
+        return Ok(None);
+    }
+    let email = crate::crypto::open_email(&enc).context("decrypting pending email for display")?;
+    Ok(Some((email, exp)))
 }

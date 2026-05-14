@@ -56,12 +56,12 @@ pub async fn flag_manuscript(
     Path(id): Path<String>,
     Form(form): Form<FlagForm>,
 ) -> AppResult<Response> {
-    let row: Option<(i64, String)> = sqlx::query_as::<_, (i64, String)>(
+    let row: Option<(i64, String)> = sqlx::query_as::<_, (i64, String)>(crate::db::pg(
         "SELECT id, COALESCE(arxiv_like_id, CAST(id AS TEXT))
            FROM manuscripts
           WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
           LIMIT 1",
-    )
+    ))
     .bind(&id)
     .bind(&id)
     .fetch_optional(&state.pool)
@@ -85,10 +85,11 @@ pub async fn flag_manuscript(
 
     // Notify all admins. Notification recipient must exist, so we
     // fan out instead of a single broadcast row.
-    let admin_ids: Vec<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE is_admin = 1")
-        .fetch_all(&state.pool)
-        .await
-        .unwrap_or_default();
+    let admin_ids: Vec<(i64,)> =
+        sqlx::query_as(crate::db::pg("SELECT id FROM users WHERE is_admin = 1"))
+            .fetch_all(&state.pool)
+            .await
+            .unwrap_or_default();
     let snippet: String = format!("Flag on manuscript {slug}: {}", first_chars(&reason, 80));
     for (aid,) in admin_ids {
         let _ = crate::notifications::notify(
@@ -119,12 +120,12 @@ pub async fn flag_comment(
     Path(comment_id): Path<i64>,
     Form(form): Form<FlagForm>,
 ) -> AppResult<Response> {
-    let row: Option<(i64, String)> = sqlx::query_as::<_, (i64, String)>(
+    let row: Option<(i64, String)> = sqlx::query_as::<_, (i64, String)>(crate::db::pg(
         "SELECT c.manuscript_id,
                 COALESCE(m.arxiv_like_id, CAST(m.id AS TEXT))
            FROM comments c JOIN manuscripts m ON m.id = c.manuscript_id
           WHERE c.id = ?",
-    )
+    ))
     .bind(comment_id)
     .fetch_optional(&state.pool)
     .await?;
@@ -145,10 +146,11 @@ pub async fn flag_comment(
     let reason = clean_reason(&form.reason);
     insert_flag(&state.pool, "comment", comment_id, user.id, &reason).await?;
 
-    let admin_ids: Vec<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE is_admin = 1")
-        .fetch_all(&state.pool)
-        .await
-        .unwrap_or_default();
+    let admin_ids: Vec<(i64,)> =
+        sqlx::query_as(crate::db::pg("SELECT id FROM users WHERE is_admin = 1"))
+            .fetch_all(&state.pool)
+            .await
+            .unwrap_or_default();
     let snippet = format!(
         "Flag on comment #{comment_id} (on {slug}): {}",
         first_chars(&reason, 80)
@@ -179,24 +181,25 @@ pub async fn flag_comment(
 /// uniqueness violation — re-flagging the same target by the same
 /// user is a no-op (not an error).
 async fn insert_flag(
-    pool: &sqlx::SqlitePool,
+    pool: &crate::db::DbPool,
     target_type: &str,
     target_id: i64,
     reporter_id: i64,
     reason: &str,
 ) -> Result<(), sqlx::Error> {
-    let res = sqlx::query(
-        "INSERT OR IGNORE INTO flag_reports
+    let res = sqlx::query(crate::db::pg(
+        "INSERT INTO flag_reports
             (target_type, target_id, reporter_id, reason)
-         VALUES (?, ?, ?, ?)",
-    )
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT (target_type, target_id, reporter_id) DO NOTHING",
+    ))
     .bind(target_type)
     .bind(target_id)
     .bind(reporter_id)
     .bind(reason)
     .execute(pool)
     .await?;
-    let _ = res.rows_affected(); // 0 if INSERT IGNORE absorbed it
+    let _ = res.rows_affected(); // 0 if ON CONFLICT absorbed it
     Ok(())
 }
 

@@ -8,12 +8,12 @@
 
 use std::time::Duration as StdDuration;
 
+use crate::db::DbPool;
 use anyhow::{Context, Result};
 use base64::Engine;
 use chrono::{Duration, NaiveDateTime, Utc};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
-use sqlx::SqlitePool;
 
 const TOKEN_PREFIX: &str = "prexiv_verify_";
 pub const TOKEN_TTL_HOURS: i64 = 24;
@@ -36,14 +36,14 @@ pub fn hash_token(plain: &str) -> String {
 
 /// Insert a fresh token row for `user_id` and return the plaintext (which
 /// must be embedded in the email and is never persisted).
-pub async fn mint_token(pool: &SqlitePool, user_id: i64) -> Result<String> {
+pub async fn mint_token(pool: &DbPool, user_id: i64) -> Result<String> {
     let plain = generate_token();
     let hash = hash_token(&plain);
     let expires_at: NaiveDateTime = (Utc::now() + Duration::hours(TOKEN_TTL_HOURS)).naive_utc();
 
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
-    )
+    ))
     .bind(user_id)
     .bind(&hash)
     .bind(expires_at)
@@ -56,12 +56,14 @@ pub async fn mint_token(pool: &SqlitePool, user_id: i64) -> Result<String> {
 
 /// Invalidate all pending tokens for a user. Used by /me/resend-verification
 /// so the prior link can no longer be replayed.
-pub async fn invalidate_for_user(pool: &SqlitePool, user_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM email_verification_tokens WHERE user_id = ?")
-        .bind(user_id)
-        .execute(pool)
-        .await
-        .context("deleting old email_verification_tokens rows")?;
+pub async fn invalidate_for_user(pool: &DbPool, user_id: i64) -> Result<()> {
+    sqlx::query(crate::db::pg(
+        "DELETE FROM email_verification_tokens WHERE user_id = ?",
+    ))
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .context("deleting old email_verification_tokens rows")?;
     Ok(())
 }
 
@@ -75,7 +77,7 @@ pub async fn invalidate_for_user(pool: &SqlitePool, user_id: i64) -> Result<()> 
 /// 12-second wall-clock cap so it can't pile up forever; failures are
 /// logged but otherwise invisible.
 pub async fn mint_and_send(
-    pool: &SqlitePool,
+    pool: &DbPool,
     user_id: i64,
     email: &str,
     username: &str,
@@ -95,10 +97,10 @@ pub async fn mint_and_send(
         match tokio::time::timeout(StdDuration::from_secs(12), send_fut).await {
             Ok(Ok(())) => {}
             Ok(Err(e)) => {
-                tracing::error!(target: "prexiv::verify", error = %e, email = %to, username = %username_owned, "verification email send failed");
+                tracing::error!(target: "prexiv::verify", error = %e, username = %username_owned, "verification email send failed");
             }
             Err(_) => {
-                tracing::error!(target: "prexiv::verify", email = %to, username = %username_owned, "verification email send timed out after 12s");
+                tracing::error!(target: "prexiv::verify", username = %username_owned, "verification email send timed out after 12s");
             }
         }
     });
@@ -111,11 +113,11 @@ pub async fn mint_and_send(
 /// Does NOT delete the row — the caller does, after successfully marking
 /// the user verified, so a transient DB error doesn't leave a verified
 /// user with a still-redeemable token.
-pub async fn resolve_token(pool: &SqlitePool, plain: &str) -> Result<Option<(i64, i64)>> {
+pub async fn resolve_token(pool: &DbPool, plain: &str) -> Result<Option<(i64, i64)>> {
     let hash = hash_token(plain);
-    let row: Option<(i64, i64, NaiveDateTime)> = sqlx::query_as(
+    let row: Option<(i64, i64, NaiveDateTime)> = sqlx::query_as(crate::db::pg(
         "SELECT id, user_id, expires_at FROM email_verification_tokens WHERE token_hash = ?",
-    )
+    ))
     .bind(&hash)
     .fetch_optional(pool)
     .await
@@ -126,27 +128,33 @@ pub async fn resolve_token(pool: &SqlitePool, plain: &str) -> Result<Option<(i64
     };
     if expires_at < Utc::now().naive_utc() {
         // Expired — clean it up while we're here.
-        let _ = sqlx::query("DELETE FROM email_verification_tokens WHERE id = ?")
-            .bind(token_id)
-            .execute(pool)
-            .await;
+        let _ = sqlx::query(crate::db::pg(
+            "DELETE FROM email_verification_tokens WHERE id = ?",
+        ))
+        .bind(token_id)
+        .execute(pool)
+        .await;
         return Ok(None);
     }
     Ok(Some((token_id, user_id)))
 }
 
-pub async fn consume(pool: &SqlitePool, token_id: i64, user_id: i64) -> Result<()> {
+pub async fn consume(pool: &DbPool, token_id: i64, user_id: i64) -> Result<()> {
     let mut tx = pool.begin().await?;
-    sqlx::query("UPDATE users SET email_verified = 1 WHERE id = ?")
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await
-        .context("marking user verified")?;
-    sqlx::query("DELETE FROM email_verification_tokens WHERE id = ?")
-        .bind(token_id)
-        .execute(&mut *tx)
-        .await
-        .context("deleting consumed token")?;
+    sqlx::query(crate::db::pg(
+        "UPDATE users SET email_verified = 1 WHERE id = ?",
+    ))
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .context("marking user verified")?;
+    sqlx::query(crate::db::pg(
+        "DELETE FROM email_verification_tokens WHERE id = ?",
+    ))
+    .bind(token_id)
+    .execute(&mut *tx)
+    .await
+    .context("deleting consumed token")?;
     tx.commit().await?;
     Ok(())
 }

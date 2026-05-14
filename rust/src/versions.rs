@@ -14,8 +14,8 @@
 //! v1 is inserted at original submission time so the version log has
 //! a complete history.
 
+use crate::db::DbPool;
 use anyhow::{Context, Result};
-use sqlx::SqlitePool;
 
 use crate::models::ManuscriptVersion;
 
@@ -40,17 +40,18 @@ pub struct VersionInput<'a> {
 /// manuscripts INSERT, inside the same enclosing transaction.
 pub async fn insert_initial<'c, E>(tx: E, manuscript_id: i64, v: &VersionInput<'_>) -> Result<i64>
 where
-    E: sqlx::Executor<'c, Database = sqlx::Sqlite>,
+    E: sqlx::Executor<'c, Database = crate::db::Db>,
 {
-    let res = sqlx::query(
+    let (version_id,): (i64,) = sqlx::query_as(crate::db::pg(
         r#"INSERT INTO manuscript_versions
               (manuscript_id, version_number,
                title, abstract, authors, category,
                pdf_path, external_url, conductor_notes,
                license, ai_training,
                revision_note)
-           VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"#,
-    )
+           VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+           RETURNING id"#,
+    ))
     .bind(manuscript_id)
     .bind(v.title)
     .bind(v.r#abstract)
@@ -61,36 +62,34 @@ where
     .bind(v.conductor_notes)
     .bind(v.license)
     .bind(v.ai_training)
-    .execute(tx)
+    .fetch_one(tx)
     .await
     .context("inserting initial manuscript_versions row")?;
-    Ok(res.last_insert_rowid())
+    Ok(version_id)
 }
 
 /// Apply a revision in one transaction. Returns the new version_number.
 /// Caller is responsible for permission checks + non-withdrawn check.
-pub async fn mint_revision(
-    pool: &SqlitePool,
-    manuscript_id: i64,
-    v: &VersionInput<'_>,
-) -> Result<i64> {
+pub async fn mint_revision(pool: &DbPool, manuscript_id: i64, v: &VersionInput<'_>) -> Result<i64> {
     let mut tx = pool.begin().await?;
 
-    let (current,): (i64,) = sqlx::query_as("SELECT current_version FROM manuscripts WHERE id = ?")
-        .bind(manuscript_id)
-        .fetch_one(&mut *tx)
-        .await
-        .context("fetching current_version")?;
+    let (current,): (i64,) = sqlx::query_as(crate::db::pg(
+        "SELECT current_version FROM manuscripts WHERE id = ?",
+    ))
+    .bind(manuscript_id)
+    .fetch_one(&mut *tx)
+    .await
+    .context("fetching current_version")?;
     let next = current + 1;
 
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         r#"UPDATE manuscripts SET
               title = ?, abstract = ?, authors = ?, category = ?,
               pdf_path = ?, external_url = ?,
               conductor_notes = ?, license = ?, ai_training = ?,
               current_version = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ?"#,
-    )
+    ))
     .bind(v.title)
     .bind(v.r#abstract)
     .bind(v.authors)
@@ -106,7 +105,7 @@ pub async fn mint_revision(
     .await
     .context("updating manuscripts with new version")?;
 
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         r#"INSERT INTO manuscript_versions
               (manuscript_id, version_number,
                title, abstract, authors, category,
@@ -114,7 +113,7 @@ pub async fn mint_revision(
                license, ai_training,
                revision_note)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
-    )
+    ))
     .bind(manuscript_id)
     .bind(next)
     .bind(v.title)
@@ -140,7 +139,7 @@ pub async fn mint_revision(
 /// replace the public source artifact and change conductor disclosure
 /// flags while minting the new manuscript version.
 pub async fn mint_revision_with_publication(
-    pool: &SqlitePool,
+    pool: &DbPool,
     manuscript_id: i64,
     v: &VersionInput<'_>,
     source_path: Option<&str>,
@@ -149,14 +148,16 @@ pub async fn mint_revision_with_publication(
 ) -> Result<i64> {
     let mut tx = pool.begin().await?;
 
-    let (current,): (i64,) = sqlx::query_as("SELECT current_version FROM manuscripts WHERE id = ?")
-        .bind(manuscript_id)
-        .fetch_one(&mut *tx)
-        .await
-        .context("fetching current_version")?;
+    let (current,): (i64,) = sqlx::query_as(crate::db::pg(
+        "SELECT current_version FROM manuscripts WHERE id = ?",
+    ))
+    .bind(manuscript_id)
+    .fetch_one(&mut *tx)
+    .await
+    .context("fetching current_version")?;
     let next = current + 1;
 
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         r#"UPDATE manuscripts SET
               title = ?, abstract = ?, authors = ?, category = ?,
               pdf_path = ?, external_url = ?, source_path = ?,
@@ -164,7 +165,7 @@ pub async fn mint_revision_with_publication(
               conductor_notes = ?, license = ?, ai_training = ?,
               current_version = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ?"#,
-    )
+    ))
     .bind(v.title)
     .bind(v.r#abstract)
     .bind(v.authors)
@@ -183,7 +184,7 @@ pub async fn mint_revision_with_publication(
     .await
     .context("updating manuscripts with new version and publication fields")?;
 
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         r#"INSERT INTO manuscript_versions
               (manuscript_id, version_number,
                title, abstract, authors, category,
@@ -191,7 +192,7 @@ pub async fn mint_revision_with_publication(
                license, ai_training,
                revision_note)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
-    )
+    ))
     .bind(manuscript_id)
     .bind(next)
     .bind(v.title)
@@ -213,11 +214,8 @@ pub async fn mint_revision_with_publication(
 }
 
 /// List all versions of a manuscript, newest first.
-pub async fn list_versions(
-    pool: &SqlitePool,
-    manuscript_id: i64,
-) -> Result<Vec<ManuscriptVersion>> {
-    let rows = sqlx::query_as::<_, ManuscriptVersion>(
+pub async fn list_versions(pool: &DbPool, manuscript_id: i64) -> Result<Vec<ManuscriptVersion>> {
+    let rows = sqlx::query_as::<_, ManuscriptVersion>(crate::db::pg(
         r#"SELECT id, manuscript_id, version_number,
                   title, abstract, authors, category,
                   pdf_path, external_url, conductor_notes,
@@ -226,7 +224,7 @@ pub async fn list_versions(
            FROM manuscript_versions
            WHERE manuscript_id = ?
            ORDER BY version_number DESC"#,
-    )
+    ))
     .bind(manuscript_id)
     .fetch_all(pool)
     .await
@@ -236,11 +234,11 @@ pub async fn list_versions(
 
 /// Look up one specific version. Returns None if version_number doesn't exist.
 pub async fn get_version(
-    pool: &SqlitePool,
+    pool: &DbPool,
     manuscript_id: i64,
     version_number: i64,
 ) -> Result<Option<ManuscriptVersion>> {
-    let row = sqlx::query_as::<_, ManuscriptVersion>(
+    let row = sqlx::query_as::<_, ManuscriptVersion>(crate::db::pg(
         r#"SELECT id, manuscript_id, version_number,
                   title, abstract, authors, category,
                   pdf_path, external_url, conductor_notes,
@@ -248,7 +246,7 @@ pub async fn get_version(
                   revision_note, revised_at
            FROM manuscript_versions
            WHERE manuscript_id = ? AND version_number = ?"#,
-    )
+    ))
     .bind(manuscript_id)
     .bind(version_number)
     .fetch_optional(pool)

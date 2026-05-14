@@ -14,12 +14,12 @@
 
 use std::time::Duration as StdDuration;
 
+use crate::db::DbPool;
 use anyhow::{Context, Result};
 use base64::Engine;
 use chrono::{Duration, NaiveDateTime, Utc};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
-use sqlx::SqlitePool;
 
 const TOKEN_PREFIX: &str = "prexiv_reset_";
 pub const TOKEN_TTL_MINUTES: i64 = 60;
@@ -40,23 +40,25 @@ pub fn hash_token(plain: &str) -> String {
 /// Mint a new reset token for `user_id`, invalidating any prior tokens
 /// for that user so only the most recent link is redeemable. Returns
 /// the plaintext token (caller embeds it in the reset URL).
-pub async fn mint_token(pool: &SqlitePool, user_id: i64) -> Result<String> {
+pub async fn mint_token(pool: &DbPool, user_id: i64) -> Result<String> {
     // Invalidate prior tokens in the same transaction so a flooded
     // attacker can't keep one alive.
     let mut tx = pool.begin().await?;
-    sqlx::query("DELETE FROM password_reset_tokens WHERE user_id = ?")
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await
-        .context("deleting prior password_reset_tokens")?;
+    sqlx::query(crate::db::pg(
+        "DELETE FROM password_reset_tokens WHERE user_id = ?",
+    ))
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .context("deleting prior password_reset_tokens")?;
 
     let plain = generate_token();
     let hash = hash_token(&plain);
     let expires_at: NaiveDateTime = (Utc::now() + Duration::minutes(TOKEN_TTL_MINUTES)).naive_utc();
 
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
-    )
+    ))
     .bind(user_id)
     .bind(&hash)
     .bind(expires_at)
@@ -70,11 +72,10 @@ pub async fn mint_token(pool: &SqlitePool, user_id: i64) -> Result<String> {
 
 /// Mint + send. Like `verify::mint_and_send` this returns the plaintext
 /// token synchronously and spawns the email send so the HTTP response
-/// isn't blocked on the upstream provider. Also writes the link to the
-/// tracing log so the operator can pluck it manually if the upstream
-/// mail provider is still pending activation.
+/// isn't blocked on the upstream provider. The plaintext link is never
+/// logged.
 pub async fn mint_and_send(
-    pool: &SqlitePool,
+    pool: &DbPool,
     user_id: i64,
     email: &str,
     username: &str,
@@ -84,13 +85,9 @@ pub async fn mint_and_send(
     let base = app_url.unwrap_or("http://localhost:3001");
     let link = format!("{}/reset-password/{}", base.trim_end_matches('/'), token);
 
-    // Log the link at info-level so an operator can find it via
-    // `grep "password reset link" prexiv-rust.log` while outbound mail
-    // is in setup. This is OK because the log file is mode 0600 on
-    // victoria — only dbai can read it.
     tracing::info!(
         target: "prexiv::passwords",
-        %username, %email, %link,
+        %username,
         "password reset link minted"
     );
 
@@ -103,10 +100,10 @@ pub async fn mint_and_send(
         match tokio::time::timeout(StdDuration::from_secs(12), send_fut).await {
             Ok(Ok(())) => {}
             Ok(Err(e)) => {
-                tracing::error!(target: "prexiv::passwords", error = %e, email = %to, username = %username_owned, "password reset email send failed");
+                tracing::error!(target: "prexiv::passwords", error = %e, username = %username_owned, "password reset email send failed");
             }
             Err(_) => {
-                tracing::error!(target: "prexiv::passwords", email = %to, username = %username_owned, "password reset email send timed out after 12s");
+                tracing::error!(target: "prexiv::passwords", username = %username_owned, "password reset email send timed out after 12s");
             }
         }
     });
@@ -119,11 +116,11 @@ pub async fn mint_and_send(
 /// not delete the row — the caller deletes after successfully updating
 /// the password, so a transient DB error doesn't leave the user
 /// password-changed with a still-redeemable token.
-pub async fn resolve_token(pool: &SqlitePool, plain: &str) -> Result<Option<(i64, i64)>> {
+pub async fn resolve_token(pool: &DbPool, plain: &str) -> Result<Option<(i64, i64)>> {
     let hash = hash_token(plain);
-    let row: Option<(i64, i64, NaiveDateTime)> = sqlx::query_as(
+    let row: Option<(i64, i64, NaiveDateTime)> = sqlx::query_as(crate::db::pg(
         "SELECT id, user_id, expires_at FROM password_reset_tokens WHERE token_hash = ?",
-    )
+    ))
     .bind(&hash)
     .fetch_optional(pool)
     .await
@@ -133,10 +130,12 @@ pub async fn resolve_token(pool: &SqlitePool, plain: &str) -> Result<Option<(i64
         return Ok(None);
     };
     if expires_at < Utc::now().naive_utc() {
-        let _ = sqlx::query("DELETE FROM password_reset_tokens WHERE id = ?")
-            .bind(token_id)
-            .execute(pool)
-            .await;
+        let _ = sqlx::query(crate::db::pg(
+            "DELETE FROM password_reset_tokens WHERE id = ?",
+        ))
+        .bind(token_id)
+        .execute(pool)
+        .await;
         return Ok(None);
     }
     Ok(Some((token_id, user_id)))
@@ -146,23 +145,27 @@ pub async fn resolve_token(pool: &SqlitePool, plain: &str) -> Result<Option<(i64
 /// single transaction. Returns Ok on success; the caller is responsible
 /// for rotating the session and logging the user in.
 pub async fn consume_and_set(
-    pool: &SqlitePool,
+    pool: &DbPool,
     token_id: i64,
     user_id: i64,
     new_hash: &str,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
-    sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
-        .bind(new_hash)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await
-        .context("updating users.password_hash")?;
-    sqlx::query("DELETE FROM password_reset_tokens WHERE id = ?")
-        .bind(token_id)
-        .execute(&mut *tx)
-        .await
-        .context("deleting consumed reset token")?;
+    sqlx::query(crate::db::pg(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+    ))
+    .bind(new_hash)
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .context("updating users.password_hash")?;
+    sqlx::query(crate::db::pg(
+        "DELETE FROM password_reset_tokens WHERE id = ?",
+    ))
+    .bind(token_id)
+    .execute(&mut *tx)
+    .await
+    .context("deleting consumed reset token")?;
     tx.commit().await?;
     Ok(())
 }
@@ -171,7 +174,7 @@ pub async fn consume_and_set(
 /// password endpoint, which accepts either. Returns Ok(None) for misses
 /// — the caller treats hit and miss identically to defeat enumeration.
 pub async fn find_user_by_email_or_username(
-    pool: &SqlitePool,
+    pool: &DbPool,
     needle: &str,
 ) -> Result<Option<(i64, String, String)>> {
     // Look up by username OR by the blind-index `email_hash`. The plaintext
@@ -179,15 +182,16 @@ pub async fn find_user_by_email_or_username(
     // from `email_enc` and decrypt before returning it to the caller (used
     // to address the password-reset email).
     let needle_hash = crate::crypto::email_hash(needle).to_vec();
-    let row: Option<(i64, String, Option<Vec<u8>>, Option<String>)> = sqlx::query_as(
-        "SELECT id, username, email_enc, email
+    let row: Option<(i64, String, Option<Vec<u8>>, Option<String>)> =
+        sqlx::query_as(crate::db::pg(
+            "SELECT id, username, email_enc, email
            FROM users WHERE username = ? OR email_hash = ? LIMIT 1",
-    )
-    .bind(needle)
-    .bind(&needle_hash)
-    .fetch_optional(pool)
-    .await
-    .context("looking up user for password reset")?;
+        ))
+        .bind(needle)
+        .bind(&needle_hash)
+        .fetch_optional(pool)
+        .await
+        .context("looking up user for password reset")?;
     let Some((id, username, enc, plain)) = row else {
         return Ok(None);
     };

@@ -60,10 +60,12 @@ pub async fn submit(
 
     // Pull the current password_hash. We don't reuse `user` (it's the
     // RequireUser snapshot without password_hash); fetch fresh.
-    let row: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
-        .bind(user.id)
-        .fetch_optional(&state.pool)
-        .await?;
+    let row: Option<(String,)> = sqlx::query_as(crate::db::pg(
+        "SELECT password_hash FROM users WHERE id = ?",
+    ))
+    .bind(user.id)
+    .fetch_optional(&state.pool)
+    .await?;
     let Some((current_hash,)) = row else {
         // Should be impossible — RequireUser implies the row exists. Fail
         // loud rather than silently rendering a form.
@@ -97,11 +99,13 @@ pub async fn submit(
     let new_hash = hash_password(&form.new_password)
         .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("bcrypt: {e}")))?;
 
-    sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
-        .bind(&new_hash)
-        .bind(user.id)
-        .execute(&state.pool)
-        .await?;
+    sqlx::query(crate::db::pg(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+    ))
+    .bind(&new_hash)
+    .bind(user.id)
+    .execute(&state.pool)
+    .await?;
 
     // Rotate the session id so any cookie that observed the pre-change
     // session is now useless. Keep the user_id mapped so they don't

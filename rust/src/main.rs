@@ -14,7 +14,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tower_sessions::cookie::SameSite;
 use tower_sessions::{Expiry, SessionManagerLayer};
-use tower_sessions_sqlx_store::SqliteStore;
+use tower_sessions_sqlx_store::PostgresStore;
 use tracing_subscriber::EnvFilter;
 
 mod api_auth;
@@ -60,21 +60,14 @@ async fn main() -> anyhow::Result<()> {
         tracing_subscriber::fmt().with_env_filter(env_filter).init();
     }
 
-    let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .map(|p| p.join("data"))
-            .unwrap_or_else(|| "./data".into())
-            .to_string_lossy()
-            .into_owned()
-    });
-    let db_path = format!("{}/prearxiv.db", data_dir);
+    let database_url =
+        std::env::var("DATABASE_URL").context("DATABASE_URL must point to PostgreSQL")?;
 
-    let pool = db::connect(&db_path)
+    let pool = db::connect(&database_url)
         .await
-        .with_context(|| format!("connecting to sqlite at {db_path}"))?;
+        .context("connecting to PostgreSQL")?;
 
-    sqlx::migrate!("./migrations")
+    sqlx::migrate!("./pg_migrations")
         .run(&pool)
         .await
         .context("running sqlx migrations")?;
@@ -100,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Session store — shares the same DB so we don't need a second file.
-    let session_store = SqliteStore::new(pool.clone());
+    let session_store = PostgresStore::new(pool.clone());
     session_store
         .migrate()
         .await
@@ -279,11 +272,11 @@ async fn main() -> anyhow::Result<()> {
 /// on the institutional-domain allowlist AND whose email has been
 /// verified. Idempotent — the `WHERE institutional_email = 0` guard
 /// means re-running this on every startup costs one cheap scan.
-async fn backfill_institutional_email(pool: &sqlx::SqlitePool) -> anyhow::Result<usize> {
-    let rows: Vec<(i64, Option<String>, i64)> = sqlx::query_as(
+async fn backfill_institutional_email(pool: &crate::db::DbPool) -> anyhow::Result<usize> {
+    let rows: Vec<(i64, Option<String>, i64)> = sqlx::query_as(crate::db::pg(
         "SELECT id, email, email_verified FROM users
           WHERE institutional_email = 0 AND email IS NOT NULL AND email <> ''",
-    )
+    ))
     .fetch_all(pool)
     .await?;
     let mut n = 0usize;
@@ -295,20 +288,23 @@ async fn backfill_institutional_email(pool: &sqlx::SqlitePool) -> anyhow::Result
         if !crate::email::is_institutional(&email) {
             continue;
         }
-        sqlx::query("UPDATE users SET institutional_email = 1 WHERE id = ?")
-            .bind(id)
-            .execute(pool)
-            .await?;
+        sqlx::query(crate::db::pg(
+            "UPDATE users SET institutional_email = 1 WHERE id = ?",
+        ))
+        .bind(id)
+        .execute(pool)
+        .await?;
         n += 1;
     }
     Ok(n)
 }
 
-async fn backfill_user_emails(pool: &sqlx::SqlitePool) -> anyhow::Result<usize> {
-    let rows: Vec<(i64, Option<String>)> =
-        sqlx::query_as("SELECT id, email FROM users WHERE email_hash IS NULL")
-            .fetch_all(pool)
-            .await?;
+async fn backfill_user_emails(pool: &crate::db::DbPool) -> anyhow::Result<usize> {
+    let rows: Vec<(i64, Option<String>)> = sqlx::query_as(crate::db::pg(
+        "SELECT id, email FROM users WHERE email_hash IS NULL",
+    ))
+    .fetch_all(pool)
+    .await?;
     let mut n = 0usize;
     for (id, email_opt) in rows {
         let email = email_opt.unwrap_or_default();
@@ -317,12 +313,14 @@ async fn backfill_user_emails(pool: &sqlx::SqlitePool) -> anyhow::Result<usize> 
         }
         let (hash, enc) = crypto::seal_email(&email)?;
         let hash_vec = hash.to_vec();
-        sqlx::query("UPDATE users SET email_hash = ?, email_enc = ? WHERE id = ?")
-            .bind(&hash_vec)
-            .bind(&enc)
-            .bind(id)
-            .execute(pool)
-            .await?;
+        sqlx::query(crate::db::pg(
+            "UPDATE users SET email_hash = ?, email_enc = ? WHERE id = ?",
+        ))
+        .bind(&hash_vec)
+        .bind(&enc)
+        .bind(id)
+        .execute(pool)
+        .await?;
         n += 1;
     }
     Ok(n)

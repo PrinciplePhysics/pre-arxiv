@@ -120,7 +120,7 @@ async fn get_me(ApiUser(u): ApiUser) -> Json<Value> {
 
 async fn list_tokens(State(state): State<AppState>, ApiUser(u): ApiUser) -> ApiResult<Json<Value>> {
     let rows: Vec<(i64, Option<String>, Option<chrono::NaiveDateTime>, Option<chrono::NaiveDateTime>, Option<chrono::NaiveDateTime>)> =
-        sqlx::query_as("SELECT id, name, last_used_at, created_at, expires_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC")
+        sqlx::query_as(crate::db::pg("SELECT id, name, last_used_at, created_at, expires_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC"))
             .bind(u.id)
             .fetch_all(&state.pool)
             .await?;
@@ -154,20 +154,20 @@ async fn create_token(
         .filter(|d| *d > 0)
         .map(|d| (chrono::Utc::now() + chrono::Duration::days(d)).naive_utc());
 
-    let res = sqlx::query(
-        "INSERT INTO api_tokens (user_id, token_hash, name, expires_at) VALUES (?, ?, ?, ?)",
+    let (token_id,): (i64,) = sqlx::query_as(
+        crate::db::pg("INSERT INTO api_tokens (user_id, token_hash, name, expires_at) VALUES (?, ?, ?, ?) RETURNING id"),
     )
     .bind(u.id)
     .bind(&hash)
     .bind(body.name.as_deref())
     .bind(expires_at)
-    .execute(&state.pool)
+    .fetch_one(&state.pool)
     .await?;
 
     Ok((
         StatusCode::CREATED,
         Json(json!({
-            "id": res.last_insert_rowid(),
+            "id": token_id,
             "name": body.name,
             "token": plain,
             "warning": "Save this token now — it will never be shown again. Treat it like a password.",
@@ -181,11 +181,13 @@ async fn revoke_token(
     ApiUser(u): ApiUser,
     Path(id): Path<i64>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
-    let res = sqlx::query("DELETE FROM api_tokens WHERE id = ? AND user_id = ?")
-        .bind(id)
-        .bind(u.id)
-        .execute(&state.pool)
-        .await?;
+    let res = sqlx::query(crate::db::pg(
+        "DELETE FROM api_tokens WHERE id = ? AND user_id = ?",
+    ))
+    .bind(id)
+    .bind(u.id)
+    .execute(&state.pool)
+    .await?;
     if res.rows_affected() == 0 {
         return Ok((
             StatusCode::NOT_FOUND,
@@ -242,7 +244,7 @@ async fn list_manuscripts(
             (None, "audited") => ("WHERE has_auditor = 1", "ORDER BY created_at DESC", false),
             (None, _) => ("", "ORDER BY score DESC, created_at DESC", false),
         };
-    let sql = format!("{base} {where_clause} {order} LIMIT ? OFFSET ?");
+    let sql = crate::db::pg_dynamic(&format!("{base} {where_clause} {order} LIMIT ? OFFSET ?"));
     let mut query = sqlx::query_as::<_, ManuscriptListItem>(&sql);
     if bind_cat {
         query = query.bind(q.category.as_deref().unwrap_or(""));
@@ -262,7 +264,7 @@ async fn get_manuscript(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
-    let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
+    let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(crate::db::pg(
         r#"SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
                   pdf_path, external_url, source_path,
                   conductor_type, conductor_ai_model, conductor_ai_model_public,
@@ -276,17 +278,18 @@ async fn get_manuscript(
            FROM manuscripts
            WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
            LIMIT 1"#,
-    )
+    ))
     .bind(&id)
     .bind(&id)
     .fetch_optional(&state.pool)
     .await?;
     let m = m.ok_or(ApiError::NotFound)?;
-    let _ =
-        sqlx::query("UPDATE manuscripts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")
-            .bind(m.id)
-            .execute(&state.pool)
-            .await;
+    let _ = sqlx::query(crate::db::pg(
+        "UPDATE manuscripts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?",
+    ))
+    .bind(m.id)
+    .execute(&state.pool)
+    .await;
     Ok(Json(redact_manuscript(&m)))
 }
 
@@ -440,7 +443,7 @@ async fn post_manuscript(
             }
         };
         let mut tx = state.pool.begin().await?;
-        let r = sqlx::query(
+        let r = sqlx::query_as::<_, (i64,)>(crate::db::pg(
             r#"INSERT INTO manuscripts (
                 arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
                 pdf_path, external_url, source_path,
@@ -459,8 +462,9 @@ async fn post_manuscript(
                 ?, ?, ?, ?,
                 ?, ?,
                 1
-            )"#,
-        )
+            )
+            RETURNING id"#,
+        ))
         .bind(&arxiv_like_id)
         .bind(&synthetic_doi)
         .bind(user.id)
@@ -522,11 +526,11 @@ async fn post_manuscript(
         } else {
             None
         })
-        .execute(&mut *tx)
+        .fetch_one(&mut *tx)
         .await;
         match r {
             Ok(rr) => {
-                new_id = rr.last_insert_rowid();
+                new_id = rr.0;
             }
             Err(e) if api_is_unique_violation(&e) => {
                 cleanup_api_uploads(
@@ -549,7 +553,7 @@ async fn post_manuscript(
             }
         }
         // Self-upvote (matches the JS app).
-        let _ = sqlx::query("INSERT INTO votes (user_id, target_type, target_id, value) VALUES (?, 'manuscript', ?, 1)")
+        let _ = sqlx::query(crate::db::pg("INSERT INTO votes (user_id, target_type, target_id, value) VALUES (?, 'manuscript', ?, 1)"))
             .bind(user.id)
             .bind(new_id)
             .execute(&mut *tx)
@@ -602,7 +606,7 @@ async fn post_manuscript(
     }
 
     // Fetch and return the freshly-created row.
-    let m: Manuscript = sqlx::query_as::<_, Manuscript>(
+    let m: Manuscript = sqlx::query_as::<_, Manuscript>(crate::db::pg(
         r#"SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
                   pdf_path, external_url, source_path,
                   conductor_type, conductor_ai_model, conductor_ai_model_public,
@@ -615,7 +619,7 @@ async fn post_manuscript(
                   created_at, updated_at,
                   license, ai_training, current_version
            FROM manuscripts WHERE id = ?"#,
-    )
+    ))
     .bind(new_id)
     .fetch_one(&state.pool)
     .await?;
@@ -821,9 +825,9 @@ async fn list_comments(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
-    let m: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
+    let m: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(crate::db::pg(
         "SELECT id FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
-    )
+    ))
     .bind(&id)
     .bind(&id)
     .fetch_optional(&state.pool)
@@ -837,11 +841,11 @@ async fn list_comments(
         String,
         Option<i64>,
         Option<chrono::NaiveDateTime>,
-    )> = sqlx::query_as(
+    )> = sqlx::query_as(crate::db::pg(
         "SELECT c.id, c.author_id, u.username, c.parent_id, c.content, c.score, c.created_at
              FROM comments c JOIN users u ON u.id = c.author_id
              WHERE c.manuscript_id = ? ORDER BY c.created_at ASC",
-    )
+    ))
     .bind(manuscript_id)
     .fetch_all(&state.pool)
     .await?;
@@ -872,7 +876,7 @@ async fn post_comment(
         ));
     }
     let m: Option<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT id, withdrawn FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
+        crate::db::pg("SELECT id, withdrawn FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1")
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
@@ -885,30 +889,30 @@ async fn post_comment(
     }
 
     let mut tx = state.pool.begin().await?;
-    let res = sqlx::query(
-        "INSERT INTO comments (manuscript_id, author_id, parent_id, content) VALUES (?, ?, ?, ?)",
+    let (cid,): (i64,) = sqlx::query_as(
+        crate::db::pg("INSERT INTO comments (manuscript_id, author_id, parent_id, content) VALUES (?, ?, ?, ?) RETURNING id"),
     )
     .bind(manuscript_id)
     .bind(user.id)
     .bind(body.parent_id)
     .bind(content)
-    .execute(&mut *tx)
+    .fetch_one(&mut *tx)
     .await?;
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "UPDATE manuscripts SET comment_count = COALESCE(comment_count, 0) + 1 WHERE id = ?",
-    )
+    ))
     .bind(manuscript_id)
     .execute(&mut *tx)
     .await?;
-    let cid = res.last_insert_rowid();
-    let submitter: Option<(i64,)> =
-        sqlx::query_as("SELECT submitter_id FROM manuscripts WHERE id = ?")
-            .bind(manuscript_id)
-            .fetch_optional(&mut *tx)
-            .await?;
+    let submitter: Option<(i64,)> = sqlx::query_as(crate::db::pg(
+        "SELECT submitter_id FROM manuscripts WHERE id = ?",
+    ))
+    .bind(manuscript_id)
+    .fetch_optional(&mut *tx)
+    .await?;
     let parent_author: Option<(i64,)> = match body.parent_id {
         Some(pid) => {
-            sqlx::query_as("SELECT author_id FROM comments WHERE id = ?")
+            sqlx::query_as(crate::db::pg("SELECT author_id FROM comments WHERE id = ?"))
                 .bind(pid)
                 .fetch_optional(&mut *tx)
                 .await?
@@ -965,7 +969,7 @@ async fn vote_manuscript(
         ));
     }
     let m: Option<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT id, withdrawn FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
+        crate::db::pg("SELECT id, withdrawn FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1")
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
@@ -978,25 +982,27 @@ async fn vote_manuscript(
     }
 
     let mut tx = state.pool.begin().await?;
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "INSERT INTO votes (user_id, target_type, target_id, value) VALUES (?, 'manuscript', ?, ?)
          ON CONFLICT(user_id, target_type, target_id) DO UPDATE SET value = excluded.value",
-    )
+    ))
     .bind(user.id)
     .bind(target_id)
     .bind(body.value)
     .execute(&mut *tx)
     .await?;
     let (score,): (i64,) = sqlx::query_as(
-        "SELECT COALESCE(SUM(value), 0) FROM votes WHERE target_type = 'manuscript' AND target_id = ?"
+        crate::db::pg("SELECT COALESCE(SUM(value), 0) FROM votes WHERE target_type = 'manuscript' AND target_id = ?")
     )
     .bind(target_id)
     .fetch_one(&mut *tx).await?;
-    sqlx::query("UPDATE manuscripts SET score = ? WHERE id = ?")
-        .bind(score)
-        .bind(target_id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(crate::db::pg(
+        "UPDATE manuscripts SET score = ? WHERE id = ?",
+    ))
+    .bind(score)
+    .bind(target_id)
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     Ok((StatusCode::OK, Json(json!({"ok": true, "score": score}))))
 }
@@ -1008,7 +1014,7 @@ async fn list_manuscript_versions(
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
     let m: Option<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT id, current_version FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"
+        crate::db::pg("SELECT id, current_version FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1")
     )
     .bind(&id).bind(&id)
     .fetch_optional(&state.pool).await?;
@@ -1042,9 +1048,9 @@ async fn get_manuscript_version(
     State(state): State<AppState>,
     Path((id, n)): Path<(String, i64)>,
 ) -> ApiResult<Json<Value>> {
-    let m: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
+    let m: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(crate::db::pg(
         "SELECT id FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
-    )
+    ))
     .bind(&id)
     .bind(&id)
     .fetch_optional(&state.pool)
@@ -1097,10 +1103,10 @@ async fn post_manuscript_version(
         Option<String>,
         Option<String>,
         Option<String>,
-    )> = sqlx::query_as(
+    )> = sqlx::query_as(crate::db::pg(
         "SELECT id, submitter_id, withdrawn, pdf_path, license, ai_training
              FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
-    )
+    ))
     .bind(&id)
     .bind(&id)
     .fetch_optional(&state.pool)
@@ -1195,7 +1201,7 @@ async fn post_manuscript_version(
     .await?;
 
     let _ = sqlx::query(
-        "INSERT INTO audit_log (actor_user_id, action, target_type, target_id, detail) VALUES (?, 'manuscript_revise', 'manuscript', ?, ?)",
+        crate::db::pg("INSERT INTO audit_log (actor_user_id, action, target_type, target_id, detail) VALUES (?, 'manuscript_revise', 'manuscript', ?, ?)"),
     )
     .bind(user.id)
     .bind(manuscript_id)
@@ -1232,20 +1238,23 @@ async fn search(
     let fts: String = q
         .split(|c: char| !c.is_alphanumeric())
         .filter(|t| !t.is_empty())
-        .map(|t| format!("{t}*"))
+        .map(|t| format!("{t}:*"))
         .collect::<Vec<_>>()
-        .join(" ");
-    let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(
+        .join(" & ");
+    if fts.is_empty() {
+        return Ok(Json(json!({"items": [], "q": q})));
+    }
+    let rows: Vec<ManuscriptListItem> = sqlx::query_as::<_, ManuscriptListItem>(crate::db::pg(
         r#"SELECT m.id, m.arxiv_like_id, m.doi, m.title, m.authors, m.category,
                   m.conductor_type, m.conductor_ai_model, m.conductor_ai_model_public,
                   m.conductor_human, m.conductor_human_public,
                   m.has_auditor, m.auditor_name,
                   m.score, m.comment_count, m.withdrawn, m.created_at
-           FROM manuscripts m
-           JOIN manuscripts_fts f ON f.rowid = m.id
-           WHERE manuscripts_fts MATCH ?
-           ORDER BY rank LIMIT 50"#,
-    )
+           FROM manuscripts m, (SELECT to_tsquery('english', ?) AS q) query
+           WHERE m.search_vector @@ query.q
+           ORDER BY ts_rank(m.search_vector, query.q) DESC, m.created_at DESC
+           LIMIT 50"#,
+    ))
     .bind(&fts)
     .fetch_all(&state.pool)
     .await?;
@@ -1340,7 +1349,7 @@ fn openapi_spec() -> Value {
                 "post": {"summary": "Post a comment", "security": [{"bearer": []}], "responses": {"201": {"description": "created"}}}
             },
             "/manuscripts/{id}/vote": {"post": {"summary": "Up/down-vote", "security": [{"bearer": []}], "responses": {"200": {"description": "ok"}}}},
-            "/search": {"get": {"summary": "FTS5 search", "responses": {"200": {"description": "ok"}}}},
+            "/search": {"get": {"summary": "Full-text search", "responses": {"200": {"description": "ok"}}}},
             "/categories": {"get": {"summary": "Category list", "responses": {"200": {"description": "ok"}}}},
             "/openapi.json": {"get": {"summary": "This document", "responses": {"200": {"description": "ok"}}}},
             "/manifest": {"get": {"summary": "Human-readable agent manifest", "responses": {"200": {"description": "ok"}}}}
@@ -1447,7 +1456,7 @@ fn make_prexiv_id_for_api() -> String {
 
 fn api_is_unique_violation(e: &sqlx::Error) -> bool {
     if let sqlx::Error::Database(db) = e {
-        if db.code().as_deref() == Some("2067") {
+        if db.code().as_deref() == Some("23505") {
             return true;
         }
         let m = db.message().to_ascii_lowercase();

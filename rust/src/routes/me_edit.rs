@@ -122,10 +122,10 @@ pub async fn submit(
         .into_response());
     }
 
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "UPDATE users SET display_name = ?, affiliation = ?, bio = ?
           WHERE id = ?",
-    )
+    ))
     .bind(opt(display_name))
     .bind(opt(affiliation))
     .bind(opt(bio))
@@ -295,11 +295,11 @@ pub async fn orcid_callback(
             return Ok(Redirect::to("/me/edit").into_response());
         }
     };
-    let existing: Option<(i64, String)> = sqlx::query_as(
+    let existing: Option<(i64, String)> = sqlx::query_as(crate::db::pg(
         "SELECT id, username FROM users
           WHERE orcid_oauth_sub = ? AND id != ?
           LIMIT 1",
-    )
+    ))
     .bind(&authenticated.orcid)
     .bind(u.id)
     .fetch_optional(&state.pool)
@@ -317,7 +317,7 @@ pub async fn orcid_callback(
         return Ok(Redirect::to("/me/edit").into_response());
     }
 
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "UPDATE users
             SET orcid = ?,
                 orcid_oauth_sub = ?,
@@ -325,7 +325,7 @@ pub async fn orcid_callback(
                 orcid_oauth_verified_at = CURRENT_TIMESTAMP,
                 orcid_verified = 0
           WHERE id = ?",
-    )
+    ))
     .bind(&authenticated.orcid)
     .bind(&authenticated.orcid)
     .bind(u.id)

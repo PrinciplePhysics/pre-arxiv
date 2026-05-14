@@ -21,7 +21,7 @@
 #     the destination is an *archive*, not a mirror. Keeping deleted
 #     files around defends against "ransomware wipes the source then
 #     we sync the empty state offsite".
-#   * Only `.tar.gz.age` files are shipped — plaintext tarballs (local
+#   * Only `.tar.gz.age` / `.tar.gz.gpg` files are shipped — plaintext tarballs (local
 #     dev fallback in §6a "Fallback for local dev") never leave the
 #     box. If you've set PREXIV_BACKUP_RECIPIENT_FILE but it points at
 #     a missing key, backup.sh would have already produced plaintext
@@ -58,7 +58,7 @@ cd "$BACKUP_ROOT"
 # -print0 / xargs -0 keep us safe on the unlikely paths that contain
 # spaces or newlines; tier names use only [a-z-]+ so this is belt-and-
 # suspenders.
-find . -type f -name '*.tar.gz.age' -print | sed 's|^\./||' > "$FILELIST"
+find . -type f \( -name '*.tar.gz.age' -o -name '*.tar.gz.gpg' \) -print | sed 's|^\./||' > "$FILELIST"
 
 if [[ ! -s "$FILELIST" ]]; then
   echo "offmachine-backup: no encrypted snapshots in $BACKUP_ROOT — nothing to push"

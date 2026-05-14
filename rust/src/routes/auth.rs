@@ -62,9 +62,9 @@ pub async fn do_login(
     // blind index (`email_hash`) so we never need to scan plaintext.
     // The username branch keeps using the existing index.
     let id_hash = crate::crypto::email_hash(&form.identifier).to_vec();
-    let row: Option<(i64, String)> = sqlx::query_as::<_, (i64, String)>(
+    let row: Option<(i64, String)> = sqlx::query_as::<_, (i64, String)>(crate::db::pg(
         "SELECT id, password_hash FROM users WHERE username = ? OR email_hash = ? LIMIT 1",
-    )
+    ))
     .bind(&form.identifier)
     .bind(&id_hash)
     .fetch_optional(&state.pool)
@@ -202,9 +202,9 @@ pub async fn do_register(
     let (email_hash, email_enc) = crate::crypto::seal_email(&email)
         .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("seal_email: {e}")))?;
     let email_hash_bytes = email_hash.to_vec();
-    let existing: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
+    let existing: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(crate::db::pg(
         "SELECT id FROM users WHERE username = ? OR email_hash = ? LIMIT 1",
-    )
+    ))
     .bind(username)
     .bind(&email_hash_bytes)
     .fetch_optional(&state.pool)
@@ -225,11 +225,8 @@ pub async fn do_register(
         Some(form.display_name.trim().to_string())
     };
 
-    // We still populate the plaintext `email` column alongside the
-    // encrypted form during rollout. Once you've confirmed the
-    // encrypted path is reliable in production, run
-    // `UPDATE users SET email = '' WHERE email_hash IS NOT NULL;`
-    // to harden — reads already prefer `email_enc`.
+    // We keep the legacy plaintext `email` column empty. `email_enc`
+    // stores the recoverable address and `email_hash` is the lookup index.
     //
     // We also tag `institutional_email = 1` at insert time if the
     // domain looks like a research-org address (.edu / .ac.<cc> / etc.,
@@ -242,23 +239,21 @@ pub async fn do_register(
     } else {
         0
     };
-    let result = sqlx::query(
+    let (user_id,): (i64,) = sqlx::query_as(crate::db::pg(
         r#"INSERT INTO users
               (username, email, email_hash, email_enc, password_hash, display_name,
                email_verified, institutional_email)
-           VALUES (?, ?, ?, ?, ?, ?, 0, ?)"#,
-    )
+           VALUES (?, '', ?, ?, ?, ?, 0, ?)
+           RETURNING id"#,
+    ))
     .bind(username)
-    .bind(&email)
     .bind(&email_hash_bytes)
     .bind(&email_enc)
     .bind(&hash)
     .bind(&display_name)
     .bind(inst_email)
-    .execute(&state.pool)
+    .fetch_one(&state.pool)
     .await?;
-
-    let user_id = result.last_insert_rowid();
 
     // Mint a verification token and fire the email send in the
     // background. `mint_and_send` returns the plaintext token, which we

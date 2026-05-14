@@ -93,10 +93,10 @@ pub async fn sitemap(State(state): State<AppState>) -> AppResult<impl IntoRespon
     }
 
     // Manuscripts.
-    let ms: Vec<(Option<String>, Option<NaiveDateTime>)> = sqlx::query_as(
+    let ms: Vec<(Option<String>, Option<NaiveDateTime>)> = sqlx::query_as(crate::db::pg(
         "SELECT arxiv_like_id, COALESCE(updated_at, created_at) AS lastmod
          FROM manuscripts WHERE withdrawn = 0 ORDER BY id DESC LIMIT 50000",
-    )
+    ))
     .fetch_all(&state.pool)
     .await?;
     for (slug_opt, lm) in &ms {
@@ -120,7 +120,7 @@ pub async fn sitemap(State(state): State<AppState>) -> AppResult<impl IntoRespon
 
     // User profiles.
     let users: Vec<(String,)> = sqlx::query_as(
-        "SELECT username FROM users WHERE EXISTS (SELECT 1 FROM manuscripts WHERE submitter_id = users.id AND withdrawn = 0) ORDER BY id LIMIT 10000",
+        crate::db::pg("SELECT username FROM users WHERE EXISTS (SELECT 1 FROM manuscripts WHERE submitter_id = users.id AND withdrawn = 0) ORDER BY id LIMIT 10000"),
     )
     .fetch_all(&state.pool)
     .await?;

@@ -31,12 +31,12 @@ pub async fn withdraw(
         return Ok(Redirect::to(&format!("/abs/{id}")).into_response());
     }
 
-    let row: Option<(i64, i64, Option<String>, i64)> = sqlx::query_as(
+    let row: Option<(i64, i64, Option<String>, i64)> = sqlx::query_as(crate::db::pg(
         "SELECT id, submitter_id, arxiv_like_id, withdrawn
          FROM manuscripts
          WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
          LIMIT 1",
-    )
+    ))
     .bind(&id)
     .bind(&id)
     .fetch_optional(&state.pool)
@@ -65,9 +65,9 @@ pub async fn withdraw(
     };
 
     sqlx::query(
-        "UPDATE manuscripts
+        crate::db::pg("UPDATE manuscripts
          SET withdrawn = 1, withdrawn_reason = ?, withdrawn_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?",
+         WHERE id = ?"),
     )
     .bind(reason_opt.as_deref())
     .bind(m_id)
@@ -80,7 +80,7 @@ pub async fn withdraw(
         "manuscript_withdraw_self"
     };
     let _ = sqlx::query(
-        "INSERT INTO audit_log (actor_user_id, action, target_type, target_id, detail) VALUES (?, ?, 'manuscript', ?, ?)",
+        crate::db::pg("INSERT INTO audit_log (actor_user_id, action, target_type, target_id, detail) VALUES (?, ?, 'manuscript', ?, ?)"),
     )
     .bind(user.id)
     .bind(action)

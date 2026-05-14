@@ -7,6 +7,7 @@
 ```sh
 cd rust
 export DATA_DIR=../data
+export DATABASE_URL=postgres://prexiv:prexiv@127.0.0.1:5432/prexiv_dev
 export PREXIV_DATA_KEY="$(openssl rand -hex 32)"
 cargo run
 # http://localhost:3001
@@ -16,22 +17,23 @@ For full manuscript processing, install:
 
 - Ghostscript (`gs`) for PDF watermarking.
 - `pdflatex` or `latexmk` for LaTeX source compilation.
-- SQLite with FTS5 support.
+- PostgreSQL 15+.
 
-`PREXIV_DATA_KEY` is required because user email addresses are encrypted at rest and indexed through a keyed HMAC blind index.
+`DATABASE_URL` is required for the PostgreSQL app database. `PREXIV_DATA_KEY` is required because user email addresses, pending email-change addresses, and TOTP secrets are encrypted at rest; email lookup uses a keyed HMAC blind index.
 
 ## Production Defaults
 
 The deployment helpers live in `../scripts/`.
 
 - `scripts/start-rust.sh` starts `rust/target/release/prexiv`, sources `$REPO/.env` and `/etc/prexiv/smtp.env` if present, defaults `APP_URL` to `https://victoria.tail921ea4.ts.net`, and defaults `PORT` to `3000`.
-- `scripts/deploy.sh` takes a pre-deploy backup, verifies DB integrity, resets the deployment checkout to `origin/main`, builds release, restarts, and health-checks localhost.
+- `scripts/deploy.sh` takes a pre-deploy PostgreSQL/upload backup, verifies the dump catalog, resets the deployment checkout to `origin/main`, builds release, restarts, and health-checks localhost.
 - Keep `UPLOAD_DIR` outside the git checkout in production. The app serves it under `/static/uploads`.
 
 Minimum production env:
 
 ```sh
 PREXIV_DATA_KEY=<stable 32-byte key>
+DATABASE_URL=postgres://prexiv:<password>@127.0.0.1:5432/prexiv
 DATA_DIR=/var/lib/prexiv/current
 UPLOAD_DIR=/var/lib/prexiv/current/uploads
 APP_URL=https://victoria.tail921ea4.ts.net
@@ -45,9 +47,9 @@ PORT=3000
 |---|---|
 | HTTP server | `axum` 0.8 |
 | Async runtime | `tokio` |
-| Database | `sqlx` + SQLite WAL |
+| Database | `sqlx` + PostgreSQL |
 | Templates | `maud` |
-| Sessions | `tower-sessions` + SQLite store |
+| Sessions | `tower-sessions` + PostgreSQL store |
 | Markdown | `pulldown-cmark` + `ammonia` |
 | Email encryption | `crypto.rs` AES-256-GCM + HMAC blind index |
 | LaTeX compile | `compile.rs` |
@@ -58,7 +60,8 @@ Main layout:
 
 ```text
 rust/
-├── migrations/       sqlx migrations
+├── pg_migrations/    active PostgreSQL sqlx migrations
+├── migrations/       legacy SQLite migrations kept for reference
 ├── src/main.rs       env, middleware, static mounts, app startup
 ├── src/routes/       axum handlers
 ├── src/templates/    maud views
@@ -113,7 +116,7 @@ The OpenAPI output is intentionally compact and may be less detailed than the ro
 
 - Passwords are bcrypt hashes.
 - HIBP k-anonymity check rejects breached registration passwords.
-- Email is encrypted at rest; email lookup uses keyed HMAC.
+- Email, pending email changes, and TOTP secrets are encrypted at rest; email lookup uses keyed HMAC.
 - CSRF is required on forms.
 - Rate limits protect auth and public write paths.
 - Uploaded PDFs are validated and watermarked before storage.

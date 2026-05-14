@@ -11,18 +11,24 @@
 //! `pending_2fa_user_id` and redirect to /login/2fa where the user
 //! types the current code.
 
+use crate::db::DbPool;
 use anyhow::{Context, Result};
 use base64::Engine;
 use rand::RngCore;
-use sqlx::SqlitePool;
 use totp_rs::{Algorithm, Secret, TOTP};
 
-/// Stored TOTP record for one user. Plaintext secret today (matches the
-/// JS app); SECURITY.md S-7 tracks the column-level encryption fix.
-#[derive(Debug, Clone, sqlx::FromRow)]
+/// Stored TOTP record for one user. The shared secret is encrypted at rest
+/// with PREXIV_DATA_KEY and decrypted only long enough to verify a code.
+#[derive(Debug, Clone)]
 pub struct UserTotp {
     pub secret: String,
     pub enabled_at: Option<chrono::NaiveDateTime>,
+}
+
+#[derive(sqlx::FromRow)]
+struct UserTotpRow {
+    secret: Vec<u8>,
+    enabled_at: Option<chrono::NaiveDateTime>,
 }
 
 const ISSUER: &str = "PreXiv";
@@ -94,40 +100,58 @@ pub fn verify(secret_b32: &str, code: &str) -> bool {
 
 // ── DB access ────────────────────────────────────────────────────────
 
-pub async fn get_for(pool: &SqlitePool, user_id: i64) -> Result<Option<UserTotp>> {
-    sqlx::query_as::<_, UserTotp>("SELECT secret, enabled_at FROM user_totp WHERE user_id = ?")
-        .bind(user_id)
-        .fetch_optional(pool)
-        .await
-        .context("loading user_totp")
+pub async fn get_for(pool: &DbPool, user_id: i64) -> Result<Option<UserTotp>> {
+    let row = sqlx::query_as::<_, UserTotpRow>(crate::db::pg(
+        "SELECT secret, enabled_at FROM user_totp WHERE user_id = ?",
+    ))
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .context("loading user_totp")?;
+    match row {
+        Some(row) => {
+            let secret =
+                crate::crypto::decrypt_blob(&row.secret).context("decrypting TOTP secret")?;
+            let secret = String::from_utf8(secret).context("TOTP secret is not UTF-8")?;
+            Ok(Some(UserTotp {
+                secret,
+                enabled_at: row.enabled_at,
+            }))
+        }
+        None => Ok(None),
+    }
 }
 
-pub async fn start_enrollment(pool: &SqlitePool, user_id: i64) -> Result<String> {
+pub async fn start_enrollment(pool: &DbPool, user_id: i64) -> Result<String> {
     let secret = generate_secret();
-    sqlx::query(
+    let secret_enc =
+        crate::crypto::encrypt_blob(secret.as_bytes()).context("encrypting TOTP secret")?;
+    sqlx::query(crate::db::pg(
         "INSERT INTO user_totp (user_id, secret, enabled_at)
          VALUES (?, ?, NULL)
          ON CONFLICT(user_id) DO UPDATE SET secret = excluded.secret, enabled_at = NULL",
-    )
+    ))
     .bind(user_id)
-    .bind(&secret)
+    .bind(&secret_enc)
     .execute(pool)
     .await
     .context("upserting user_totp enrollment")?;
     Ok(secret)
 }
 
-pub async fn confirm_enrollment(pool: &SqlitePool, user_id: i64) -> Result<()> {
-    sqlx::query("UPDATE user_totp SET enabled_at = CURRENT_TIMESTAMP WHERE user_id = ?")
-        .bind(user_id)
-        .execute(pool)
-        .await
-        .context("setting user_totp.enabled_at")?;
+pub async fn confirm_enrollment(pool: &DbPool, user_id: i64) -> Result<()> {
+    sqlx::query(crate::db::pg(
+        "UPDATE user_totp SET enabled_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+    ))
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .context("setting user_totp.enabled_at")?;
     Ok(())
 }
 
-pub async fn disable(pool: &SqlitePool, user_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM user_totp WHERE user_id = ?")
+pub async fn disable(pool: &DbPool, user_id: i64) -> Result<()> {
+    sqlx::query(crate::db::pg("DELETE FROM user_totp WHERE user_id = ?"))
         .bind(user_id)
         .execute(pool)
         .await
@@ -135,11 +159,11 @@ pub async fn disable(pool: &SqlitePool, user_id: i64) -> Result<()> {
     Ok(())
 }
 
-pub async fn is_enabled(pool: &SqlitePool, user_id: i64) -> bool {
+pub async fn is_enabled(pool: &DbPool, user_id: i64) -> bool {
     matches!(
-        sqlx::query_as::<_, (i64,)>(
-            "SELECT 1 FROM user_totp WHERE user_id = ? AND enabled_at IS NOT NULL",
-        )
+        sqlx::query_as::<_, (i64,)>(crate::db::pg(
+            "SELECT 1 FROM user_totp WHERE user_id = ? AND enabled_at IS NOT NULL"
+        ),)
         .bind(user_id)
         .fetch_optional(pool)
         .await,

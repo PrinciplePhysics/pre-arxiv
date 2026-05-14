@@ -9,6 +9,7 @@
 //! `Authorization` header, looks the hash up, honours `expires_at`, and
 //! touches `last_used_at` so token-management UIs can show recency.
 
+use crate::db::DbPool;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::header;
 use axum::http::request::Parts;
@@ -19,7 +20,6 @@ use base64::Engine;
 use rand::RngCore;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use sqlx::SqlitePool;
 
 use crate::models::User;
 use crate::state::AppState;
@@ -71,14 +71,14 @@ pub fn extract_bearer(parts: &Parts) -> BearerToken {
 /// Look up the user that owns the given plaintext bearer token. Honours
 /// `expires_at` (returns None if expired). Touches `last_used_at` on a
 /// successful match.
-pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User> {
+pub async fn find_user_by_bearer(pool: &DbPool, plain: &str) -> Option<User> {
     let h = hash_token(plain);
-    let row = sqlx::query_as::<_, (i64, i64, Option<String>)>(
+    let row = sqlx::query_as::<_, (i64, i64, Option<String>)>(crate::db::pg(
         r#"SELECT t.id, t.user_id, t.expires_at
            FROM api_tokens t
            WHERE t.token_hash = ?
            LIMIT 1"#,
-    )
+    ))
     .bind(&h)
     .fetch_optional(pool)
     .await
@@ -86,7 +86,7 @@ pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User>
     .flatten()?;
     let (token_id, user_id, expires_at): (i64, i64, Option<String>) = row;
 
-    // Expiry check (SQLite stores as ISO-8601 text via CURRENT_TIMESTAMP).
+    // Expiry check against database timestamps.
     if let Some(exp) = expires_at {
         if let Ok(t) = chrono::NaiveDateTime::parse_from_str(&exp, "%Y-%m-%d %H:%M:%S") {
             if t < chrono::Utc::now().naive_utc() {
@@ -95,13 +95,13 @@ pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User>
         }
     }
 
-    let mut user = sqlx::query_as::<_, User>(
+    let mut user = sqlx::query_as::<_, User>(crate::db::pg(
         r#"SELECT id, username, email, display_name, affiliation, bio,
                   karma, is_admin, email_verified, orcid, created_at,
                   email_enc, orcid_verified, institutional_email,
                   orcid_oauth_verified, orcid_oauth_verified_at, orcid_oauth_sub
            FROM users WHERE id = ?"#,
-    )
+    ))
     .bind(user_id)
     .fetch_optional(pool)
     .await
@@ -112,10 +112,12 @@ pub async fn find_user_by_bearer(pool: &SqlitePool, plain: &str) -> Option<User>
     // Only bump last_used_at once we know the token resolved to a real,
     // still-existing user. Avoids touching the row on tokens that point at
     // deleted accounts or on errors further down the request.
-    let _ = sqlx::query("UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?")
-        .bind(token_id)
-        .execute(pool)
-        .await;
+    let _ = sqlx::query(crate::db::pg(
+        "UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?",
+    ))
+    .bind(token_id)
+    .execute(pool)
+    .await;
 
     Some(user)
 }

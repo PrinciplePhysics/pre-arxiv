@@ -457,7 +457,7 @@ pub async fn do_submit(
     // file persistence. Collisions are vanishingly rare with the 30-bit daily
     // suffix; if one still happens, ask the user to retry rather than storing
     // a PDF stamped with a different id.
-    let result = sqlx::query(
+    let result = sqlx::query_as::<_, (i64,)>(crate::db::pg(
         r#"INSERT INTO manuscripts (
                 arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
                 pdf_path, external_url, source_path,
@@ -476,8 +476,9 @@ pub async fn do_submit(
                 ?, ?, ?, ?,
                 ?, ?,
                 ?, ?
-            )"#,
-    )
+            )
+            RETURNING id"#,
+    ))
     .bind(&arxiv_like_id)
     .bind(&synthetic_doi)
     .bind(user.id)
@@ -512,7 +513,7 @@ pub async fn do_submit(
     .bind(auditor_orcid.as_deref())
     .bind(license)
     .bind(ai_training)
-    .execute(&state.pool)
+    .fetch_one(&state.pool)
     .await;
     let result = match result {
         Ok(rr) => rr,
@@ -528,7 +529,7 @@ pub async fn do_submit(
         }
     };
 
-    let new_id = result.last_insert_rowid();
+    let new_id = result.0;
     // Record v1 in manuscript_versions so the version log is complete
     // from the moment of original submission.
     let v1 = crate::versions::VersionInput {
@@ -628,10 +629,10 @@ fn make_prexiv_id() -> String {
 }
 
 /// Sqlx error -> "is this a UNIQUE-constraint violation?" predicate.
-/// SQLite returns extended code 2067 (SQLITE_CONSTRAINT_UNIQUE).
+/// PostgreSQL returns SQLSTATE 23505.
 fn is_unique_violation(e: &sqlx::Error) -> bool {
     if let sqlx::Error::Database(db) = e {
-        if db.code().as_deref() == Some("2067") {
+        if db.code().as_deref() == Some("23505") {
             return true;
         }
         let m = db.message().to_ascii_lowercase();

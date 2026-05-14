@@ -155,10 +155,12 @@ pub async fn disable(
         set_flash(&session, "Form expired — please try again.").await;
         return Ok(Redirect::to("/me/2fa").into_response());
     }
-    let hash: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
-        .bind(user.id)
-        .fetch_optional(&state.pool)
-        .await?;
+    let hash: Option<(String,)> = sqlx::query_as(crate::db::pg(
+        "SELECT password_hash FROM users WHERE id = ?",
+    ))
+    .bind(user.id)
+    .fetch_optional(&state.pool)
+    .await?;
     if !verify_password_timing_safe(&form.current_password, hash.as_ref().map(|(h,)| h.as_str())) {
         let body = templates::two_factor::render_status(
             &ctx,

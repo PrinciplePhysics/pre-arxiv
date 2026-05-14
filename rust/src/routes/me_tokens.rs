@@ -28,7 +28,7 @@ pub async fn show(
     RequireUser(user): RequireUser,
 ) -> AppResult<Html<String>> {
     let rows: Vec<TokenRow> = sqlx::query_as::<_, (i64, Option<String>, Option<chrono::NaiveDateTime>, Option<chrono::NaiveDateTime>, Option<chrono::NaiveDateTime>)>(
-        "SELECT id, name, last_used_at, created_at, expires_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC",
+        crate::db::pg("SELECT id, name, last_used_at, created_at, expires_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC"),
     )
     .bind(user.id)
     .fetch_all(&state.pool)
@@ -99,9 +99,9 @@ pub async fn create(
 
     let plain = generate_token();
     let hash = hash_token(&plain);
-    sqlx::query(
+    sqlx::query(crate::db::pg(
         "INSERT INTO api_tokens (user_id, token_hash, name, expires_at) VALUES (?, ?, ?, ?)",
-    )
+    ))
     .bind(user.id)
     .bind(&hash)
     .bind(name.as_deref())
@@ -129,11 +129,13 @@ pub async fn revoke(
         set_flash(&session, "Form expired — please try again.").await;
         return Ok(Redirect::to("/me/tokens").into_response());
     }
-    sqlx::query("DELETE FROM api_tokens WHERE id = ? AND user_id = ?")
-        .bind(id)
-        .bind(user.id)
-        .execute(&state.pool)
-        .await?;
+    sqlx::query(crate::db::pg(
+        "DELETE FROM api_tokens WHERE id = ? AND user_id = ?",
+    ))
+    .bind(id)
+    .bind(user.id)
+    .execute(&state.pool)
+    .await?;
     set_flash(&session, "Token revoked.").await;
     Ok(Redirect::to("/me/tokens").into_response())
 }

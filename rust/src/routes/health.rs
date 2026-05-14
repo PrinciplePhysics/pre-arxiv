@@ -14,7 +14,7 @@ pub async fn healthz() -> Json<serde_json::Value> {
 }
 
 pub async fn readyz(State(state): State<AppState>) -> (StatusCode, Json<serde_json::Value>) {
-    let db_ok = sqlx::query_scalar::<_, i64>("SELECT 1")
+    let db_ok = sqlx::query_scalar::<_, i64>(crate::db::pg("SELECT 1::BIGINT"))
         .fetch_one(&state.pool)
         .await
         .map(|n| n == 1)

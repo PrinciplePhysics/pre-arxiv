@@ -18,7 +18,7 @@ use crate::templates;
 use crate::versions;
 
 async fn load_manuscript(state: &AppState, id: &str) -> AppResult<Manuscript> {
-    let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
+    let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(crate::db::pg(
         r#"SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
                   pdf_path, external_url,
                   conductor_type, conductor_ai_model, conductor_ai_model_public,
@@ -32,7 +32,7 @@ async fn load_manuscript(state: &AppState, id: &str) -> AppResult<Manuscript> {
                   license, ai_training, current_version
            FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
            LIMIT 1"#,
-    )
+    ))
     .bind(id)
     .bind(id)
     .fetch_optional(&state.pool)

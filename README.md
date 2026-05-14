@@ -14,20 +14,21 @@ The product idea is simple:
 
 The Rust app in [`rust/`](rust/) is the production path. The older Node.js app at the repository root remains as legacy/reference code while migration finishes, but new product work should target Rust.
 
-Both implementations still use the same SQLite database at `data/prearxiv.db`. The Rust app runs sqlx migrations; the Node app keeps its historical `schema_version` table. SQLite WAL mode allows one writer and many readers.
+The Rust production app uses PostgreSQL through `sqlx` migrations in `rust/pg_migrations/`. The legacy Node.js app keeps its historical SQLite tooling only for seed/reset compatibility and is not the production runtime.
 
 ## Run locally
 
 Runtime dependencies for the full Rust feature set:
 
 - Rust stable toolchain
-- SQLite with FTS5
+- PostgreSQL 15+ with a database URL available in `DATABASE_URL`
 - `gs` / Ghostscript for PDF watermarking
 - `pdflatex` or `latexmk` for LaTeX source compilation
 
 ```sh
 cd rust
 export DATA_DIR=../data
+export DATABASE_URL=postgres://prexiv:prexiv@127.0.0.1:5432/prexiv_dev
 export PREXIV_DATA_KEY="$(openssl rand -hex 32)"
 cargo run
 # http://localhost:3001
@@ -44,9 +45,10 @@ npm run seed
 
 | Variable | Default | Purpose |
 |---|---:|---|
+| `DATABASE_URL` | required | PostgreSQL connection string for application tables and server-side sessions. |
 | `PREXIV_DATA_KEY` | required | 32-byte hex or base64 key for email encryption and email blind indexes. |
 | `PORT` | `3001` direct / `3000` via deploy scripts | Rust HTTP port. Victoria's `scripts/start-rust.sh` defaults to `3000`. |
-| `DATA_DIR` | repo `data/` | SQLite database and session tables. |
+| `DATA_DIR` | repo `data/` | Local runtime directory for non-database files. |
 | `UPLOAD_DIR` | repo `public/uploads/` | Stored public PDF/source artifacts. Use an external persistent path in production. |
 | `APP_URL` | derived/local | Absolute public base URL used in citations, OpenAPI/agent prompts, and PDF watermark links. |
 | `NODE_ENV=production` | unset | Enables secure cookies and HSTS behavior behind HTTPS. |
@@ -125,8 +127,8 @@ Website and JSON manuscript submission require a PreXiv-hosted LaTeX source or P
 ## Security posture
 
 - Passwords are bcrypt-hashed; registration checks Have I Been Pwned k-anonymity for breached passwords.
-- Email addresses are encrypted at rest with AES-256-GCM and indexed with a keyed HMAC blind index.
-- Sessions are SQLite-backed, HTTP-only, SameSite=Lax, and Secure in production.
+- Email addresses, pending email-change addresses, and TOTP secrets are encrypted at rest with AES-256-GCM. Email lookup uses a keyed HMAC blind index.
+- Sessions are PostgreSQL-backed, HTTP-only, SameSite=Lax, and Secure in production.
 - CSRF protection covers state-changing forms.
 - Public writes, auth attempts, comments, votes, flags, and API writes are rate-limited.
 - Uploaded PDFs are never served raw before processing; direct PDFs are stored only after watermarking.
@@ -150,6 +152,7 @@ Production should set at least:
 
 ```sh
 PREXIV_DATA_KEY=<stable 32-byte key>
+DATABASE_URL=postgres://prexiv:<password>@127.0.0.1:5432/prexiv
 DATA_DIR=/var/lib/prexiv/current
 UPLOAD_DIR=/var/lib/prexiv/current/uploads
 APP_URL=https://victoria.tail921ea4.ts.net
@@ -167,7 +170,7 @@ PORT=3000
 # PREXIV_APPEALS_CONTACT=mailto:appeals@prexiv.org
 ```
 
-Keep `UPLOAD_DIR` outside the git checkout so deploys cannot delete user PDFs/source. Back up both `DATA_DIR/prearxiv.db` and `UPLOAD_DIR`. The bundled `scripts/deploy.sh` snapshots DB/uploads first, verifies SQLite integrity, fetches `origin/main`, resets the deployment checkout to it, builds the Rust binary, restarts via `scripts/start-rust.sh`, and health-checks localhost.
+Keep `UPLOAD_DIR` outside the git checkout so deploys cannot delete user PDFs/source. Back up both PostgreSQL and `UPLOAD_DIR`. The bundled `scripts/deploy.sh` is for servers where the deployment copy is a real git checkout: it snapshots the database/uploads first with `scripts/backup.sh`, verifies the PostgreSQL dump catalog, fetches `origin/main`, resets the checkout to it, builds the Rust binary, restarts via `scripts/start-rust.sh`, and health-checks localhost. The `prexiv.net` host is currently updated by SSH/rsync to `/home/prexiv`, then server-side build/restart.
 
 ## Legacy Node app
 

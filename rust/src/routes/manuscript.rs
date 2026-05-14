@@ -56,7 +56,7 @@ async fn render_view(
     id: String,
 ) -> AppResult<Response> {
     let lookup_id = lookup_prexiv_id(&id);
-    let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
+    let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(crate::db::pg(
         r#"
         SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
                pdf_path, external_url, source_path,
@@ -73,7 +73,7 @@ async fn render_view(
         WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ?
         LIMIT 1
         "#,
-    )
+    ))
     .bind(&lookup_id)
     .bind(&id)
     .fetch_optional(&state.pool)
@@ -85,9 +85,9 @@ async fn render_view(
     let m = match m {
         Some(m) => m,
         None => {
-            let alias: Option<(String,)> = sqlx::query_as(
+            let alias: Option<(String,)> = sqlx::query_as(crate::db::pg(
                 "SELECT new_slug FROM prexiv_id_aliases WHERE old_slug = ? OR old_slug = ? LIMIT 1",
-            )
+            ))
             .bind(&id)
             .bind(&lookup_id)
             .fetch_optional(&state.pool)
@@ -110,7 +110,7 @@ async fn render_view(
         return Ok(Redirect::permanent(&format!("/abs/{canonical_public_slug}")).into_response());
     }
 
-    let comments: Vec<CommentWithAuthor> = sqlx::query_as::<_, CommentWithAuthor>(
+    let comments: Vec<CommentWithAuthor> = sqlx::query_as::<_, CommentWithAuthor>(crate::db::pg(
         r#"
         SELECT c.id, c.manuscript_id, c.author_id,
                u.username AS author_username,
@@ -120,15 +120,15 @@ async fn render_view(
         WHERE c.manuscript_id = ?
         ORDER BY c.created_at ASC
         "#,
-    )
+    ))
     .bind(m.id)
     .fetch_all(&state.pool)
     .await?;
 
-    let submitter: Option<(String, Option<String>, i64, i64, i64)> = sqlx::query_as(
+    let submitter: Option<(String, Option<String>, i64, i64, i64)> = sqlx::query_as(crate::db::pg(
         "SELECT username, display_name, email_verified, institutional_email, orcid_oauth_verified
            FROM users WHERE id = ?",
-    )
+    ))
     .bind(m.submitter_id)
     .fetch_optional(&state.pool)
     .await?;
@@ -136,7 +136,7 @@ async fn render_view(
     // Viewer's current vote on this manuscript: -1, 0, or +1.
     let my_vote: i64 = match &maybe_user.0 {
         Some(u) => sqlx::query_as::<_, (i64,)>(
-            "SELECT value FROM votes WHERE user_id = ? AND target_type = 'manuscript' AND target_id = ?",
+            crate::db::pg("SELECT value FROM votes WHERE user_id = ? AND target_type = 'manuscript' AND target_id = ?"),
         )
         .bind(u.id)
         .bind(m.id)
@@ -150,16 +150,18 @@ async fn render_view(
     // Category counts for the sidebar "Subject Areas" index — same shape
     // as bioRxiv's category sidebar.
     let cats: Vec<(String, i64)> = sqlx::query_as::<_, (String, i64)>(
-        "SELECT category, COUNT(*) FROM manuscripts WHERE withdrawn = 0 GROUP BY category ORDER BY category"
+        crate::db::pg("SELECT category, COUNT(*) FROM manuscripts WHERE withdrawn = 0 GROUP BY category ORDER BY category")
     )
     .fetch_all(&state.pool)
     .await?;
 
-    sqlx::query("UPDATE manuscripts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")
-        .bind(m.id)
-        .execute(&state.pool)
-        .await
-        .ok();
+    sqlx::query(crate::db::pg(
+        "UPDATE manuscripts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?",
+    ))
+    .bind(m.id)
+    .execute(&state.pool)
+    .await
+    .ok();
 
     // Sharing metadata. abs-truncated description for OG/Twitter card.
     let slug = canonical_public_slug;
@@ -215,14 +217,14 @@ async fn load_public_artifact(
     let lookup_id = lookup_prexiv_id(id);
     let row: Option<(Option<String>,)> = match kind {
         ArtifactKind::Pdf => sqlx::query_as(
-            "SELECT pdf_path FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
+            crate::db::pg("SELECT pdf_path FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"),
         )
         .bind(&lookup_id)
         .bind(id)
         .fetch_optional(&state.pool)
         .await?,
         ArtifactKind::Source => sqlx::query_as(
-            "SELECT source_path FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
+            crate::db::pg("SELECT source_path FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1"),
         )
         .bind(&lookup_id)
         .bind(id)
@@ -235,9 +237,9 @@ async fn load_public_artifact(
     if row.is_some() {
         return Ok(ArtifactLookup::Missing);
     }
-    let alias: Option<(String,)> = sqlx::query_as(
+    let alias: Option<(String,)> = sqlx::query_as(crate::db::pg(
         "SELECT new_slug FROM prexiv_id_aliases WHERE old_slug = ? OR old_slug = ? LIMIT 1",
-    )
+    ))
     .bind(id)
     .bind(&lookup_id)
     .fetch_optional(&state.pool)

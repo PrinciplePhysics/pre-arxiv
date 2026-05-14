@@ -9,14 +9,15 @@
 #
 # The script assumes:
 #   • The repo is checked out at $HOME/prexiv-deploy/prexiv (override REPO).
-#   • The data lives at $REPO/data (override DATA_DIR).
+#   • PostgreSQL credentials live in $REPO/.env or DATABASE_URL.
+#   • Uploaded artifacts live at $REPO/data/uploads unless overridden.
 #   • Backups go to /var/lib/prexiv/backups (override BACKUP_ROOT).
 #   • The Rust binary writes its PID to $HOME/prexiv-deploy/prexiv-rust.pid
 #     (override PID_FILE).
 #
 # What we do, in order — each step aborts if it fails:
-#   1. Pre-deploy snapshot of Tier-1 (DB + uploads).
-#   2. Integrity-check the snapshot.
+#   1. Pre-deploy snapshot of Tier-1 (PostgreSQL DB + uploads).
+#   2. Verify the snapshot dump catalog.
 #   3. git fetch + reset --hard origin/main.
 #   4. cargo build --release.  (skipped if first arg is "skip-build")
 #   5. Stop the old binary (SIGTERM, then SIGKILL after 5s).
@@ -47,6 +48,12 @@ abort() {
 }
 
 cd "$REPO" || abort "repo dir $REPO not found"
+if [ -r "$REPO/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$REPO/.env"
+  set +a
+fi
 
 # 1. Snapshot Tier-1 BEFORE touching anything.
 echo "[1/7] pre-deploy snapshot…"
@@ -55,29 +62,29 @@ DATA_DIR="$DATA_DIR" BACKUP_ROOT="$BACKUP_ROOT" \
   bash "$REPO/scripts/backup.sh" pre-deploy "$REASON" \
   || abort "backup.sh failed (Tier-1 NOT snapshotted; refusing to proceed)"
 
-# 2. Integrity-check the snapshot we just took.
-#    The newest archive may be either .tar.gz or .tar.gz.age depending
-#    on whether age encryption is enabled (recipient pub-key present).
-echo "[2/7] verifying snapshot integrity…"
-LATEST="$(find "$BACKUP_ROOT/pre-deploy/" -maxdepth 1 -type f \( -name '*.tar.gz.age' -o -name '*.tar.gz' \) -printf '%T@ %p\n' \
+# 2. Verify the snapshot we just took.
+#    The newest archive may be .tar.gz.age, .tar.gz.gpg, or plaintext .tar.gz
+#    in local development.
+echo "[2/7] verifying snapshot dump…"
+LATEST="$(find "$BACKUP_ROOT/pre-deploy/" -maxdepth 1 -type f \( -name '*.tar.gz.age' -o -name '*.tar.gz.gpg' -o -name '*.tar.gz' \) -printf '%T@ %p\n' \
   | sort -rn | head -1 | awk '{print $2}')"
 [ -n "$LATEST" ] || abort "could not locate the snapshot just written"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-# backup.sh tars from inside a temp dir with `tar -C $TMP_DIR -czf .`
-# so entries are recorded as ./prearxiv.db etc. Extracting everything
-# and then looking at the result avoids whatever path-stripping the
-# specific tar implementation does or doesn't do.
 if [[ "$LATEST" == *.age ]]; then
   KEYFILE="${BACKUP_KEY:-/etc/prexiv/backup-key.txt}"
   [ -r "$KEYFILE" ] || abort "encrypted snapshot but private key $KEYFILE not readable — re-check key perms"
   age -d -i "$KEYFILE" "$LATEST" | tar -C "$TMP" -xz
+elif [[ "$LATEST" == *.gpg ]]; then
+  KEYFILE="${PREXIV_BACKUP_PASSPHRASE_FILE:-}"
+  [ -n "$KEYFILE" ] && [ -r "$KEYFILE" ] || abort "gpg snapshot but PREXIV_BACKUP_PASSPHRASE_FILE is not readable"
+  gpg --batch --yes --pinentry-mode loopback --passphrase-file "$KEYFILE" --decrypt "$LATEST" | tar -C "$TMP" -xz
 else
   tar -C "$TMP" -xzf "$LATEST"
 fi
-[ -f "$TMP/prearxiv.db" ] || abort "snapshot is missing prearxiv.db (corrupt tarball?)"
-INTEG="$(sqlite3 "$TMP/prearxiv.db" 'PRAGMA integrity_check;' | head -1)"
-[ "$INTEG" = "ok" ] || abort "snapshot integrity_check returned: $INTEG"
+[ -f "$TMP/prexiv.dump" ] || abort "snapshot is missing prexiv.dump (corrupt tarball?)"
+command -v pg_restore >/dev/null 2>&1 || abort "pg_restore not in PATH"
+pg_restore --list "$TMP/prexiv.dump" >/dev/null || abort "pg_restore could not read snapshot dump"
 echo "      → $LATEST ok"
 
 # 3. Sync source.

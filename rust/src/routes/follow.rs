@@ -30,19 +30,20 @@ pub async fn follow(
         set_flash(&session, "Verify your email before following users.").await;
         return Ok(Redirect::to(&format!("/u/{username}")).into_response());
     }
-    let target: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE username = ?")
-        .bind(&username)
-        .fetch_optional(&state.pool)
-        .await?;
+    let target: Option<(i64,)> =
+        sqlx::query_as(crate::db::pg("SELECT id FROM users WHERE username = ?"))
+            .bind(&username)
+            .fetch_optional(&state.pool)
+            .await?;
     let target_id = target.ok_or(AppError::NotFound)?.0;
     if target_id == me.id {
         set_flash(&session, "You can't follow yourself.").await;
         return Ok(Redirect::to(&format!("/u/{username}")).into_response());
     }
-    let res = sqlx::query(
+    let res = sqlx::query(crate::db::pg(
         "INSERT INTO follows (follower_id, followee_id) VALUES (?, ?)
          ON CONFLICT(follower_id, followee_id) DO NOTHING",
-    )
+    ))
     .bind(me.id)
     .bind(target_id)
     .execute(&state.pool)
@@ -76,16 +77,19 @@ pub async fn unfollow(
     if !verify_csrf(&session, &form.csrf_token).await {
         return Ok(Redirect::to(&format!("/u/{username}")).into_response());
     }
-    let target: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE username = ?")
-        .bind(&username)
-        .fetch_optional(&state.pool)
-        .await?;
+    let target: Option<(i64,)> =
+        sqlx::query_as(crate::db::pg("SELECT id FROM users WHERE username = ?"))
+            .bind(&username)
+            .fetch_optional(&state.pool)
+            .await?;
     let target_id = target.ok_or(AppError::NotFound)?.0;
-    sqlx::query("DELETE FROM follows WHERE follower_id = ? AND followee_id = ?")
-        .bind(me.id)
-        .bind(target_id)
-        .execute(&state.pool)
-        .await?;
+    sqlx::query(crate::db::pg(
+        "DELETE FROM follows WHERE follower_id = ? AND followee_id = ?",
+    ))
+    .bind(me.id)
+    .bind(target_id)
+    .execute(&state.pool)
+    .await?;
     set_flash(&session, format!("Unfollowed @{username}.")).await;
     Ok(Redirect::to(&format!("/u/{username}")).into_response())
 }

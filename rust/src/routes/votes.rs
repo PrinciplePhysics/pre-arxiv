@@ -61,10 +61,12 @@ pub async fn vote(
     // succeed. Withdrawal is the user's signal that the manuscript should
     // no longer accrue social signal.
     if form.target_type == "manuscript" {
-        let w: Option<(i64,)> = sqlx::query_as("SELECT withdrawn FROM manuscripts WHERE id = ?")
-            .bind(form.target_id)
-            .fetch_optional(&state.pool)
-            .await?;
+        let w: Option<(i64,)> = sqlx::query_as(crate::db::pg(
+            "SELECT withdrawn FROM manuscripts WHERE id = ?",
+        ))
+        .bind(form.target_id)
+        .fetch_optional(&state.pool)
+        .await?;
         if matches!(w, Some((1,))) {
             set_flash(
                 &session,
@@ -78,9 +80,9 @@ pub async fn vote(
     let mut tx = state.pool.begin().await?;
 
     // Upsert vote — clicking the same direction twice flips to neutral (delete).
-    let existing: Option<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
+    let existing: Option<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(crate::db::pg(
         "SELECT id, value FROM votes WHERE user_id = ? AND target_type = ? AND target_id = ?",
-    )
+    ))
     .bind(user.id)
     .bind(&form.target_type)
     .bind(form.target_id)
@@ -91,20 +93,20 @@ pub async fn vote(
         // Explicit clear (value=0) on an existing row, OR re-posting the
         // same direction (Reddit-style toggle to neutral). Both delete.
         (Some((vote_id, _)), 0) => {
-            sqlx::query("DELETE FROM votes WHERE id = ?")
+            sqlx::query(crate::db::pg("DELETE FROM votes WHERE id = ?"))
                 .bind(vote_id)
                 .execute(&mut *tx)
                 .await?;
         }
         (Some((vote_id, prev)), v) if prev == v => {
-            sqlx::query("DELETE FROM votes WHERE id = ?")
+            sqlx::query(crate::db::pg("DELETE FROM votes WHERE id = ?"))
                 .bind(vote_id)
                 .execute(&mut *tx)
                 .await?;
         }
         // Change direction: update the row in place.
         (Some((vote_id, _)), v) => {
-            sqlx::query("UPDATE votes SET value = ? WHERE id = ?")
+            sqlx::query(crate::db::pg("UPDATE votes SET value = ? WHERE id = ?"))
                 .bind(v)
                 .bind(vote_id)
                 .execute(&mut *tx)
@@ -114,9 +116,9 @@ pub async fn vote(
         // below still runs so the response is consistent.
         (None, 0) => {}
         (None, v) => {
-            sqlx::query(
+            sqlx::query(crate::db::pg(
                 "INSERT INTO votes (user_id, target_type, target_id, value) VALUES (?, ?, ?, ?)",
-            )
+            ))
             .bind(user.id)
             .bind(&form.target_type)
             .bind(form.target_id)
@@ -127,9 +129,9 @@ pub async fn vote(
     }
 
     // Recompute score from the votes table.
-    let score: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(
+    let score: Option<(i64,)> = sqlx::query_as::<_, (i64,)>(crate::db::pg(
         "SELECT COALESCE(SUM(value), 0) FROM votes WHERE target_type = ? AND target_id = ?",
-    )
+    ))
     .bind(&form.target_type)
     .bind(form.target_id)
     .fetch_optional(&mut *tx)
@@ -142,14 +144,16 @@ pub async fn vote(
     // values, never let a future refactor turn this into an injection.
     match form.target_type.as_str() {
         "manuscript" => {
-            sqlx::query("UPDATE manuscripts SET score = ? WHERE id = ?")
-                .bind(score)
-                .bind(form.target_id)
-                .execute(&mut *tx)
-                .await?;
+            sqlx::query(crate::db::pg(
+                "UPDATE manuscripts SET score = ? WHERE id = ?",
+            ))
+            .bind(score)
+            .bind(form.target_id)
+            .execute(&mut *tx)
+            .await?;
         }
         "comment" => {
-            sqlx::query("UPDATE comments SET score = ? WHERE id = ?")
+            sqlx::query(crate::db::pg("UPDATE comments SET score = ? WHERE id = ?"))
                 .bind(score)
                 .bind(form.target_id)
                 .execute(&mut *tx)
