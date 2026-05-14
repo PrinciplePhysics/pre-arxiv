@@ -230,6 +230,7 @@ Audit run 2026-05-12 (re-audited same day). Grepped for known antipatterns; veri
 - **API token storage.** Plaintext is `prexiv_` + 36 base64url chars (27 random bytes of entropy). Stored as SHA-256 hex; the plaintext is shown to the caller exactly once at creation and never persisted.
 - **Authorization.** `RequireUser` / `RequireAdmin` extractors gate every private route. `/admin` and `/admin/audit` reject non-admins with 403. The `withdraw` endpoint verifies `viewer.id == submitter_id || viewer.is_admin()` before mutating.
 - **Static asset caching.** Versioned `/static` app assets use immutable long-lived cache headers. Uploaded manuscript artifacts use shorter cache headers so readers get reasonable performance without turning uploaded records into effectively permanent browser cache entries.
+- **Self-hosted UI dependencies.** The browser no longer depends on Google Fonts or jsDelivr for normal page rendering; Cormorant Garamond and KaTeX runtime/font assets are served from `/static/vendor`.
 
 ### Caveats
 

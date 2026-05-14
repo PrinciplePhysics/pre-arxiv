@@ -119,7 +119,7 @@ The OpenAPI output is intentionally compact and may be less detailed than the ro
 - Uploaded PDFs are validated and watermarked before storage.
 - LaTeX source archives reject traversal and special files; compile runs in a temp directory with `-no-shell-escape`.
 - Security headers are set globally, including CSP, no-sniff, frame denial, referrer policy, and permissions policy; production adds HSTS.
-- Static app assets are cacheable as immutable versioned assets; uploaded public artifacts receive shorter cache headers.
+- Static app assets are cacheable as immutable versioned assets; uploaded public artifacts receive shorter cache headers. The production UI self-hosts font and KaTeX assets under `/static/vendor`.
 - User-submitted links render as `nofollow ugc noopener`.
 
 ## Known Gaps

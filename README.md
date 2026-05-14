@@ -134,6 +134,7 @@ Website and JSON manuscript submission require a PreXiv-hosted LaTeX source or P
 - Archive extraction rejects traversal paths and special files.
 - Security headers include CSP, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, and production HSTS. CSP still allows inline script/style for current JSON-LD and legacy template compatibility; tightening that further is a future hardening task.
 - Static app assets under `/static` are served with long-lived immutable cache headers; uploaded manuscript artifacts use shorter cache headers.
+- Frontend font and KaTeX assets are self-hosted under `/static/vendor` so normal page loads do not depend on Google Fonts or jsDelivr.
 - User-submitted links render with `rel="nofollow ugc noopener"` and open in a new tab.
 
 ## Deployment

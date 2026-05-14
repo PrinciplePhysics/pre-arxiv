@@ -142,9 +142,8 @@ async fn main() -> anyhow::Result<()> {
     //     may include manuscript ids that aren't yet public) to outbound
     //     links.
     //   Content-Security-Policy          → keep scripts/styles/images to
-    //     the current app plus the explicit font/KaTeX CDNs the templates
-    //     already use. Inline style is temporarily allowed because older
-    //     templates still carry a few inline layout styles.
+    //     the current app. Inline style is temporarily allowed because
+    //     older templates still carry a few inline layout styles.
     //   Permissions-Policy                 → disable browser features PreXiv
     //     does not use, reducing the blast radius of a compromised page.
     //   Strict-Transport-Security        → only in production, where the
@@ -167,7 +166,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(SetResponseHeaderLayer::if_not_present(
             header::CONTENT_SECURITY_POLICY,
             HeaderValue::from_static(
-                "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; connect-src 'self'; upgrade-insecure-requests",
+                "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; upgrade-insecure-requests",
             ),
         ))
         .layer(SetResponseHeaderLayer::if_not_present(
