@@ -101,25 +101,6 @@
   margin-top: 2px;
   line-height: 1.22;
 }
-.bx-stats li.bx-stat-doi { align-items: center; }
-.bx-stats li.bx-stat-doi .val {
-  max-width: 210px;
-  font-size: 0.86em;
-  font-weight: 700;
-  line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bx-stats li.bx-stat-doi .val a {
-  color: var(--ink-soft);
-  text-decoration: none;
-}
-.bx-stats li.bx-stat-doi .val a:hover {
-  color: var(--brand);
-  text-decoration: underline;
-}
-
 .bx-actions {
   display: flex;
   gap: 6px;
