@@ -83,7 +83,7 @@ rust/
 - Static policy and help pages: about, how it works, agent support, guidelines, ToS, privacy, DMCA, moderation policies, licenses, permissions.
 - Indexer surfaces: sitemap, RSS/Atom/JSON feeds, OAI-PMH Dublin Core.
 - Operations: `/healthz`, `/readyz`, optional structured logs with `PREXIV_LOG_FORMAT=json`, and an admin dashboard with moderation, growth, storage, category, and operational-gap panels.
-- Responsive UI for desktop, tablet, and phone widths in current Chrome, Edge, Firefox, Safari, iOS Safari, and Android Chrome. Obsolete Internet Explorer is not a supported browser target.
+- Responsive UI for desktop, tablet, and phone widths in current Chrome, Edge, Firefox, Safari, iOS Safari, and Android Chrome. The submit form has a JavaScript fallback for selector features such as `:has()`. Obsolete Internet Explorer is not a supported browser target.
 
 ## Permission Model
 
@@ -118,7 +118,8 @@ The OpenAPI output is intentionally compact and may be less detailed than the ro
 - Rate limits protect auth and public write paths.
 - Uploaded PDFs are validated and watermarked before storage.
 - LaTeX source archives reject traversal and special files; compile runs in a temp directory with `-no-shell-escape`.
-- Security headers are set globally; production adds HSTS.
+- Security headers are set globally, including CSP, no-sniff, frame denial, referrer policy, and permissions policy; production adds HSTS.
+- Static app assets are cacheable as immutable versioned assets; uploaded public artifacts receive shorter cache headers.
 - User-submitted links render as `nofollow ugc noopener`.
 
 ## Known Gaps

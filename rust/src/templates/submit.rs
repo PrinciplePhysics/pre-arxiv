@@ -179,7 +179,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     }
                 }
 
-                section.source-choice-section {
+                section.source-choice-section.source-choice-tex {
                     p.label-text { "Source format " span.req { "*" } }
                     p.muted.small.no-katex { "PreXiv keeps a hosted copy of every paper. Upload your LaTeX source and we compile it, or upload a finished PDF directly. External URLs are supplemental links." }
 
@@ -620,24 +620,6 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
         // styled card honest — no orphan native "No file chosen" label.
         script { (PreEscaped(r#"
 (function(){
-  // ─── Upload-dropzone filename echo ──────────────────────────────
-  document.querySelectorAll('.upload-dropzone').forEach(function(zone){
-    var inp = zone.querySelector('.upload-input');
-    var out = document.getElementById(zone.dataset.boundName);
-    if(!inp || !out) return;
-    var empty = out.dataset.empty || 'No file selected';
-    inp.addEventListener('change', function(){
-      var f = inp.files && inp.files[0];
-      if(f){
-        out.textContent = f.name + ' · ' + (f.size/1024/1024).toFixed(2) + ' MB';
-        out.classList.add('has-file');
-      } else {
-        out.textContent = empty;
-        out.classList.remove('has-file');
-      }
-    });
-  });
-
   // ─── AI-model tag input ────────────────────────────────────────
   // Source of truth is the hidden #conductor_ai_model field
   // (comma-joined string). Chips are visual. Typer just accumulates.

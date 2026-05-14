@@ -64,7 +64,7 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260514m";
+const ASSET_VER: &str = "20260514n";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target {
@@ -154,6 +154,7 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                 script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" {}
                 script defer src={ "/static/js/katex-init.js?v=" (ASSET_VER) } {}
                 script defer src={ "/static/js/copy-button.js?v=" (ASSET_VER) } {}
+                script defer src={ "/static/js/prexiv-ui.js?v=" (ASSET_VER) } {}
                 @if cur == "/" {
                     script defer src={ "/static/js/welcome-modal.js?v=" (ASSET_VER) } {}
                 }

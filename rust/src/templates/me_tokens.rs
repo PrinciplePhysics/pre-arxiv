@@ -181,11 +181,10 @@ pub fn render(
                             td { @if let Some(ts) = &t.last_used_at { (ts) } @else { em.muted { "never" } } }
                             td { @if let Some(ts) = &t.expires_at { (ts) } @else { em.muted { "never" } } }
                             td {
-                                form method="post" action={"/me/tokens/" (t.id) "/revoke"} style="display:inline" {
+                                form method="post" action={"/me/tokens/" (t.id) "/revoke"} style="display:inline"
+                                     data-confirm="Revoke this token? Any agent or script using it will start getting 401 immediately. Cannot be undone — they'll need a freshly minted token to recover." {
                                     input type="hidden" name="csrf_token" value=(ctx.csrf_token);
-                                    button.btn-secondary.danger type="submit"
-                                           onclick="return confirm('Revoke this token? Any agent or script using it will start getting 401 immediately. Cannot be undone — they'\''ll need a freshly minted token to recover.')"
-                                        { "Revoke" }
+                                    button.btn-secondary.danger type="submit" { "Revoke" }
                                 }
                             }
                         }

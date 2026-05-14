@@ -83,7 +83,7 @@ npm run seed
 - **Harvesting:** sitemap, RSS/Atom/JSON feeds, and OAI-PMH Dublin Core (`/oai`) are exposed for indexers.
 - **Onboarding/documentation:** `/how-it-works` explains the new-user workflow; `/agent-support` explains token-based agent operation, examples, token rotation, rate limits, and safety expectations.
 - **Operations:** `/healthz` checks the process; `/readyz` checks process plus database readiness. The admin dashboard shows moderation/user/submission/storage signals and labels uninstrumented operational gaps instead of pretending they exist.
-- **Responsive product UI:** the Rust templates and CSS are designed for desktop, tablet, and phone widths. Supported browsers are current Chrome, Edge, Firefox, Safari, iOS Safari, and Android Chrome. Obsolete Internet Explorer is not a supported target because the interface depends on modern CSS, secure cookies, and current TLS behavior.
+- **Responsive product UI:** the Rust templates and CSS are designed for desktop, tablet, and phone widths. Supported browsers are current Chrome, Edge, Firefox, Safari, iOS Safari, and Android Chrome. Form behavior uses progressive enhancement with a JavaScript fallback for newer CSS selectors such as `:has()`. Obsolete Internet Explorer is not a supported target because the interface depends on modern CSS, secure cookies, and current TLS behavior.
 
 ## Permissions
 
@@ -132,7 +132,8 @@ Website and JSON manuscript submission require a PreXiv-hosted LaTeX source or P
 - Uploaded PDFs are never served raw before processing; direct PDFs are stored only after watermarking.
 - LaTeX compilation runs in an isolated temp directory with `-no-shell-escape` and bounded timeouts.
 - Archive extraction rejects traversal paths and special files.
-- Security headers include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, and production HSTS.
+- Security headers include CSP, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, and production HSTS. CSP still allows inline script/style for current JSON-LD and legacy template compatibility; tightening that further is a future hardening task.
+- Static app assets under `/static` are served with long-lived immutable cache headers; uploaded manuscript artifacts use shorter cache headers.
 - User-submitted links render with `rel="nofollow ugc noopener"` and open in a new tab.
 
 ## Deployment

@@ -2968,12 +2968,16 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .source-block { display: none; margin-top: 10px; }
 .source-choice-section:has(input[name="source_type"][value="tex"]:checked) .source-tex-block { display: block; }
 .source-choice-section:has(input[name="source_type"][value="pdf"]:checked) .source-pdf-block { display: block; }
+@supports not selector(:has(*)) {
+  .source-choice-section.source-choice-tex .source-tex-block { display: block; }
+  .source-choice-section.source-choice-pdf .source-pdf-block { display: block; }
+}
 .source-external-url { display: block; margin-top: 10px; }
 
 /* ─── /submit: polished upload dropzone ─────────────────────────────
    A label-target acts as the visible card and proxies clicks/drops to
-   the visually-hidden <input type="file"> beneath it. Inline JS in the
-   template updates `.upload-filename` text when a file is chosen.
+   the visually-hidden <input type="file"> beneath it. Shared JS updates
+   `.upload-filename` text when a file is chosen.
    The dashed border + tinted backdrop reads as a familiar "drop zone"
    without screaming for attention. Hover/focus brighten the rule and
    nudge the tray icon up by 1px for a small bit of physicality.

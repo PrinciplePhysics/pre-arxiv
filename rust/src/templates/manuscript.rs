@@ -571,14 +571,14 @@ pub fn render(
                                 "Withdrawing replaces this page with a tombstone. The id, DOI, title, conductor metadata, and reason stay so citations do not break; the body, PDF link, and search index drop."
                                 @if let Some(u) = &ctx.user { @if u.is_admin() && u.id != m.submitter_id { " Admin override." } }
                             }
-                            form action={"/m/" (slug) "/withdraw"} method="post" {
+                            form action={"/m/" (slug) "/withdraw"} method="post"
+                                  data-confirm="Withdraw this manuscript? The page will be replaced with a tombstone immediately. This action is not reversible from the UI." {
                                 input type="hidden" name="csrf_token" value=(ctx.csrf_token);
                                 textarea name="reason" rows="3" maxlength="500"
                                          style="width:100%;font-size:0.9em"
                                          placeholder="Reason shown on the tombstone." {}
                                 button.btn-secondary.danger type="submit"
                                        style="margin-top:6px;width:100%"
-                                       onclick="return confirm('Withdraw this manuscript? The page will be replaced with a tombstone immediately. This action is not reversible from the UI.');"
                                     { "Withdraw manuscript" }
                             }
                         }

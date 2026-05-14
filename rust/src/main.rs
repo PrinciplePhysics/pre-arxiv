@@ -213,9 +213,27 @@ async fn main() -> anyhow::Result<()> {
         .merge(routes::auth_post_router().layer(auth_layer))
         .merge(routes::write_post_router().layer(write_layer))
         // The more-specific upload mount goes FIRST so axum picks it up
-        // before the generic /static fallback.
-        .nest_service("/static/uploads", ServeDir::new(upload_dir))
-        .nest_service("/static", ServeDir::new(static_dir))
+        // before the generic /static fallback. Versioned app assets get
+        // long-lived immutable caching; uploaded manuscripts use shorter
+        // caching because their paths are user-facing archive artifacts.
+        .nest_service(
+            "/static/uploads",
+            tower::ServiceBuilder::new()
+                .layer(SetResponseHeaderLayer::overriding(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static("public, max-age=3600"),
+                ))
+                .service(ServeDir::new(upload_dir)),
+        )
+        .nest_service(
+            "/static",
+            tower::ServiceBuilder::new()
+                .layer(SetResponseHeaderLayer::overriding(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static("public, max-age=31536000, immutable"),
+                ))
+                .service(ServeDir::new(static_dir)),
+        )
         // Unmatched routes — return the styled 404 page.
         .fallback(routes::not_found_fallback)
         .layer(security_headers)

@@ -244,26 +244,6 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                 "."
             }
         }
-        script { (PreEscaped(r#"
-(function(){
-  document.querySelectorAll('.upload-dropzone').forEach(function(zone){
-    var inp = zone.querySelector('.upload-input');
-    var out = document.getElementById(zone.dataset.boundName);
-    if(!inp || !out) return;
-    var empty = out.dataset.empty || 'No file selected';
-    inp.addEventListener('change', function(){
-      var f = inp.files && inp.files[0];
-      if(f){
-        out.textContent = f.name + ' · ' + (f.size/1024/1024).toFixed(2) + ' MB';
-        out.classList.add('has-file');
-      } else {
-        out.textContent = empty;
-        out.classList.remove('has-file');
-      }
-    });
-  });
-})();
-"#)) }
     };
     layout(&format!("Revise {slug}"), ctx, body)
 }
