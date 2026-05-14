@@ -1801,9 +1801,8 @@ button.small { padding: 3px 8px; font-size: 12px; }
     font-size: 9pt;
     color: #555;
   }
-  /* Don't do that for in-page anchors / mailto / pure CSS hooks. */
-  a[href^="#"]::after,
-  a[href^="javascript:"]::after { content: ""; }
+  /* Don't do that for in-page anchors. */
+  a[href^="#"]::after { content: ""; }
 
   /* Avoid breaking section heads from the first paragraph. */
   h1, h2, h3 { page-break-after: avoid; }
