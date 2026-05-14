@@ -3219,7 +3219,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
     grid-template-columns: 1fr;
   }
   .upload-target { flex-wrap: wrap; padding: 14px 14px; gap: 12px; }
-  .upload-button { width: 100%; justify-content: center; }
   .upload-hint-list { grid-template-columns: 1fr; row-gap: 8px; }
   .upload-hint-key { padding-top: 0; }
 }
@@ -3242,10 +3241,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(217, 107, 46, 0.28);
 }
-:root[data-theme="dark"] .upload-button {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(217, 107, 46, 0.40);
-}
 @media (prefers-color-scheme: dark) {
   :root[data-theme="auto"] .upload-target {
     background: #2d2017;
@@ -3257,10 +3252,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   :root[data-theme="auto"] .upload-icon {
     background: rgba(255, 255, 255, 0.04);
     border-color: rgba(217, 107, 46, 0.28);
-  }
-  :root[data-theme="auto"] .upload-button {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: rgba(217, 107, 46, 0.40);
   }
 }
 
