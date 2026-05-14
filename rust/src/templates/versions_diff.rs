@@ -17,6 +17,7 @@ pub fn render(
     right: &ManuscriptVersion,
 ) -> Markup {
     let slug = slug_for(m);
+    let public_slug = slug.strip_prefix("prexiv:").unwrap_or(&slug).to_string();
     let body = html! {
         div.page-header {
             h1 {
@@ -64,7 +65,7 @@ pub fn render(
         p style="margin-top:32px" {
             a.btn-secondary href={ "/m/" (slug) "/versions" } { "← All versions" }
             " "
-            a.btn-secondary href={ "/m/" (slug) } { "Latest" }
+            a.btn-secondary href={ "/abs/" (public_slug) } { "Latest" }
         }
     };
     layout(

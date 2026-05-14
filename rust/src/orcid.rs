@@ -103,9 +103,6 @@ struct OAuthTokenResponse {
     orcid: Option<String>,
     #[serde(default)]
     name: Option<String>,
-    #[serde(default)]
-    scope: Option<String>,
-    #[serde(default)]
     id_token: Option<String>,
 }
 
@@ -113,7 +110,6 @@ struct OAuthTokenResponse {
 pub struct AuthenticatedOrcid {
     pub orcid: String,
     pub name: Option<String>,
-    pub scope: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -203,7 +199,6 @@ pub async fn exchange_authorization_code(
     Ok(AuthenticatedOrcid {
         orcid,
         name: token.name.or(claim_name),
-        scope: token.scope,
     })
 }
 

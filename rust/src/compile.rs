@@ -31,7 +31,6 @@ const BLACKOUT_TEX: &str = r"\rule{6em}{1.1ex}";
 #[derive(Debug)]
 pub struct Compiled {
     pub pdf: Vec<u8>,
-    pub log: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -565,7 +564,7 @@ async fn compile_tex(workdir: &Path, main: &Path) -> Result<Compiled, CompileErr
     }
     let pdf = std::fs::read(&pdf_path)
         .map_err(|e| CompileError::Other(format!("reading compiled PDF: {e}")))?;
-    Ok(Compiled { pdf, log })
+    Ok(Compiled { pdf })
 }
 
 async fn run_pdflatex(workdir: &Path, mainfile: &str) -> Result<String, CompileError> {

@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 //! /admin — operational dashboard, flag queue, and audit log. Gated by RequireAdmin.
 
 use axum::extract::{Form, Path, Query, State};
@@ -146,7 +147,10 @@ pub async fn queue(
                 match m {
                     Some((Some(slug), title, w)) => (
                         Some(format!("{title} [{slug}]")),
-                        Some(format!("/m/{slug}")),
+                        Some(format!(
+                            "/abs/{}",
+                            slug.strip_prefix("prexiv:").unwrap_or(&slug)
+                        )),
                         w != 0,
                     ),
                     _ => (None, None, false),
@@ -166,7 +170,10 @@ pub async fn queue(
                 match c {
                     Some((author, snippet, Some(slug))) => (
                         Some(format!("comment by {author}: {snippet}")),
-                        Some(format!("/m/{slug}#comment-{target_id}")),
+                        Some(format!(
+                            "/abs/{}#comment-{target_id}",
+                            slug.strip_prefix("prexiv:").unwrap_or(&slug)
+                        )),
                         false,
                     ),
                     _ => (None, None, false),

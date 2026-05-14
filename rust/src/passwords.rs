@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 //! Password-reset tokens — mint, hash, persist, resolve.
 //!
 //! Shape mirrors `verify.rs` (email-verification tokens) but with a much

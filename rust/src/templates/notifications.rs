@@ -14,7 +14,7 @@ pub fn render(ctx: &PageCtx, rows: &[NotificationRow]) -> Markup {
             h1 { "Notifications" }
             p.muted {
                 (unread)
-                @if unread == 1 { " unread, " } @else { " unread, " }
+                " unread, "
                 (rows.len())
                 " total. Unread first."
             }
@@ -62,18 +62,17 @@ fn notification_text(n: &NotificationRow) -> Markup {
         .as_deref()
         .or(n.actor_username.as_deref())
         .unwrap_or("Someone");
-    let actor_link = match &n.actor_username {
-        Some(u) => Some(format!("/u/{u}")),
-        None => None,
-    };
+    let actor_link = n.actor_username.as_ref().map(|u| format!("/u/{u}"));
     let target_slug = n.target_slug.as_deref().unwrap_or("");
+    let target_public_slug = target_slug.strip_prefix("prexiv:").unwrap_or(target_slug);
     let target_title = n.target_title.as_deref().unwrap_or("a manuscript");
 
     let target_url = match n.target_type.as_deref() {
-        Some("manuscript") if !target_slug.is_empty() => Some(format!("/m/{target_slug}")),
-        Some("comment") if !target_slug.is_empty() && n.target_id.is_some() => {
-            Some(format!("/m/{target_slug}#comment-{}", n.target_id.unwrap()))
-        }
+        Some("manuscript") if !target_slug.is_empty() => Some(format!("/abs/{target_public_slug}")),
+        Some("comment") if !target_slug.is_empty() && n.target_id.is_some() => Some(format!(
+            "/abs/{target_public_slug}#comment-{}",
+            n.target_id.unwrap()
+        )),
         Some("user") => actor_link.clone(),
         _ => None,
     };

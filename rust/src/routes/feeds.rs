@@ -104,11 +104,12 @@ pub async fn sitemap(State(state): State<AppState>) -> AppResult<impl IntoRespon
             Some(s) => s.as_str(),
             None => continue,
         };
+        let public_slug = slug.strip_prefix("prexiv:").unwrap_or(slug);
         xml.push_str("<url>");
         xml.push_str(&format!(
-            "<loc>{}/m/{}</loc>",
+            "<loc>{}/abs/{}</loc>",
             xml_escape(&base),
-            xml_escape(slug)
+            xml_escape(public_slug)
         ));
         if let Some(t) = lm {
             xml.push_str(&format!("<lastmod>{}</lastmod>", iso8601(t)));

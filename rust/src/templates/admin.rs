@@ -306,7 +306,8 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                                 tr {
                                     td.admin-title-cell {
                                         @if let Some(slug) = &m.slug {
-                                            a href={ "/m/" (slug) } { (m.title) }
+                                            @let public_slug = slug.strip_prefix("prexiv:").unwrap_or(slug);
+                                            a href={ "/abs/" (public_slug) } { (m.title) }
                                             div.muted.small.mono { (slug) " · v" (m.current_version) }
                                         } @else {
                                             (m.title)

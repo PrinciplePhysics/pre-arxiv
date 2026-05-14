@@ -34,7 +34,7 @@ use aes_gcm::aead::{Aead, KeyInit, OsRng};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use anyhow::{anyhow, bail, Context, Result};
 use base64::Engine as _;
-use hmac::{Hmac, Mac};
+use hmac::Hmac;
 use rand::RngCore;
 use sha2::Sha256;
 use std::sync::OnceLock;
@@ -85,16 +85,6 @@ fn decode_key(s: &str) -> Result<[u8; 32]> {
     let mut out = [0u8; 32];
     out.copy_from_slice(&b);
     Ok(out)
-}
-
-/// Generate a fresh 32-byte key as a 64-char hex string. Convenience for
-/// bootstrap and tests; the real key is generated once with
-/// `openssl rand -hex 32` (or `head -c 32 /dev/urandom | xxd -p`) and
-/// pinned into the deployment's environment.
-pub fn fresh_key_hex() -> String {
-    let mut k = [0u8; 32];
-    OsRng.fill_bytes(&mut k);
-    hex::encode(k)
 }
 
 // ─── AES-256-GCM ───────────────────────────────────────────────────────

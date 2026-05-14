@@ -25,20 +25,20 @@ pub async fn post_comment(
 ) -> AppResult<Response> {
     if !verify_csrf(&session, &form.csrf_token).await {
         set_flash(&session, "Form expired — please try again.").await;
-        return Ok(Redirect::to(&format!("/m/{id}")).into_response());
+        return Ok(Redirect::to(&format!("/abs/{id}")).into_response());
     }
     if !user.is_verified_or_admin() {
         set_flash(&session, "Verify your email before commenting.").await;
-        return Ok(Redirect::to(&format!("/m/{id}")).into_response());
+        return Ok(Redirect::to(&format!("/abs/{id}")).into_response());
     }
     let content = form.content.trim();
     if content.is_empty() {
         set_flash(&session, "Comment cannot be empty.").await;
-        return Ok(Redirect::to(&format!("/m/{id}")).into_response());
+        return Ok(Redirect::to(&format!("/abs/{id}")).into_response());
     }
     if content.len() > 8000 {
         set_flash(&session, "Comment too long (max 8000 chars).").await;
-        return Ok(Redirect::to(&format!("/m/{id}")).into_response());
+        return Ok(Redirect::to(&format!("/abs/{id}")).into_response());
     }
 
     let m: Option<(i64, String, i64)> = sqlx::query_as::<_, (i64, String, i64)>(
@@ -59,7 +59,7 @@ pub async fn post_comment(
             "This manuscript has been withdrawn; new comments are disabled.",
         )
         .await;
-        return Ok(Redirect::to(&format!("/m/{slug}")).into_response());
+        return Ok(Redirect::to(&format!("/abs/{slug}")).into_response());
     }
 
     let mut tx = state.pool.begin().await?;
@@ -127,7 +127,7 @@ pub async fn post_comment(
         .await;
     }
 
-    Ok(Redirect::to(&format!("/m/{slug}#comment-{cid}")).into_response())
+    Ok(Redirect::to(&format!("/abs/{slug}#comment-{cid}")).into_response())
 }
 
 // ─── POST /c/{id}/delete ─────────────────────────────────────────────
@@ -164,7 +164,7 @@ pub async fn delete_comment(
         return Err(AppError::NotFound);
     };
 
-    let back = format!("/m/{slug}#comments");
+    let back = format!("/abs/{slug}#comments");
 
     if !verify_csrf(&session, &form.csrf_token).await {
         set_flash(&session, "Form expired — please try again.").await;

@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn postscript_stamps_first_page_in_times_new_roman() {
-        let ps = watermark_postscript("prexiv:2605.00001", "cs.AI", "https://prexiv.example/");
+        let ps = watermark_postscript("prexiv:260513.3n9jxa", "cs.AI", "https://prexiv.example/");
 
         assert!(ps.contains("PreXivPageCount 0 eq"));
         assert!(ps.contains("/TimesNewRomanPSMT findfont 14 scalefont def"));

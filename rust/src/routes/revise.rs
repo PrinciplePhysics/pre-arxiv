@@ -98,11 +98,11 @@ pub async fn show(
             "Only the submitter (or an admin) may revise a manuscript.",
         )
         .await;
-        return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
+        return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
     if !user.is_verified_or_admin() {
         set_flash(&session, "Verify your email before revising a manuscript.").await;
-        return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
+        return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
     if m.is_withdrawn() {
         set_flash(
@@ -110,7 +110,7 @@ pub async fn show(
             "This manuscript is withdrawn and can't be revised.",
         )
         .await;
-        return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
+        return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
     let mut ctx = build_ctx(&session, maybe_user, "/m").await;
     ctx.no_index = true;
@@ -134,11 +134,11 @@ pub async fn submit(
             "Only the submitter (or an admin) may revise a manuscript.",
         )
         .await;
-        return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
+        return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
     if !user.is_verified_or_admin() {
         set_flash(&session, "Verify your email before revising a manuscript.").await;
-        return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
+        return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
     if m.is_withdrawn() {
         set_flash(
@@ -146,7 +146,7 @@ pub async fn submit(
             "This manuscript is withdrawn and can't be revised.",
         )
         .await;
-        return Ok(Redirect::to(&format!("/m/{}", slug_for(&m))).into_response());
+        return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
 
     // Collect form fields and any source/PDF upload in memory. Matches
@@ -556,7 +556,7 @@ pub async fn submit(
         format!("Revision saved as v{new_version}. The latest version is now live."),
     )
     .await;
-    Ok(Redirect::to(&format!("/m/{slug}")).into_response())
+    Ok(Redirect::to(&format!("/abs/{slug}")).into_response())
 }
 
 async fn cleanup_uploads(upload_dir: &FsPath, pdf_path: Option<&str>, source_path: Option<&str>) {

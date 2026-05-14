@@ -141,9 +141,12 @@ async fn main() -> anyhow::Result<()> {
     //                                    → don't leak full URLs (which
     //     may include manuscript ids that aren't yet public) to outbound
     //     links.
-    //   Permissions-Policy: interest-cohort=()
-    //                                    → opt out of FLoC-style tracking
-    //     (cheap; harmless to set).
+    //   Content-Security-Policy          → keep scripts/styles/images to
+    //     the current app plus the explicit font/KaTeX CDNs the templates
+    //     already use. Inline style is temporarily allowed because older
+    //     templates still carry a few inline layout styles.
+    //   Permissions-Policy                 → disable browser features PreXiv
+    //     does not use, reducing the blast radius of a compromised page.
     //   Strict-Transport-Security        → only in production, where the
     //     Tailscale Funnel serves HTTPS. Browsers ignore HSTS sent over
     //     plaintext HTTP, but spec says don't send it — so we gate on
@@ -162,8 +165,16 @@ async fn main() -> anyhow::Result<()> {
             HeaderValue::from_static("strict-origin-when-cross-origin"),
         ))
         .layer(SetResponseHeaderLayer::if_not_present(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static(
+                "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; connect-src 'self'; upgrade-insecure-requests",
+            ),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
             header::HeaderName::from_static("permissions-policy"),
-            HeaderValue::from_static("interest-cohort=()"),
+            HeaderValue::from_static(
+                "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
+            ),
         ));
 
     // Per-IP rate limiting via tower_governor. Default key extractor
@@ -173,22 +184,23 @@ async fn main() -> anyhow::Result<()> {
     // the same source). Two buckets:
     //
     //   * `auth_governor` — applied to /login, /register, /forgot-password
-    //     and the /login/2fa second-step. 5 attempts per minute with a
-    //     burst of 5. Defends against credential-stuffing.
+    //     and the /login/2fa second-step. 1 request/second with a burst of
+    //     5. Defends against credential-stuffing without annoying normal
+    //     form use.
     //
     //   * `write_governor` — applied to /submit, /vote, comment posts,
-    //     and the API write paths. 30 requests per minute, burst 30.
+    //     and the API write paths. 1 request/second with a burst of 30.
     //     Defends against vote-brigading and submission spam.
     let auth_governor = Arc::new(
         GovernorConfigBuilder::default()
-            .per_second(12) // 5/min average
+            .per_second(1)
             .burst_size(5)
             .finish()
             .expect("auth GovernorConfig"),
     );
     let write_governor = Arc::new(
         GovernorConfigBuilder::default()
-            .per_second(2) // 30/min average
+            .per_second(1)
             .burst_size(30)
             .finish()
             .expect("write GovernorConfig"),

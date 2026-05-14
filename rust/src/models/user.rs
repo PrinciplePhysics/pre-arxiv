@@ -55,10 +55,6 @@ impl User {
     pub fn is_verified_or_admin(&self) -> bool {
         self.is_verified() || self.is_admin()
     }
-    pub fn display(&self) -> &str {
-        self.display_name.as_deref().unwrap_or(&self.username)
-    }
-
     /// `true` if the user has an authenticated ORCID OAuth binding, or
     /// has verified ownership of an institutional-looking email domain.
     /// Legacy ORCID name matches are intentionally excluded.

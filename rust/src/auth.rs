@@ -27,10 +27,6 @@ pub fn hash_password(plain: &str) -> Result<String, bcrypt::BcryptError> {
     bcrypt::hash(plain, 10)
 }
 
-pub fn verify_password(plain: &str, hash: &str) -> bool {
-    bcrypt::verify(plain, hash).unwrap_or(false)
-}
-
 /// A real bcrypt hash of a value no user will ever submit. Used by
 /// `verify_password_timing_safe` to keep the no-such-user branch
 /// indistinguishable (by wall-clock) from the wrong-password branch.

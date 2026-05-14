@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 //! JSON REST API under /api/v1 — the agent-ready path.
 //!
 //! Read endpoints are public. Public write endpoints and token creation
@@ -12,7 +13,6 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-use chrono::Datelike;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -411,14 +411,12 @@ async fn post_manuscript(
 
     // Allocate id + INSERT with retry on UNIQUE collision (see submit.rs
     // for rationale).
-    let mut arxiv_like_id = String::new();
-    let mut synthetic_doi = String::new();
     let mut new_id: i64 = 0;
     let mut ok = false;
     let mut last_err: Option<sqlx::Error> = None;
     for _ in 0..3 {
-        arxiv_like_id = make_prexiv_id_for_api();
-        synthetic_doi = format!("10.99999/{}", arxiv_like_id);
+        let arxiv_like_id = make_prexiv_id_for_api();
+        let synthetic_doi = format!("10.99999/{}", arxiv_like_id);
         let artifact = match persist_api_artifact(
             &state,
             &v,
@@ -1276,7 +1274,7 @@ async fn manifest() -> Json<Value> {
             "scopes": "all (single-scope tokens for now)",
             "verified_required_for_public_writes": true
         },
-        "id_format": "prexiv:YYMM.NNNNN",
+        "id_format": "prexiv:YYMMDD.xxxxxx",
         "doi_format_synthetic": "10.99999/<id>",
         "endpoints": {
             "whoami":           "GET  /api/v1/me",
@@ -1298,7 +1296,7 @@ async fn manifest() -> Json<Value> {
             "Be honest about conductor_type ('human-ai' or 'ai-agent').",
             "Set conductor_ai_model to the actual model identifier.",
             "If autonomous (ai-agent), disclose that no human conductor directed production; the token owner remains responsible for lawful posting and accurate provenance.",
-            "Do not list a human auditor who has not actually read and signed a scoped correctness statement.",
+            "Do not list a human auditor who has not actually read the manuscript and signed a scoped public audit statement.",
             "Manuscripts can be searched, voted, commented on, and cited; treat the corpus accordingly."
         ]
     }))
@@ -1431,7 +1429,7 @@ fn redact_manuscript(m: &Manuscript) -> Value {
 }
 
 /// API-side allocator. Same algorithm as `submit::make_prexiv_id` —
-/// `prexiv:YYMMDD.SSSSSS` with a random Crockford-32 suffix. The
+/// `prexiv:YYMMDD.xxxxxx` with a random Crockford-32 suffix. The
 /// UNIQUE constraint on `arxiv_like_id` plus the caller's small retry
 /// loop handles collisions, which are vanishingly rare given the
 /// ~10^9 suffix space.
@@ -1456,13 +1454,4 @@ fn api_is_unique_violation(e: &sqlx::Error) -> bool {
         return m.contains("unique constraint") || m.contains("constraint failed");
     }
     false
-}
-
-#[allow(dead_code)]
-fn make_prexiv_id() -> String {
-    let now = chrono::Utc::now();
-    let yy = now.year() % 100;
-    let mm = now.month();
-    let serial: u32 = rand::thread_rng().gen_range(0..100_000);
-    format!("prexiv:{:02}{:02}.{:05}", yy, mm, serial)
 }

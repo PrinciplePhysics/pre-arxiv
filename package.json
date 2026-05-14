@@ -1,7 +1,7 @@
 {
   "name": "pre-arxiv",
   "version": "0.1.0",
-  "description": "pre-arxiv — a repository for research manuscripts with explicit AI-use disclosure that have not yet passed rigorous peer audit",
+  "description": "PreXiv — a research manuscript archive with explicit AI-use provenance, hosted artifacts, version history, and optional human audit statements",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

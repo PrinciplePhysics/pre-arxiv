@@ -41,6 +41,7 @@ pub fn render(
 ) -> Markup {
     let logged_in = ctx.user.is_some();
     let slug = m.arxiv_like_id.as_deref().unwrap_or("");
+    let public_slug = slug.strip_prefix("prexiv:").unwrap_or(slug);
     let submitter_verified_scholar = submitter
         .map(|(_, _, ev, ie, oo)| *oo != 0 || (*ev != 0 && *ie != 0))
         .unwrap_or(false);
@@ -147,14 +148,14 @@ pub fn render(
                                 } @else { "(undisclosed)" }
                                 " acting on its own, without ongoing human direction."
                                 @if m.has_auditor == 0 {
-                                    " No human conductor directed the production, and no auditor has signed a correctness statement. The submitter remains responsible for lawful posting and accurate provenance disclosure."
+                                    " No human conductor directed the production, and no auditor has signed an audit statement. The submitter remains responsible for lawful posting and accurate provenance disclosure."
                                 }
                             }
                         }
                         @if m.has_auditor == 0 && m.conductor_type != "ai-agent" {
                             div.warn-banner {
                                 strong { "Unaudited manuscript." }
-                                " No human auditor has signed a correctness statement. Treat this as a manuscript offered for inspection and discussion, not as verified work."
+                                " No human auditor has signed an audit statement. Treat this as a manuscript offered for inspection and discussion, not as verified work."
                             }
                         } @else if m.has_auditor != 0 {
                             @let self_audited = match (&m.auditor_name, &m.conductor_human) {
@@ -166,13 +167,13 @@ pub fn render(
                                     strong { "Self-audited." }
                                     " "
                                     @if let Some(n) = &m.auditor_name { (n) }
-                                    " is both the conductor and the auditor: they directed the AI and have read the manuscript line by line, signing a scoped correctness statement (see below). This is a stronger claim than conducting alone, but weaker than a third-party audit."
+                                    " is both the conductor and the auditor: they directed the AI and have read the manuscript line by line, signing a scoped public audit statement (see below). This is a stronger claim than conducting alone, but weaker than a third-party audit."
                                 } @else {
                                     strong { "Audited." }
                                     " "
                                     @if let Some(n) = &m.auditor_name { (n) }
                                     @if let Some(a) = &m.auditor_affiliation { " (" (a) ")" }
-                                    " has read the manuscript and provided a signed, scoped correctness statement (see below)."
+                                    " has read the manuscript and provided a signed, scoped public audit statement (see below)."
                                 }
                             }
                         }
@@ -451,13 +452,13 @@ pub fn render(
 
                 div.bx-sidebar-block {
                     h3 { "Access and citation" }
-                    @if let Some(path) = &m.pdf_path {
-                        a.bx-sidebar-btn href={ "/static/uploads/" (path) } target="_blank" rel="noopener" {
+                    @if m.pdf_path.is_some() {
+                        a.bx-sidebar-btn href={ "/pdf/" (public_slug) } target="_blank" rel="noopener" {
                             "Download hosted PDF"
                         }
                     }
-                    @if let Some(src) = &m.source_path {
-                        a.bx-sidebar-btn.secondary href={ "/static/uploads/" (src) } target="_blank" rel="noopener" title="Compiled from this LaTeX source" {
+                    @if m.source_path.is_some() {
+                        a.bx-sidebar-btn.secondary href={ "/src/" (public_slug) } target="_blank" rel="noopener" title="Compiled from this LaTeX source" {
                             "Download hosted source"
                         }
                     }
@@ -495,7 +496,7 @@ pub fn render(
                             }
                         }
                     } @else if !m.is_withdrawn() {
-                        a.bx-sidebar-btn.secondary href={ "/login?next=/m/" (slug) } style="margin-top:8px" { "Sign in to vote" }
+                        a.bx-sidebar-btn.secondary href={ "/login?next=/abs/" (public_slug) } style="margin-top:8px" { "Sign in to vote" }
                     }
 
                     // Flag-for-moderation. Hidden when the viewer is the
@@ -515,7 +516,7 @@ pub fn render(
                         }
                     } @else if !logged_in && !m.is_withdrawn() {
                         p.muted.small style="margin:10px 0 0;text-align:center" {
-                            a href={ "/login?next=/m/" (slug) } { "Sign in" }
+                            a href={ "/login?next=/abs/" (public_slug) } { "Sign in" }
                             " to report issues."
                         }
                     }

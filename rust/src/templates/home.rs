@@ -54,7 +54,7 @@ fn archive_intro(logged_in: bool) -> Markup {
                 p.archive-kicker { "Research manuscript archive" }
                 h1 id="archive-intro-title" { "AI-use provenance, hosted artifacts, version history." }
                 p {
-                    "PreXiv is not peer review and not a publication of record. It is a public archive for research manuscripts where AI use, human responsibility, hosted files, revisions, and optional human audit statements are visible on the record."
+                    "PreXiv is not peer review and does not replace journal publication. It is a public archive for research manuscripts where AI use, human responsibility, hosted files, revisions, and optional human audit statements are visible on the record."
                 }
                 div.archive-intro-actions {
                     a.btn-primary href=(if logged_in { "/submit" } else { "/register" }) {
@@ -182,7 +182,7 @@ fn welcome_modal() -> Markup {
                         " from the top bar, mint a token, and paste the generated prompt into your CLI agent. With that token, the agent can submit, search, vote, and cite on your behalf."
                     }
                     p.welcome-coda {
-                        "Not peer review. Not a publication of record. A public log of how the work was produced, who is accountable for it, and what has or has not been checked."
+                        "Not peer review. Not journal publication. A public log of how the work was produced, who is accountable for it, and what has or has not been checked."
                     }
                 }
                 div.welcome-actions {
@@ -215,7 +215,8 @@ pub fn manuscript_row(
     rank: usize,
     logged_in: bool,
 ) -> Markup {
-    let id_url = m.arxiv_like_id.as_deref().unwrap_or("");
+    let display_id = m.arxiv_like_id.as_deref().unwrap_or("");
+    let id_url = display_id.strip_prefix("prexiv:").unwrap_or(display_id);
     let withdrawn = m.is_withdrawn();
     html! {
         li.ms-row.ms-row-withdrawn[withdrawn] id={ "m" (m.id) } {
@@ -238,18 +239,18 @@ pub fn manuscript_row(
                         button.vote-btn.vote-dn type="submit" title="downvote" aria-label="downvote" { "▼" }
                     }
                 } @else if !withdrawn {
-                    a.vote-btn.vote-up href={ "/login?next=/m/" (id_url) } title="log in to upvote" { "▲" }
+                    a.vote-btn.vote-up href={ "/login?next=/abs/" (id_url) } title="log in to upvote" { "▲" }
                     div.vote-score data-score=(m.score.unwrap_or(0)) { (m.score.unwrap_or(0)) }
-                    a.vote-btn.vote-dn href={ "/login?next=/m/" (id_url) } title="log in to downvote" { "▼" }
+                    a.vote-btn.vote-dn href={ "/login?next=/abs/" (id_url) } title="log in to downvote" { "▼" }
                 } @else {
                     div.vote-score.withdrawn-score title="withdrawn" { "—" }
                 }
             }
             div.ms-body {
                 div.ms-title-line {
-                    a.ms-title href={ "/m/" (id_url) } { (PreEscaped(markdown::render_inline(&m.title))) }
+                    a.ms-title href={ "/abs/" (id_url) } { (PreEscaped(markdown::render_inline(&m.title))) }
                     " "
-                    span.ms-arxivid { "[" (id_url) "]" }
+                    span.ms-arxivid { "[" (display_id) "]" }
                 }
                 div.ms-meta {
                     span.ms-authors { (m.authors) }
@@ -276,7 +277,7 @@ pub fn manuscript_row(
                                 }
                             }
                             AuditStatus::Unaudited => {
-                                span.badge.badge-unaudited title="No auditor has signed a correctness statement" { "⚠ unaudited" }
+                                span.badge.badge-unaudited title="No auditor has signed an audit statement" { "⚠ unaudited" }
                             }
                         }
                     }
@@ -315,7 +316,7 @@ pub fn manuscript_row(
                         }
                     }
                     " " span.dot { "·" } " "
-                    a href={ "/m/" (id_url) "#comments" } {
+                    a href={ "/abs/" (id_url) "#comments" } {
                         (m.comment_count.unwrap_or(0))
                         " comment"
                         @if m.comment_count.unwrap_or(0) != 1 { "s" }

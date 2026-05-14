@@ -723,10 +723,6 @@ pub const CATEGORIES: &[Category] = &[
     },
 ];
 
-pub fn lookup(id: &str) -> Option<&'static Category> {
-    CATEGORIES.iter().find(|c| c.id == id)
-}
-
 pub fn in_group(group: &str) -> impl Iterator<Item = &'static Category> + '_ {
     CATEGORIES.iter().filter(move |c| c.group == group)
 }

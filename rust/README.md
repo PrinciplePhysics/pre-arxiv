@@ -32,8 +32,8 @@ Minimum production env:
 
 ```sh
 PREXIV_DATA_KEY=<stable 32-byte key>
-DATA_DIR=/var/lib/prexiv
-UPLOAD_DIR=/var/lib/prexiv/uploads
+DATA_DIR=/var/lib/prexiv/current
+UPLOAD_DIR=/var/lib/prexiv/current/uploads
 APP_URL=https://victoria.tail921ea4.ts.net
 NODE_ENV=production
 PORT=3000
@@ -70,7 +70,7 @@ rust/
 ## Current Feature Set
 
 - Public listings: ranked, new, top, audited, browse, search.
-- Manuscript pages with conductor/auditor provenance, comments, votes, license cards, citation tools, and version controls.
+- Manuscript pages with conductor/auditor provenance, comments, votes, license cards, citation tools, and version controls. Public manuscript routes mirror arXiv vocabulary: `/abs/YYMMDD.xxxxxx` for the landing page, `/pdf/YYMMDD.xxxxxx` for the hosted PDF, and `/src/YYMMDD.xxxxxx` for the hosted public source artifact. The record id remains `prexiv:YYMMDD.xxxxxx`.
 - Submission via a PreXiv-hosted LaTeX source (`.tex`, `.zip`, `.tar.gz`/`.tgz`) or direct PDF. External URLs are supplemental links, not replacements for the hosted artifact.
 - Server-side LaTeX compile with shell escape disabled and timeouts.
 - Redaction of private human conductor and/or AI model fields in the public source before compilation.
@@ -83,6 +83,7 @@ rust/
 - Static policy and help pages: about, how it works, agent support, guidelines, ToS, privacy, DMCA, moderation policies, licenses, permissions.
 - Indexer surfaces: sitemap, RSS/Atom/JSON feeds, OAI-PMH Dublin Core.
 - Operations: `/healthz`, `/readyz`, optional structured logs with `PREXIV_LOG_FORMAT=json`, and an admin dashboard with moderation, growth, storage, category, and operational-gap panels.
+- Responsive UI for desktop, tablet, and phone widths in current Chrome, Edge, Firefox, Safari, iOS Safari, and Android Chrome. Obsolete Internet Explorer is not a supported browser target.
 
 ## Permission Model
 

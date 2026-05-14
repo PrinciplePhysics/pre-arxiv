@@ -168,7 +168,7 @@ pub async fn audited_listing(
         templates::listing::render(
             &ctx,
             "Audited",
-            "Only manuscripts with a named human auditor who has signed a correctness statement.",
+            "Only manuscripts with a named human auditor who has signed a scoped public audit statement.",
             &rows,
             "/audited",
             false, // widened — never auto-widen on /audited

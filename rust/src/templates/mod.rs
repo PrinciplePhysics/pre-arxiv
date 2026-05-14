@@ -22,4 +22,4 @@ pub mod two_factor;
 pub mod versions;
 pub mod versions_diff;
 
-pub use layout::{layout, PageCtx};
+pub use layout::PageCtx;

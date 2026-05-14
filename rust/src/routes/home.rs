@@ -6,7 +6,7 @@ use tower_sessions::Session;
 use crate::auth::MaybeUser;
 use crate::categories::restricted_not_in_clause;
 use crate::error::AppResult;
-use crate::helpers::build_ctx;
+use crate::helpers::build_ctx_with_state;
 use crate::models::ManuscriptListItem;
 use crate::state::AppState;
 use crate::templates;
@@ -99,7 +99,7 @@ pub async fn index(
             .await?;
     }
 
-    let ctx = build_ctx(&session, maybe_user, "/").await;
+    let ctx = build_ctx_with_state(&state, &session, maybe_user, "/").await;
     Ok(Html(
         templates::home::render(&ctx, &rows, widened, !want_filter).into_string(),
     ))

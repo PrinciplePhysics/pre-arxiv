@@ -21,7 +21,6 @@ use totp_rs::{Algorithm, Secret, TOTP};
 /// JS app); SECURITY.md S-7 tracks the column-level encryption fix.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct UserTotp {
-    pub user_id: i64,
     pub secret: String,
     pub enabled_at: Option<chrono::NaiveDateTime>,
 }
@@ -96,13 +95,11 @@ pub fn verify(secret_b32: &str, code: &str) -> bool {
 // ── DB access ────────────────────────────────────────────────────────
 
 pub async fn get_for(pool: &SqlitePool, user_id: i64) -> Result<Option<UserTotp>> {
-    sqlx::query_as::<_, UserTotp>(
-        "SELECT user_id, secret, enabled_at FROM user_totp WHERE user_id = ?",
-    )
-    .bind(user_id)
-    .fetch_optional(pool)
-    .await
-    .context("loading user_totp")
+    sqlx::query_as::<_, UserTotp>("SELECT secret, enabled_at FROM user_totp WHERE user_id = ?")
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .context("loading user_totp")
 }
 
 pub async fn start_enrollment(pool: &SqlitePool, user_id: i64) -> Result<String> {
@@ -139,14 +136,13 @@ pub async fn disable(pool: &SqlitePool, user_id: i64) -> Result<()> {
 }
 
 pub async fn is_enabled(pool: &SqlitePool, user_id: i64) -> bool {
-    match sqlx::query_as::<_, (i64,)>(
-        "SELECT 1 FROM user_totp WHERE user_id = ? AND enabled_at IS NOT NULL",
+    matches!(
+        sqlx::query_as::<_, (i64,)>(
+            "SELECT 1 FROM user_totp WHERE user_id = ? AND enabled_at IS NOT NULL",
+        )
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await,
+        Ok(Some(_))
     )
-    .bind(user_id)
-    .fetch_optional(pool)
-    .await
-    {
-        Ok(Some(_)) => true,
-        _ => false,
-    }
 }

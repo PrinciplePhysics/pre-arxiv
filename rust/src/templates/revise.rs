@@ -10,6 +10,7 @@ const UPLOAD_ICON_SVG: &str = r##"<svg viewBox="0 0 24 24" fill="none" stroke="c
 
 pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
     let slug = m.arxiv_like_id.clone().unwrap_or_else(|| m.id.to_string());
+    let public_slug = slug.strip_prefix("prexiv:").unwrap_or(&slug).to_string();
     let next_version = m.current_version + 1;
     let ai_model_public = m.conductor_ai_model_public != 0;
     let human_public = m.conductor_human_public != 0;
@@ -236,7 +237,7 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, error: Option<&str>) -> Markup {
                     "Publish v" (next_version)
                 }
                 " "
-                a.btn-secondary href={ "/m/" (slug) } { "Cancel" }
+                a.btn-secondary href={ "/abs/" (public_slug) } { "Cancel" }
             }
 
             p.muted.small style="margin-top:18px" {

@@ -1,6 +1,6 @@
 //! Crockford Base32, lowercase variant.
 //!
-//! Used to encode the per-day monotonic serial inside the PreXiv
+//! Used to encode the random per-day suffix inside the PreXiv
 //! identifier `prexiv:YYMMDD.SUFFIX`. The alphabet is
 //! `0-9` then `a-z` minus `i`, `l`, `o`, `u` — 32 characters, chosen
 //! to be unambiguous at glance (no confusion between `1` and `l`,
@@ -31,6 +31,7 @@ pub fn encode(mut n: u64, width: usize) -> String {
 /// Decode an ASCII Crockford-32 string (lowercase) back to its integer
 /// value. Returns `None` on any non-alphabet character. Lengths up to
 /// 12 chars (=60 bits) fit in a u64 without truncation.
+#[allow(dead_code)]
 pub fn decode(s: &str) -> Option<u64> {
     let mut acc: u64 = 0;
     for c in s.bytes() {

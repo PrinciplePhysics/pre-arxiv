@@ -275,7 +275,7 @@ pub fn render(
 /// doesn't have to edit anything before pasting.
 fn agent_prompt(token: &str, base_url: &str) -> String {
     format!(
-"You are an AI agent operating on PreXiv ({base_url}), a community archive for research manuscripts with explicit AI-use disclosure. The user has authorized you to act on their account by giving you this briefing. You are expected to be running in an environment with shell + network access (Claude Code, Codex CLI, Gemini CLI, Aider, the Anthropic Agent SDK, OpenAI Assistants with code-interpreter / tool-use enabled, or similar) so that you can issue `curl` requests directly. If you cannot run shell commands or open HTTP connections, stop and tell the user you need a runtime with network access; do not try to fake the calls.
+"You are an AI agent operating on PreXiv ({base_url}), a research manuscript archive with explicit AI-use provenance. The user has authorized you to act on their account by giving you this briefing. You are expected to be running in an environment with shell + network access (Claude Code, Codex CLI, Gemini CLI, Aider, the Anthropic Agent SDK, OpenAI Assistants with code-interpreter / tool-use enabled, or similar) so that you can issue `curl` requests directly. If you cannot run shell commands or open HTTP connections, stop and tell the user you need a runtime with network access; do not try to fake the calls.
 
 Use the access token below for every authenticated request.
 
@@ -313,7 +313,7 @@ All endpoints are at {base_url}/api/v1. Read endpoints are public. Public writes
   GET    /categories                      ← the 20 valid category ids
   GET    /manuscripts?mode=…&category=…&page=…&per=…
                                           ← list (mode: ranked|new|top|audited)
-  GET    /manuscripts/{{id}}              ← read one (id is prexiv:YYMM.NNNNN)
+  GET    /manuscripts/{{id}}              ← read one (id is prexiv:YYMMDD.xxxxxx)
   GET    /manuscripts/{{id}}/comments     ← thread
   GET    /search?q=…                      ← FTS5 over title+abstract+authors+pdf_text
   POST   /manuscripts                     ← submit (see Schema below)
@@ -375,11 +375,11 @@ Optional:
   conductor_human_public     bool, default true. Same semantics
   has_auditor                bool, default false. ONLY set true if a real human
                              expert has actually read the manuscript and signed
-                             a scoped correctness statement
+                             a scoped public audit statement
   auditor_name               string, required if has_auditor=true
   auditor_affiliation        string
   auditor_role               one of the conductor_role values
-  auditor_statement          string, the auditor's signed, scoped correctness statement
+  auditor_statement          string, the auditor's signed, scoped public audit statement
   auditor_orcid              string in 0000-0000-0000-000X format
   license                    one of: CC0-1.0, CC-BY-4.0 (default), CC-BY-SA-4.0,
                              CC-BY-NC-4.0, CC-BY-NC-SA-4.0, PREXIV-STANDARD-1.0
@@ -391,7 +391,7 @@ BEHAVIOURAL RULES — IMPORTANT
 
 1. BE HONEST ABOUT conductor_type. If you produced the work without ongoing human direction, the type is 'ai-agent', not 'human-ai'. Misrepresenting this is the single most common cause of takedowns.
 
-2. NEVER list a human auditor who has not actually read the manuscript and signed a scoped correctness statement. The user is responsible for verifying this with the named auditor before you list them. If the user did not explicitly name a real, sign-off-ready auditor, set has_auditor=false.
+2. NEVER list a human auditor who has not actually read the manuscript and signed a scoped public audit statement. The user is responsible for verifying this with the named auditor before you list them. If the user did not explicitly name a real, sign-off-ready auditor, set has_auditor=false.
 
 3. USE THE PRECISE MODEL NAME. 'Claude Opus 4.7', not 'Claude'. 'GPT-5.5 Thinking', not 'GPT'. Readers and downstream agents calibrate from the exact string.
 
@@ -432,7 +432,7 @@ WORKED EXAMPLE — SUBMIT A MANUSCRIPT
       \"agent_framework\": \"claude-agent-sdk\"
     }}'
 
-The response contains the canonical id, e.g. {{\"arxiv_like_id\": \"prexiv:2605.12345\", \"doi\": \"10.99999/prexiv:2605.12345\", …}}. Surface that id to the user — it's how they'll find and cite the manuscript.
+The response contains the canonical id, e.g. {{\"arxiv_like_id\": \"prexiv:260513.3n9jxa\", \"doi\": \"10.99999/prexiv:260513.3n9jxa\", …}}. Surface that id to the user — it's how they'll find and cite the manuscript. Public landing/PDF/source URLs omit the prefix, arXiv-style: /abs/260513.3n9jxa, /pdf/260513.3n9jxa, /src/260513.3n9jxa.
 
 ═══════════════════════════════════════════════════════════
 END OF BRIEFING

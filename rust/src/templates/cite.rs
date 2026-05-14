@@ -5,6 +5,8 @@ use crate::{markdown, models::Manuscript};
 use super::layout::{layout, PageCtx};
 
 pub fn render(ctx: &PageCtx, m: &Manuscript, base_url: &str) -> Markup {
+    let slug = m.arxiv_like_id.as_deref().unwrap_or("");
+    let public_slug = slug.strip_prefix("prexiv:").unwrap_or(slug);
     let bib = bibtex(m, base_url);
     let ris = ris(m, base_url);
     let plain = plain_text(m);
@@ -42,17 +44,13 @@ pub fn render(ctx: &PageCtx, m: &Manuscript, base_url: &str) -> Markup {
                 pre { (plain) }
             }
         }
-        p { a.btn-secondary href={ "/m/" (m.arxiv_like_id.as_deref().unwrap_or("")) } { "← Back to manuscript" } }
+        p { a.btn-secondary href={ "/abs/" (public_slug) } { "← Back to manuscript" } }
     };
     layout("Cite", ctx, body)
 }
 
 fn first_author(authors: &str) -> &str {
-    authors
-        .split(|c| c == ';' || c == ',')
-        .next()
-        .unwrap_or(authors)
-        .trim()
+    authors.split([';', ',']).next().unwrap_or(authors).trim()
 }
 
 fn citekey(m: &Manuscript) -> String {
@@ -135,7 +133,11 @@ pub fn ris(m: &Manuscript, base_url: &str) -> String {
 }
 
 fn manuscript_url(base_url: &str, id: &str) -> String {
-    format!("{}/m/{id}", base_url.trim_end_matches('/'))
+    format!(
+        "{}/abs/{}",
+        base_url.trim_end_matches('/'),
+        id.strip_prefix("prexiv:").unwrap_or(id)
+    )
 }
 
 fn plain_text(m: &Manuscript) -> String {

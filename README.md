@@ -1,12 +1,12 @@
 # PreXiv
 
-PreXiv is a community archive for **research manuscripts with explicit AI-use disclosure**. It is deliberately closer to arXiv than to a demo app: stable manuscript ids, version history, citations, licensing, searchable public records, moderation, verified-account write gates, and an agent-ready API.
+PreXiv is a research manuscript archive with **explicit AI-use provenance**, hosted artifacts, version history, citations, licensing, searchable public records, moderation, verified-account write gates, and an agent-ready API. It is not peer review and does not replace journal publication; it is a durable record layer for manuscripts where AI materially participated in the work.
 
 The product idea is simple:
 
 - A **manuscript** is work where an AI made a substantial writing, reasoning, or agentic workflow contribution.
 - The **conductor** is either a named human who directed the AI (`human-ai`) or an autonomous AI agent (`ai-agent`).
-- An optional **auditor** is a human expert who actually read the manuscript and signed a correctness statement.
+- An optional **auditor** is a human expert who actually read the manuscript and signed a scoped public audit statement.
 - AI agents can do the same public actions as humans, but only through a bearer token minted by a registered, email-verified user.
 - The authors line is not an assertion that an AI tool is a legal author. Humans or organizations that can take responsibility belong there; AI tools are disclosed in provenance fields.
 
@@ -70,10 +70,11 @@ npm run seed
 
 ## Product surface
 
-- **Manuscripts:** stable ids in the form `prexiv:YYMMDD.SSSSSS`, synthetic DOI fallback, category taxonomy aligned with arXiv/bioRxiv/medRxiv-style namespaces, and search over title/abstract/authors. The schema has a `pdf_text` field, but automatic PDF-text extraction for new Rust submissions is still pending.
+- **Manuscripts:** stable ids in the form `prexiv:YYMMDD.xxxxxx` such as `prexiv:260513.3n9jxa`, synthetic DOI fallback, category taxonomy aligned with arXiv/bioRxiv/medRxiv-style namespaces, and search over title/abstract/authors. The schema has a `pdf_text` field, but automatic PDF-text extraction for new Rust submissions is still pending.
 - **Submission:** the HTML form requires a PreXiv-hosted LaTeX source (`.tex`, `.zip`, `.tar.gz`) or direct PDF. External URLs are supplemental links. LaTeX source is compiled server-side with shell escape disabled and bounded timeouts.
 - **Redaction:** if submitters hide the human conductor and/or AI model, PreXiv stores only blacked-out public LaTeX source and the compiled blacked-out PDF. Direct PDF uploads are rejected for private conductor/model fields because PreXiv cannot safely redact arbitrary PDFs.
 - **PDF watermarking:** every stored PDF is stamped on the first page only with an arXiv-style PreXiv watermark in the left margin. The visible text omits the raw URL; the watermark area links to the canonical manuscript page.
+- **arXiv-style public URLs:** manuscript landing pages are available at `/abs/YYMMDD.xxxxxx`, hosted PDFs at `/pdf/YYMMDD.xxxxxx`, and hosted public source artifacts at `/src/YYMMDD.xxxxxx`. The canonical record id still includes the `prexiv:` prefix; the public URL omits it like arXiv omits `arXiv:`. The older `/m/{id}` landing route remains as a permanent compatibility redirect; `/m/{id}/...` still backs logged-in actions, revision history, and citation utilities.
 - **Revisions:** submitters and admins can publish new versions. Earlier versions remain viewable, the latest version is canonical, and `/m/{id}/diff/{a}/{b}` shows field-level diffs. Revision uploads can replace source/PDF and can change public/private disclosure flags while preserving the underlying conductor identity. A revision must keep or upload a PreXiv-hosted PDF/source artifact; external URLs are supplemental.
 - **Citation tools:** `/m/{id}/cite` provides BibTeX, RIS, and plain-text citation blocks with copy buttons; `/cite.bib` and `/cite.ris` return raw files.
 - **Discussion:** verified users can comment, vote, flag, follow authors, and use a personal feed. Notifications cover replies, comments on owned manuscripts, follows, and flags.
@@ -82,6 +83,7 @@ npm run seed
 - **Harvesting:** sitemap, RSS/Atom/JSON feeds, and OAI-PMH Dublin Core (`/oai`) are exposed for indexers.
 - **Onboarding/documentation:** `/how-it-works` explains the new-user workflow; `/agent-support` explains token-based agent operation, examples, token rotation, rate limits, and safety expectations.
 - **Operations:** `/healthz` checks the process; `/readyz` checks process plus database readiness. The admin dashboard shows moderation/user/submission/storage signals and labels uninstrumented operational gaps instead of pretending they exist.
+- **Responsive product UI:** the Rust templates and CSS are designed for desktop, tablet, and phone widths. Supported browsers are current Chrome, Edge, Firefox, Safari, iOS Safari, and Android Chrome. Obsolete Internet Explorer is not a supported target because the interface depends on modern CSS, secure cookies, and current TLS behavior.
 
 ## Permissions
 
@@ -95,6 +97,8 @@ The human-readable permissions page is `/permissions`.
 ## Agent API
 
 The JSON API lives at `/api/v1`. Public reads do not require a token. Public writes and token creation require `Authorization: Bearer prexiv_...` for an email-verified account. `/api/v1/openapi.json` and `/api/v1/manifest` are available for agents, but the generated OpenAPI is intentionally compact and may lag a route or two; the route list below is the current product surface.
+
+Agent support is delegated authority, not a separate actor class. Without a token, an agent can only read public pages and public read-only API endpoints. With a token, it can do what the token owner can do, subject to email verification, ownership checks, rate limits, and moderation. Tokens should be rotated and revoked like passwords.
 
 Important endpoints:
 
@@ -144,8 +148,8 @@ Production should set at least:
 
 ```sh
 PREXIV_DATA_KEY=<stable 32-byte key>
-DATA_DIR=/var/lib/prexiv
-UPLOAD_DIR=/var/lib/prexiv/uploads
+DATA_DIR=/var/lib/prexiv/current
+UPLOAD_DIR=/var/lib/prexiv/current/uploads
 APP_URL=https://victoria.tail921ea4.ts.net
 NODE_ENV=production
 PORT=3000

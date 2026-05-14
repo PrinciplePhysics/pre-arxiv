@@ -5,6 +5,7 @@ use crate::models::ManuscriptListItem;
 use super::home::manuscript_row;
 use super::layout::{layout, PageCtx};
 
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     ctx: &PageCtx,
     heading: &str,

@@ -52,7 +52,7 @@ pub async fn vote(
     //            equals the new value, toggle to neutral — Reddit-style).
     //    0    → explicit clear. REST-friendly "DELETE my vote." Sent by
     //            JSON clients and by the topbar's "neutral" click target.
-    if !matches!(form.value, -1 | 0 | 1) {
+    if !matches!(form.value, -1..=1) {
         return Ok(Redirect::to(&back).into_response());
     }
 

@@ -15,7 +15,7 @@
 //! the baseline. Future formats (arXivRaw, datacite) can be added.
 //!
 //! Identifier scheme: `oai:prexiv:<arxiv_like_id>` (e.g.
-//! `oai:prexiv:prexiv:2605.31415`). The repo prefix lets harvesters
+//! `oai:prexiv:prexiv:260513.3n9jxa`). The repo prefix lets harvesters
 //! distinguish our records from records they pull from elsewhere.
 
 use axum::extract::{Query, State};
@@ -31,6 +31,7 @@ const ID_PREFIX: &str = "oai:prexiv:";
 const PAGE_LIST: usize = 100;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct OaiQuery {
     pub verb: Option<String>,
     pub identifier: Option<String>,
@@ -155,7 +156,7 @@ async fn identify(state: &AppState) -> String {
     out.push_str("      <scheme>oai</scheme>\n");
     out.push_str("      <repositoryIdentifier>prexiv</repositoryIdentifier>\n");
     out.push_str("      <delimiter>:</delimiter>\n");
-    out.push_str("      <sampleIdentifier>oai:prexiv:prexiv:2605.31415</sampleIdentifier>\n");
+    out.push_str("      <sampleIdentifier>oai:prexiv:prexiv:260513.3n9jxa</sampleIdentifier>\n");
     out.push_str("    </oai-identifier>\n");
     out.push_str("  </description>\n");
     out.push_str("</Identify>\n");
@@ -238,15 +239,16 @@ fn dc_metadata(r: &DbRow, base_url: &str) -> String {
         "    <dc:description>{}</dc:description>\n",
         x(&r.abstract_)
     ));
-    out.push_str(&format!("    <dc:publisher>PreXiv</dc:publisher>\n"));
+    out.push_str("    <dc:publisher>PreXiv</dc:publisher>\n");
     if let Some(t) = r.created_at {
         out.push_str(&format!("    <dc:date>{}</dc:date>\n", iso(&t)));
     }
     out.push_str("    <dc:type>Preprint</dc:type>\n");
+    let public_slug = slug.strip_prefix("prexiv:").unwrap_or(slug);
     out.push_str(&format!(
-        "    <dc:identifier>{}/m/{}</dc:identifier>\n",
+        "    <dc:identifier>{}/abs/{}</dc:identifier>\n",
         x(base_url),
-        x(slug)
+        x(public_slug)
     ));
     if let Some(d) = &r.doi {
         out.push_str(&format!(
@@ -282,8 +284,8 @@ fn header_xml(r: &DbRow) -> String {
         ID_PREFIX,
         x(slug)
     ));
-    let used = if r.withdrawn != 0 && r.withdrawn_at.is_some() {
-        iso(r.withdrawn_at.as_ref().unwrap())
+    let used = if r.withdrawn != 0 {
+        r.withdrawn_at.as_ref().map(iso).unwrap_or(stamp)
     } else {
         stamp
     };

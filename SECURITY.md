@@ -15,8 +15,8 @@ PreXiv stores three classes of data, in strict descending order of value:
 
 | Class | What | Where | Recoverable if lost? |
 |---|---|---|---|
-| **Tier 1 — user content** | Manuscripts, authors, abstracts, conductor metadata, auditor statements, comments, votes, follows, flags, accounts (bcrypt hashes, ORCID, display names, bio, affiliation), API tokens (hashed), audit log | `data/prearxiv.db` (SQLite) + `data/uploads/` (uploaded PDFs) | **No.** This is the entire reason PreXiv exists. |
-| **Tier 2 — session state** | Active logins, CSRF tokens, flash messages, the one-shot just-minted-token state | `data/sessions.db` (or, on the JS app, `data/sessions.db`) | Yes — losing it just logs everyone out and rotates CSRF tokens. |
+| **Tier 1 — user content** | Manuscripts, authors, abstracts, conductor metadata, auditor statements, comments, votes, follows, flags, accounts (bcrypt hashes, authenticated ORCID iD, display names, bio, affiliation), API tokens (hashed), audit log | `DATA_DIR/prearxiv.db` (SQLite) + `UPLOAD_DIR` (uploaded PDF/source artifacts) | **No.** This is the entire reason PreXiv exists. |
+| **Tier 2 — session state** | Active logins, CSRF tokens, flash messages, the one-shot just-minted-token state | SQLite session tables managed by `tower-sessions` in the app database | Yes — losing it just logs everyone out and rotates CSRF tokens. |
 | **Tier 3 — derivable** | FTS5 search index, view counts, per-manuscript computed scores, the `data/prearxiv.seed.db` snapshot | Inside `prearxiv.db` | Yes — rebuilt from the source data. |
 
 **The invariant:** Tier 1 data is preserved no matter what happens to the
@@ -32,8 +32,7 @@ a botched deploy — none of those touch Tier 1 data.
 │   ├── prearxiv.db                   ← Tier 1, the SQLite database
 │   ├── prearxiv.db-wal               ← SQLite WAL (commits land here first)
 │   ├── prearxiv.db-shm               ← SQLite shared-memory
-│   ├── sessions.db                   ← Tier 2
-│   ├── uploads/                      ← Tier 1, uploaded PDFs
+│   ├── uploads/                      ← Tier 1, uploaded PDFs and source artifacts
 │   └── prearxiv.seed.db              ← Tier 3, optional demo seed snapshot
 └── backups/
     ├── pre-deploy/                   ← snapshot before every deploy, kept ≥ 30
@@ -205,7 +204,7 @@ Audit run 2026-05-12 (re-audited same day). Grepped for known antipatterns; veri
 | **S-1.** Open redirect on `/login?next=` | Medium (phishing-aid) | **FIXED** |
 | **S-2.** Session cookie missing explicit `SameSite=Lax` | Low | **FIXED** |
 | **S-3.** Defense-in-depth: dynamic table name in `routes/votes.rs` | Informational | **FIXED** |
-| **S-4.** No rate limiting in the Rust port | Medium (abuse-aid) | Open — planned, tower-governor |
+| **S-4.** Missing rate limiting in the Rust port | Medium (abuse-aid) | **FIXED** — `tower-governor` protects auth and public-write/API-write routes with per-IP token buckets |
 | **S-5.** No off-machine backup | High (durability) | **FIXED** — `scripts/offmachine-backup.sh` rsyncs encrypted snapshots to `$PREXIV_OFFMACHINE_DEST` after every `backup.sh`; see §6 |
 | **S-6.** Backup tarballs plaintext on disk | Medium (leakage) | **FIXED** — age-encrypted to /etc/prexiv/backup.pub, see §6a |
 | **S-7.** `users.email` plaintext in DB | Medium (leakage) | **FIXED for email** — AES-256-GCM column-level encryption with HMAC-SHA256 blind index; `rust/src/crypto.rs`, migration `0012_email_at_rest_encryption.sql`, app-startup backfill. `totp_secret` and `webhooks.secret` still pending — see §6a |
@@ -233,7 +232,7 @@ Audit run 2026-05-12 (re-audited same day). Grepped for known antipatterns; veri
 
 ### Caveats
 
-- **Verified-only write policy is enforced.** Manuscript submission, revision, comment, vote, flag, and API-token minting require an email-verified account in the Rust production path. Admins can bypass this for moderation/operational work.
+- **Verified-only write policy is enforced.** Manuscript submission, revision, comment, vote, flag, follow, and API-token minting require an email-verified account in the Rust production path. Admins can bypass this for moderation/operational work.
 - **No advanced abuse-heuristic layer yet.** Rate limits cover auth, submit, comment, vote, flag, and API writes, but there is no shadow-banning, captcha for known-spam IPs, or submission-frequency dampening beyond those limits. Revisit when traffic grows.
 
 ## 8. Operator runbook

@@ -69,7 +69,7 @@ pub async fn flag_manuscript(
     let Some((manuscript_id, slug)) = row else {
         return Err(AppError::NotFound);
     };
-    let back = format!("/m/{slug}");
+    let back = format!("/abs/{slug}");
 
     if !verify_csrf(&session, &form.csrf_token).await {
         set_flash(&session, "Form expired — please try again.").await;
@@ -131,7 +131,7 @@ pub async fn flag_comment(
     let Some((_manuscript_id, slug)) = row else {
         return Err(AppError::NotFound);
     };
-    let back = format!("/m/{slug}#comment-{comment_id}");
+    let back = format!("/abs/{slug}#comment-{comment_id}");
 
     if !verify_csrf(&session, &form.csrf_token).await {
         set_flash(&session, "Form expired — please try again.").await;

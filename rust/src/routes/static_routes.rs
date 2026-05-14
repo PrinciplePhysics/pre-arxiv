@@ -14,7 +14,9 @@ Disallow: /logout
 Disallow: /submit
 Disallow: /vote
 Allow: /
-Allow: /m/
+Allow: /abs/
+Allow: /pdf/
+Allow: /src/
 Allow: /search
 Allow: /u/
 Allow: /static/

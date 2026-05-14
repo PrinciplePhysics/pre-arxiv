@@ -12,12 +12,50 @@ use crate::state::AppState;
 use crate::templates;
 use crate::templates::layout::OgMeta;
 
-pub async fn view(
+pub async fn legacy_view_redirect(Path(id): Path<String>) -> AppResult<Redirect> {
+    Ok(Redirect::permanent(&format!("/abs/{}", bare_slug(&id))))
+}
+
+pub async fn view_abs(
     State(state): State<AppState>,
     session: Session,
     maybe_user: MaybeUser,
     Path(id): Path<String>,
 ) -> AppResult<Response> {
+    render_view(state, session, maybe_user, id).await
+}
+
+pub async fn pdf(State(state): State<AppState>, Path(id): Path<String>) -> AppResult<Response> {
+    match load_public_artifact(&state, &id, ArtifactKind::Pdf).await? {
+        ArtifactLookup::Found(path) => {
+            Ok(Redirect::temporary(&format!("/static/uploads/{path}")).into_response())
+        }
+        ArtifactLookup::Alias(new_slug) => {
+            Ok(Redirect::permanent(&format!("/pdf/{new_slug}")).into_response())
+        }
+        ArtifactLookup::Missing => Err(AppError::NotFound),
+    }
+}
+
+pub async fn source(State(state): State<AppState>, Path(id): Path<String>) -> AppResult<Response> {
+    match load_public_artifact(&state, &id, ArtifactKind::Source).await? {
+        ArtifactLookup::Found(path) => {
+            Ok(Redirect::temporary(&format!("/static/uploads/{path}")).into_response())
+        }
+        ArtifactLookup::Alias(new_slug) => {
+            Ok(Redirect::permanent(&format!("/src/{new_slug}")).into_response())
+        }
+        ArtifactLookup::Missing => Err(AppError::NotFound),
+    }
+}
+
+async fn render_view(
+    state: AppState,
+    session: Session,
+    maybe_user: MaybeUser,
+    id: String,
+) -> AppResult<Response> {
+    let lookup_id = lookup_prexiv_id(&id);
     let m: Option<Manuscript> = sqlx::query_as::<_, Manuscript>(
         r#"
         SELECT id, arxiv_like_id, doi, submitter_id, title, abstract, authors, category,
@@ -36,29 +74,41 @@ pub async fn view(
         LIMIT 1
         "#,
     )
-    .bind(&id)
+    .bind(&lookup_id)
     .bind(&id)
     .fetch_optional(&state.pool)
     .await?;
 
     // If no row matched, check the retired-id alias table. A retired
-    // slug 301-redirects to its modern counterpart so external links
-    // and citations under the old `prexiv:YYMM.NNNNN` scheme keep
-    // working forever.
+    // slug 301-redirects to its current `prexiv:YYMMDD.xxxxxx`
+    // counterpart so external links and citations keep working.
     let m = match m {
         Some(m) => m,
         None => {
-            let alias: Option<(String,)> =
-                sqlx::query_as("SELECT new_slug FROM prexiv_id_aliases WHERE old_slug = ? LIMIT 1")
-                    .bind(&id)
-                    .fetch_optional(&state.pool)
-                    .await?;
+            let alias: Option<(String,)> = sqlx::query_as(
+                "SELECT new_slug FROM prexiv_id_aliases WHERE old_slug = ? OR old_slug = ? LIMIT 1",
+            )
+            .bind(&id)
+            .bind(&lookup_id)
+            .fetch_optional(&state.pool)
+            .await?;
             if let Some((new_slug,)) = alias {
-                return Ok(Redirect::permanent(&format!("/m/{new_slug}")).into_response());
+                return Ok(
+                    Redirect::permanent(&format!("/abs/{}", bare_slug(&new_slug))).into_response(),
+                );
             }
             return Err(AppError::NotFound);
         }
     };
+    let canonical_public_slug = m
+        .arxiv_like_id
+        .as_deref()
+        .map(bare_slug)
+        .unwrap_or_else(|| bare_slug(&id))
+        .to_string();
+    if id != canonical_public_slug {
+        return Ok(Redirect::permanent(&format!("/abs/{canonical_public_slug}")).into_response());
+    }
 
     let comments: Vec<CommentWithAuthor> = sqlx::query_as::<_, CommentWithAuthor>(
         r#"
@@ -112,13 +162,13 @@ pub async fn view(
         .ok();
 
     // Sharing metadata. abs-truncated description for OG/Twitter card.
-    let slug = m.arxiv_like_id.as_deref().unwrap_or("").to_string();
+    let slug = canonical_public_slug;
     let abs_excerpt = excerpt_plain(&m.r#abstract, 280);
     let base = state.app_url.as_deref().unwrap_or("");
     let canon = if base.is_empty() {
-        format!("/m/{}", slug)
+        format!("/abs/{}", slug)
     } else {
-        format!("{}/m/{}", base.trim_end_matches('/'), slug)
+        format!("{}/abs/{}", base.trim_end_matches('/'), slug)
     };
     let og = OgMeta {
         title: strip_inline_md(&m.title),
@@ -144,6 +194,69 @@ pub async fn view(
             .into_string(),
     )
     .into_response())
+}
+
+enum ArtifactKind {
+    Pdf,
+    Source,
+}
+
+enum ArtifactLookup {
+    Found(String),
+    Alias(String),
+    Missing,
+}
+
+async fn load_public_artifact(
+    state: &AppState,
+    id: &str,
+    kind: ArtifactKind,
+) -> AppResult<ArtifactLookup> {
+    let lookup_id = lookup_prexiv_id(id);
+    let row: Option<(Option<String>,)> = match kind {
+        ArtifactKind::Pdf => sqlx::query_as(
+            "SELECT pdf_path FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
+        )
+        .bind(&lookup_id)
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?,
+        ArtifactKind::Source => sqlx::query_as(
+            "SELECT source_path FROM manuscripts WHERE arxiv_like_id = ? OR CAST(id AS TEXT) = ? LIMIT 1",
+        )
+        .bind(&lookup_id)
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?,
+    };
+    if let Some((Some(path),)) = row {
+        return Ok(ArtifactLookup::Found(path));
+    }
+    if row.is_some() {
+        return Ok(ArtifactLookup::Missing);
+    }
+    let alias: Option<(String,)> = sqlx::query_as(
+        "SELECT new_slug FROM prexiv_id_aliases WHERE old_slug = ? OR old_slug = ? LIMIT 1",
+    )
+    .bind(id)
+    .bind(&lookup_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    Ok(alias
+        .map(|(new_slug,)| ArtifactLookup::Alias(bare_slug(&new_slug).to_string()))
+        .unwrap_or(ArtifactLookup::Missing))
+}
+
+fn bare_slug(id: &str) -> &str {
+    id.strip_prefix("prexiv:").unwrap_or(id)
+}
+
+fn lookup_prexiv_id(id: &str) -> String {
+    if id.starts_with("prexiv:") {
+        id.to_string()
+    } else {
+        format!("prexiv:{id}")
+    }
 }
 
 /// First N chars of `s` with markdown + LaTeX stripped, suitable for an
@@ -200,7 +313,7 @@ fn strip_inline_md(s: &str) -> String {
     // Titles can have $…$ inline math. For OG the math should appear as
     // its source-form (good enough for sharing) so we just strip leading
     // markdown markers.
-    s.replace('*', "").replace('`', "").replace('_', "")
+    s.replace(['*', '`', '_'], "")
 }
 
 fn build_scholarly_article_jsonld(m: &Manuscript, description: &str, url: &str) -> String {

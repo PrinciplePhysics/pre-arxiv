@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 //! /me/delete-account + /me/export — GDPR-style account-management.
 //!
 //! Delete: hard-deletes the user row + anything that cascades (sessions,

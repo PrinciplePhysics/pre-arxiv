@@ -20,8 +20,6 @@ pub const KIND_FOLLOWED: &str = "followed";
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct NotificationRow {
     pub id: i64,
-    pub recipient_id: i64,
-    pub actor_id: Option<i64>,
     pub kind: String,
     pub target_type: Option<String>,
     pub target_id: Option<i64>,
@@ -79,7 +77,7 @@ pub async fn unread_count(pool: &SqlitePool, user_id: i64) -> Result<i64> {
 
 pub async fn list_for(pool: &SqlitePool, user_id: i64, limit: i64) -> Result<Vec<NotificationRow>> {
     let rows = sqlx::query_as::<_, NotificationRow>(
-        r#"SELECT n.id, n.recipient_id, n.actor_id, n.kind, n.target_type,
+        r#"SELECT n.id, n.kind, n.target_type,
                   n.target_id, n.detail, n.read_at, n.created_at,
                   u.username AS actor_username,
                   u.display_name AS actor_display,

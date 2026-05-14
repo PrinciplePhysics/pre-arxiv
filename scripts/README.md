@@ -1,18 +1,22 @@
 # scripts/
 
-Operational helpers for running PreXiv in production.
+Operational helpers for running PreXiv in production. The production Rust app
+expects persistent data outside the git checkout, typically
+`DATA_DIR=/var/lib/prexiv/current` and
+`UPLOAD_DIR=/var/lib/prexiv/current/uploads`.
 
 ## `backup.sh`
 
-Tarballs a hot snapshot of the SQLite DB plus the upload tree into
-`backups/prexiv-YYYYMMDD-HHMMSS.tar.gz`, then prunes everything older than the
-14 newest archives.
+Creates a hot snapshot of the SQLite DB plus uploaded artifacts into
+`$BACKUP_ROOT/<tier>/<timestamp>.tar.gz` or `.tar.gz.age`, then rotates that
+tier according to the retention policy in the script.
 
 Inside, it uses `sqlite3 ... ".backup ..."` rather than `cp` so the snapshot is
 consistent across the main DB file and any pending WAL pages.
 
-It's idempotent: running it more than once a day just produces additional
-timestamped archives, and the rotation keeps the newest 14.
+If `/etc/prexiv/backup.pub` exists and `age` is installed, the archive is
+encrypted before it is written to its final path. Local development can fall
+back to plaintext archives.
 
 ### Run it
 
@@ -20,14 +24,13 @@ timestamped archives, and the rotation keeps the newest 14.
 ./scripts/backup.sh
 ```
 
-Override the defaults via env if you keep things outside the repo:
+Override the defaults via env if needed:
 
-| var          | default                        |
-|--------------|--------------------------------|
-| `DATA_DIR`   | `<repo>/data`                  |
-| `UPLOAD_DIR` | `<repo>/public/uploads`        |
-| `BACKUP_DIR` | `<repo>/backups`               |
-| `KEEP`       | `14`                           |
+| var | default |
+|---|---|
+| `DATA_DIR` | `/var/lib/prexiv/current` |
+| `BACKUP_ROOT` | `/var/lib/prexiv/backups` |
+| `PREXIV_BACKUP_RECIPIENT_FILE` | `/etc/prexiv/backup.pub` |
 
 ### Cron
 
@@ -35,7 +38,7 @@ To take a daily snapshot at 04:00 UTC, add a line like this to the host's
 crontab (`crontab -e`):
 
 ```
-0 4 * * * /home/dbai/pre-arxiv/scripts/backup.sh >> /home/dbai/pre-arxiv/backups/backup.log 2>&1
+0 4 * * * cd /home/dbai/prexiv-deploy/prexiv && DATA_DIR=/var/lib/prexiv/current ./scripts/backup.sh daily cron >> /var/lib/prexiv/backups/backup.log 2>&1
 ```
 
 (This file documents the entry — install it manually when you're ready; the

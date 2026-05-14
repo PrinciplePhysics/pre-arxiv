@@ -3,6 +3,7 @@
 //! lives in commits and in pages_content/licenses.html.
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct License {
     pub id: &'static str,
     pub short: &'static str,

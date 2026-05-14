@@ -70,7 +70,7 @@ pub async fn show_version(
     if n == m.current_version {
         // Redirect to the canonical URL for the current version.
         let slug = m.arxiv_like_id.clone().unwrap_or_else(|| m.id.to_string());
-        return Ok(axum::response::Redirect::to(&format!("/m/{slug}")).into_response());
+        return Ok(axum::response::Redirect::to(&format!("/abs/{slug}")).into_response());
     }
     let v = versions::get_version(&state.pool, m.id, n)
         .await

@@ -293,9 +293,9 @@ pub async fn do_submit(
         }
     }
 
-    if !bearer_authenticated
-        && !(fields.responsibility_ack && fields.artifact_ack && fields.provenance_ack)
-    {
+    let review_confirmed =
+        fields.responsibility_ack && fields.artifact_ack && fields.provenance_ack;
+    if !(bearer_authenticated || review_confirmed) {
         return Ok(err_page(
             &session,
             maybe_user,
@@ -550,7 +550,7 @@ pub async fn do_submit(
         format!("Manuscript submitted as {arxiv_like_id}."),
     )
     .await;
-    Ok(Redirect::to(&format!("/m/{arxiv_like_id}")).into_response())
+    Ok(Redirect::to(&format!("/abs/{arxiv_like_id}")).into_response())
 }
 
 fn opt(s: &str) -> Option<&str> {
@@ -590,11 +590,11 @@ fn sanitize_filename(name: &str) -> String {
     }
 }
 
-/// Allocate a fresh `prexiv:YYMMDD.SSSSSS` id.
+/// Allocate a fresh `prexiv:YYMMDD.xxxxxx` id.
 ///
 /// Format breakdown:
 ///   - `YYMMDD` — UTC year/month/day, two digits each.
-///   - `SSSSSS` — 6-character lowercase Crockford base-32 random suffix.
+///   - `xxxxxx` — 6-character lowercase Crockford base-32 random suffix.
 ///
 /// Two design properties:
 ///
@@ -613,8 +613,8 @@ fn sanitize_filename(name: &str) -> String {
 ///    direct-submit path hits the unlucky collision, the user can retry and
 ///    receive a fresh id.
 ///
-/// Legacy `prexiv:YYMM.NNNN(N)` ids stay valid via the
-/// `prexiv_id_aliases` table — see migration 0014.
+/// Retired legacy ids stay valid via the `prexiv_id_aliases` table;
+/// new manuscripts always receive the `prexiv:YYMMDD.xxxxxx` form.
 fn make_prexiv_id() -> String {
     let now = chrono::Utc::now();
     let yymmdd = format!("{:02}{:02}{:02}", now.year() % 100, now.month(), now.day());

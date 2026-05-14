@@ -31,7 +31,7 @@ pub struct PageCtx {
     pub unread_notifications: i64,
     /// Optional OpenGraph + Twitter-card metadata for this page.
     /// Populated by routes that produce a sharable resource (mostly
-    /// /m/{id}). Left None on internal-only pages.
+    /// /abs/{id}). Left None on internal-only pages.
     pub og: Option<OgMeta>,
     /// Optional schema.org JSON-LD blob, already serialised to a
     /// string. Routes set this for indexable content (manuscript pages
@@ -57,13 +57,6 @@ pub struct OgMeta {
     pub author: Option<String>,
 }
 
-impl PageCtx {
-    pub fn no_index(mut self) -> Self {
-        self.no_index = true;
-        self
-    }
-}
-
 const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="12" fill="#fff"/><path d="M 14 14 L 50 50" stroke="#b8430a" stroke-width="8" stroke-linecap="round"/><path d="M 50 14 L 14 50" stroke="#b8430a" stroke-width="3.5" stroke-linecap="round"/><circle cx="32" cy="32" r="2.6" fill="#fff"/></svg>"##;
 
 /// Cache-buster appended as a `?v=` query string on every reference to
@@ -71,7 +64,7 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260514h";
+const ASSET_VER: &str = "20260514i";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target {
@@ -161,7 +154,9 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                 script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" {}
                 script defer src={ "/static/js/katex-init.js?v=" (ASSET_VER) } {}
                 script defer src={ "/static/js/copy-button.js?v=" (ASSET_VER) } {}
-                script defer src={ "/static/js/welcome-modal.js?v=" (ASSET_VER) } {}
+                @if cur == "/" {
+                    script defer src={ "/static/js/welcome-modal.js?v=" (ASSET_VER) } {}
+                }
             }
             body {
                 a.skip-link href="#main-content" { "Skip to main content" }
@@ -259,7 +254,7 @@ pub fn layout(title: &str, ctx: &PageCtx, body: Markup) -> Markup {
                             a href="/policies"   { "Policies" }
                         }
                         p.footer-meta {
-                            "© " (chrono::Utc::now().format("%Y")) " PreXiv. Research preprints with AI-use disclosure. Manuscripts here have not undergone formal peer review."
+                            "© " (chrono::Utc::now().format("%Y")) " PreXiv. Research manuscripts with AI-use provenance. Manuscripts here have not undergone formal peer review."
                         }
                     }
                 }

@@ -181,31 +181,4 @@ impl ManuscriptListItem {
     pub fn ai_models(&self) -> Vec<&str> {
         split_models(&self.conductor_ai_model)
     }
-
-    /// Display string for the conductor: "Alice + GPT-4" / "Autonomous: GPT-4" /
-    /// "Anonymous + GPT-4" depending on privacy flags. Mirrors the JS helper.
-    pub fn conductor_label(&self) -> String {
-        match self.conductor_type.as_str() {
-            "ai-agent" => {
-                if self.conductor_ai_model_public != 0 {
-                    format!("Autonomous: {}", self.conductor_ai_model)
-                } else {
-                    "Autonomous (model private)".to_string()
-                }
-            }
-            _ => {
-                let human = if self.conductor_human_public != 0 {
-                    self.conductor_human.as_deref().unwrap_or("Anonymous")
-                } else {
-                    "Anonymous"
-                };
-                let model = if self.conductor_ai_model_public != 0 {
-                    self.conductor_ai_model.as_str()
-                } else {
-                    "AI (private)"
-                };
-                format!("{human} + {model}")
-            }
-        }
-    }
 }

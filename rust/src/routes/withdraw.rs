@@ -28,7 +28,7 @@ pub async fn withdraw(
 ) -> AppResult<Response> {
     if !verify_csrf(&session, &form.csrf_token).await {
         set_flash(&session, "Form expired — please try again.").await;
-        return Ok(Redirect::to(&format!("/m/{id}")).into_response());
+        return Ok(Redirect::to(&format!("/abs/{id}")).into_response());
     }
 
     let row: Option<(i64, i64, Option<String>, i64)> = sqlx::query_as(
@@ -46,7 +46,7 @@ pub async fn withdraw(
 
     if already_withdrawn != 0 {
         set_flash(&session, "This manuscript is already withdrawn.").await;
-        return Ok(Redirect::to(&format!("/m/{slug}")).into_response());
+        return Ok(Redirect::to(&format!("/abs/{slug}")).into_response());
     }
     if submitter_id != user.id && !user.is_admin() {
         set_flash(
@@ -54,7 +54,7 @@ pub async fn withdraw(
             "Only the submitter (or an admin) may withdraw a manuscript.",
         )
         .await;
-        return Ok(Redirect::to(&format!("/m/{slug}")).into_response());
+        return Ok(Redirect::to(&format!("/abs/{slug}")).into_response());
     }
 
     let reason = form.reason.trim();
@@ -94,5 +94,5 @@ pub async fn withdraw(
         "Manuscript withdrawn. The page now shows a tombstone.",
     )
     .await;
-    Ok(Redirect::to(&format!("/m/{slug}")).into_response())
+    Ok(Redirect::to(&format!("/abs/{slug}")).into_response())
 }

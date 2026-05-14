@@ -46,7 +46,6 @@ pub mod home;
 pub mod listings;
 pub mod manuscript;
 pub mod manuscript_versions;
-pub mod me;
 pub mod me_account;
 pub mod me_edit;
 pub mod me_email;
@@ -77,8 +76,13 @@ pub fn router() -> Router<AppState> {
         .route("/audited", get(listings::audited_listing))
         .route("/browse", get(listings::browse_index))
         .route("/browse/{cat}", get(listings::browse_category))
-        // Manuscript
-        .route("/m/{id}", get(manuscript::view))
+        // Public manuscript surfaces. /abs, /pdf, and /src intentionally
+        // mirror arXiv's public URL vocabulary; /m remains as a legacy
+        // compatibility alias and as the prefix for state-changing actions.
+        .route("/abs/{id}", get(manuscript::view_abs))
+        .route("/pdf/{id}", get(manuscript::pdf))
+        .route("/src/{id}", get(manuscript::source))
+        .route("/m/{id}", get(manuscript::legacy_view_redirect))
         // /m/{id}/comment POST is in write_post_router() (rate-limited)
         .route("/m/{id}/cite", get(cite::cite))
         .route("/m/{id}/cite.bib", get(cite::bib))
@@ -171,8 +175,8 @@ pub fn router() -> Router<AppState> {
         .route("/oai", get(oai::oai))
 }
 
-/// POST endpoints subject to the strict auth-attempt rate limit
-/// (5 attempts / min per IP). Layered with auth_layer in main.rs.
+/// POST endpoints subject to the strict auth-attempt rate limit.
+/// Layered with auth_layer in main.rs.
 pub fn auth_post_router() -> Router<AppState> {
     Router::new()
         .route("/login", post(auth::do_login))
@@ -182,9 +186,8 @@ pub fn auth_post_router() -> Router<AppState> {
         .route("/reset-password/{token}", post(forgot::submit_reset))
 }
 
-/// POST endpoints subject to the standard write-throttle rate limit
-/// (30 req / min per IP). Submission, voting, commenting. Layered
-/// with write_layer in main.rs.
+/// POST endpoints subject to the standard write-throttle rate limit.
+/// Submission, voting, commenting. Layered with write_layer in main.rs.
 pub fn write_post_router() -> Router<AppState> {
     Router::new()
         .route(

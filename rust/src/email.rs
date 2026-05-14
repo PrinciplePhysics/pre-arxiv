@@ -1,3 +1,4 @@
+#![allow(clippy::items_after_test_module)]
 //! Outbound email — HTTPS POST to Brevo's transactional API.
 //!
 //! Why not SMTP: victoria sits behind a carrier-grade NAT whose ISP blocks

@@ -76,7 +76,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                 strong { "conductor" }
                 " is the human who guided the AI, or records that no human conductor directed an autonomous agent workflow; the "
                 strong { "auditor" }
-                " (optional) is a human expert who has signed a scoped correctness statement. These fields are provenance disclosures, not legal authorship labels."
+                " (optional) is a human expert who has signed a scoped public audit statement. These fields are provenance disclosures, not legal authorship labels."
             }
         }
 
@@ -392,7 +392,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         span {
                             "I acknowledge that this manuscript was produced by an AI agent acting "
                             strong { "autonomously" }
-                            ". No human conductor directed the production, and no auditor has signed a correctness statement unless I add one below. I remain responsible for having rights to post it and for describing the agent honestly. The manuscript page will display a prominent "
+                            ". No human conductor directed the production, and no auditor has signed an audit statement unless I add one below. I remain responsible for having rights to post it and for describing the agent honestly. The manuscript page will display a prominent "
                             em { "\"AI-agent (autonomous)\"" }
                             " banner alongside any auditing status."
                         }
@@ -412,7 +412,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                     span.step-title { "Audit " span.muted { "(optional but encouraged)" } }
                 }
                 p.muted.small.no-katex {
-                    "A human auditor is someone who has read the manuscript line by line and is willing to attach their professional reputation to a scoped correctness statement. This is "
+                    "A human auditor is someone who has read the manuscript line by line and is willing to attach their professional reputation to a scoped public audit statement. This is "
                     em { "not" }
                     " formal peer review, not platform endorsement, and not professional advice to readers. Listing an auditor who has not actually read and signed off is the fastest way to get the submission removed."
                 }
@@ -422,7 +422,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         input type="radio" name="audit_status" value="none" checked;
                         div.ctype-body {
                             strong { "No auditor" }
-                            span.muted.small { "Nobody is signing a correctness statement. The manuscript page will show a prominent " em { "unaudited" } " warning." }
+                            span.muted.small { "Nobody is signing an audit statement. The manuscript page will show a prominent " em { "unaudited" } " warning." }
                         }
                     }
                     label.ctype-card.audit-self-radio {
@@ -450,7 +450,7 @@ pub fn render(ctx: &PageCtx, error: Option<&str>) -> Markup {
                         input type="checkbox" name="no_auditor_ack";
                         span {
                             "I understand and acknowledge that "
-                            strong { "no human auditor is signing a correctness statement for this manuscript." }
+                            strong { "no human auditor is signing an audit statement for this manuscript." }
                             " I remain responsible for lawful posting, accurate provenance disclosure, and not misrepresenting what has been checked. A prominent "
                             em { "\"unaudited\"" }
                             " warning will be displayed on the manuscript page."

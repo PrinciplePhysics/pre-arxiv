@@ -10,19 +10,25 @@ fn slug_for(m: &Manuscript) -> String {
     m.arxiv_like_id.clone().unwrap_or_else(|| m.id.to_string())
 }
 
+fn public_slug_for(m: &Manuscript) -> String {
+    let slug = slug_for(m);
+    slug.strip_prefix("prexiv:").unwrap_or(&slug).to_string()
+}
+
 pub fn render_list(ctx: &PageCtx, m: &Manuscript, versions: &[ManuscriptVersion]) -> Markup {
     let slug = slug_for(m);
+    let public_slug = public_slug_for(m);
     let body = html! {
         div.page-header {
             h1 {
                 "Versions of "
-                a href={ "/m/" (slug) } { code.no-katex { (slug) } }
+                a href={ "/abs/" (public_slug) } { code.no-katex { (slug) } }
             }
             p.muted {
                 (versions.len())
                 @if versions.len() == 1 { " version" } @else { " versions" }
                 " on file. Each row links to a permalink for that specific snapshot; the page at "
-                code.no-katex { "/m/" (slug) }
+                code.no-katex { "/abs/" (public_slug) }
                 " always shows the latest."
             }
         }
@@ -48,7 +54,7 @@ pub fn render_list(ctx: &PageCtx, m: &Manuscript, versions: &[ManuscriptVersion]
                             }
                         }
                         @if v.version_number == m.current_version {
-                            a.btn-secondary.btn-small href={ "/m/" (slug) } { "View latest" }
+                            a.btn-secondary.btn-small href={ "/abs/" (public_slug) } { "View latest" }
                         } @else {
                             a.btn-secondary.btn-small href={ "/m/" (slug) "/v/" (v.version_number) } { "View v" (v.version_number) }
                         }
@@ -63,7 +69,7 @@ pub fn render_list(ctx: &PageCtx, m: &Manuscript, versions: &[ManuscriptVersion]
         }
 
         p style="margin-top:24px" {
-            a.btn-secondary href={ "/m/" (slug) } { "\u{2190} Back to manuscript" }
+            a.btn-secondary href={ "/abs/" (public_slug) } { "\u{2190} Back to manuscript" }
         }
     };
     layout(&format!("Versions of {slug}"), ctx, body)
@@ -71,6 +77,7 @@ pub fn render_list(ctx: &PageCtx, m: &Manuscript, versions: &[ManuscriptVersion]
 
 pub fn render_version(ctx: &PageCtx, m: &Manuscript, v: &ManuscriptVersion) -> Markup {
     let slug = slug_for(m);
+    let public_slug = public_slug_for(m);
     let body = html! {
         div.historical-banner role="status" {
             div.verify-banner-text {
@@ -87,7 +94,7 @@ pub fn render_version(ctx: &PageCtx, m: &Manuscript, v: &ManuscriptVersion) -> M
                 }
             }
             div.verify-banner-actions {
-                a.btn-primary href={ "/m/" (slug) } { "View latest \u{2192}" }
+                a.btn-primary href={ "/abs/" (public_slug) } { "View latest \u{2192}" }
                 a.btn-secondary href={ "/m/" (slug) "/versions" } { "All versions" }
             }
         }
