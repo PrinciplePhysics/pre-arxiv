@@ -370,9 +370,18 @@ pub fn render(
                             }
                         }
                         @if let Some(doi) = &m.doi {
-                            li class="bx-stat-long bx-stat-doi" {
+                            @let doi_parts = doi.split_once('/');
+                            li.bx-stat-doi {
                                 span.lbl { "DOI" }
-                                span.val.mono { (doi) }
+                                span.val.mono {
+                                    @if let Some((prefix, suffix)) = doi_parts {
+                                        span.doi-prefix { (prefix) "/" }
+                                        br;
+                                        span.doi-tail { (suffix) }
+                                    } @else {
+                                        (doi)
+                                    }
+                                }
                             }
                         }
                         @if let Some(ts) = &m.created_at {
