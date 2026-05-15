@@ -246,6 +246,13 @@ html { scroll-behavior: smooth; }
   overflow-x: auto;
 }
 .markdown pre code { background: transparent; padding: 0; }
+.prose pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.prose pre code {
+  white-space: inherit;
+}
 .markdown table {
   border-collapse: collapse;
   margin: 0.6em 0;
