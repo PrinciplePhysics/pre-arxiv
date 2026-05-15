@@ -244,9 +244,9 @@ pub fn verify_banner(csrf_token: &str, email: &str, pending_token: Option<&str>)
                     strong { "Email not verified yet." }
                     " "
                     "Click the button to verify your email and unlock manuscript submission. "
-                    "A copy is also queued for delivery to "
+                    "A copy has also been sent to "
                     strong { (email) }
-                    " (email delivery is in setup; the in-browser link is the fast path)."
+                    "."
                 }
                 div.verify-banner-actions {
                     a.btn-primary href={ "/verify/" (token) } { "Verify my email →" }
@@ -285,7 +285,7 @@ pub fn email_change_banner(
             @if let Some(token) = pending_token {
                 div.verify-banner-text {
                     strong { "Pending email change to " (new_email) }
-                    " — click below to confirm. We've also queued a confirmation email to that address; whichever you click first wins."
+                    " — click below to confirm. A confirmation email was also sent to that address."
                 }
                 div.verify-banner-actions {
                     a.btn-primary href={ "/confirm-email-change/" (token) } { "Confirm new email →" }

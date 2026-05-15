@@ -141,7 +141,7 @@ async fn identify(state: &AppState) -> String {
     out.push_str("  <repositoryName>PreXiv</repositoryName>\n");
     out.push_str(&format!("  <baseURL>{}/oai</baseURL>\n", x(&base_url)));
     out.push_str("  <protocolVersion>2.0</protocolVersion>\n");
-    out.push_str("  <adminEmail>noreply@prexiv.local</adminEmail>\n");
+    out.push_str("  <adminEmail>noreply@prexiv.net</adminEmail>\n");
     out.push_str(&format!(
         "  <earliestDatestamp>{}</earliestDatestamp>\n",
         x(&earliest_str)

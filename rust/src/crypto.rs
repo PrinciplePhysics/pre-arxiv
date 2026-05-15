@@ -152,7 +152,7 @@ fn normalize_email(s: &str) -> String {
 /// Encrypt an email address for storage. Returns `(hash, ciphertext)`
 /// — the hash goes in `email_hash` (UNIQUE lookup), the ciphertext goes
 /// in `email_enc` (so we can recover the original casing/whitespace for
-/// display and SMTP).
+/// display and email delivery).
 pub fn seal_email(email: &str) -> Result<([u8; 32], Vec<u8>)> {
     let hash = email_hash(email);
     let enc = encrypt_blob(email.as_bytes())?;

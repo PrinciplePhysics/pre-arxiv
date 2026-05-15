@@ -107,10 +107,9 @@ pub async fn resend(
         tracing::error!(target: "prexiv::verify", error = %e, user_id = user.id, "invalidate failed");
     }
 
-    // Mint a fresh token (also fires the email in the background). The
-    // returned plaintext goes into the session so the /me/edit banner
-    // can render the inline "Verify my email →" button while outbound
-    // mail provider activation is still pending.
+    // Mint a fresh token and send it. Production keeps the plaintext token
+    // out of the browser; the inline fallback is dev-only unless explicitly
+    // enabled.
     let pending_token = verify::mint_and_send(
         &state.pool,
         user.id,
@@ -120,16 +119,19 @@ pub async fn resend(
     )
     .await
     .ok();
-    if let Some(t) = pending_token {
-        let _ = session.insert("pending_verify_token", t).await;
+    if crate::email::inline_token_fallback_enabled() {
+        if let Some(t) = pending_token {
+            let _ = session.insert("pending_verify_token", t).await;
+        }
     }
 
     set_flash(
         &session,
         format!(
-            "Fresh verification link generated for {}. Click the green button below to verify, or watch your inbox for the email copy.",
+            "Fresh verification link sent to {}. Check that inbox to verify ownership.",
             user.email
         ),
-    ).await;
+    )
+    .await;
     Ok(Redirect::to("/me/edit").into_response())
 }

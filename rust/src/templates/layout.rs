@@ -17,7 +17,7 @@ pub struct PageCtx {
     /// register and resend-verification handlers. Lets the verify-banner
     /// render a direct "Verify my email →" button without waiting for a
     /// delivered email — used as a fallback when the outbound mail
-    /// provider can't yet send (e.g., Brevo activation pending).
+    /// provider can't yet send.
     /// Persists until the user successfully verifies (the /verify/{token}
     /// handler clears it on success).
     pub pending_verify_token: Option<String>,
@@ -64,7 +64,7 @@ const BRAND_SVG: &str = r##"<svg viewBox="0 0 64 64" width="32" height="32" aria
 /// script change so the browser re-fetches instead of replaying its
 /// stale copy. (Bump format: yyyymmdd-letter — increments alphabetically
 /// for same-day re-deploys.)
-const ASSET_VER: &str = "20260514p";
+const ASSET_VER: &str = "20260515n";
 
 fn nav_class(current: &str, target: &str) -> &'static str {
     if current == target {

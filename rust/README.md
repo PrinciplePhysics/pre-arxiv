@@ -25,7 +25,7 @@ For full manuscript processing, install:
 
 The deployment helpers live in `../scripts/`.
 
-- `scripts/start-rust.sh` starts `rust/target/release/prexiv`, sources `$REPO/.env` and `/etc/prexiv/smtp.env` if present, defaults `APP_URL` to `https://victoria.tail921ea4.ts.net`, and defaults `PORT` to `3000`.
+- `scripts/start-rust.sh` starts `rust/target/release/prexiv`, sources `$REPO/.env`, `/etc/prexiv/mail.env`, and the legacy `/etc/prexiv/smtp.env` if present, defaults `APP_URL` to `https://prexiv.net`, and defaults `PORT` to `3000`.
 - `scripts/deploy.sh` takes a pre-deploy PostgreSQL/upload backup, verifies the dump catalog, resets the deployment checkout to `origin/main`, builds release, restarts, and health-checks localhost.
 - Keep `UPLOAD_DIR` outside the git checkout in production. The app serves it under `/static/uploads`.
 
@@ -36,10 +36,18 @@ PREXIV_DATA_KEY=<stable 32-byte key>
 DATABASE_URL=postgres://prexiv:<password>@127.0.0.1:5432/prexiv
 DATA_DIR=/var/lib/prexiv/current
 UPLOAD_DIR=/var/lib/prexiv/current/uploads
-APP_URL=https://victoria.tail921ea4.ts.net
+APP_URL=https://prexiv.net
 NODE_ENV=production
 PORT=3000
+MAIL_FROM_ADDRESS=noreply@prexiv.net
+GMAIL_CLIENT_ID=...
+GMAIL_CLIENT_SECRET=...
+GMAIL_REFRESH_TOKEN=...
 ```
+
+See the root `README.md` "Outbound email" section for the full Gmail API setup
+walkthrough, including the Google Cloud Console, OAuth Playground, SPF, DKIM,
+and DMARC links.
 
 ## Architecture
 

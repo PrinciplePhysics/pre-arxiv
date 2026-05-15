@@ -58,6 +58,11 @@ npm run seed
 | `ADMIN_USERNAMES` | unset | Comma-separated usernames promoted to admin at startup where supported. |
 | `ZENODO_TOKEN` | unset | Optional real DOI deposit integration; without it PreXiv uses synthetic `10.99999/...` identifiers. |
 | `ZENODO_USE_PRODUCTION` | `0` | Use production Zenodo when set to `1`; otherwise sandbox. |
+| `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` / `GMAIL_REFRESH_TOKEN` | unset | Enable real outbound verification/password-reset email through Gmail API. The refresh token must have `https://www.googleapis.com/auth/gmail.send`. |
+| `GMAIL_USER_ID` | `me` | Gmail API user id. Use `me` for the OAuth-authorized mailbox. |
+| `MAIL_FROM_ADDRESS` | `noreply@prexiv.net` | Sender address. For Gmail API this must be the authorized mailbox or a verified Gmail send-as alias for the OAuth account. |
+| `MAIL_FROM_NAME` | `PreXiv` | Sender display name. |
+| `PREXIV_ALLOW_INLINE_EMAIL_TOKENS` | unset | Development-only escape hatch. Production should leave this unset so email verification proves mailbox control. |
 | `ORCID_CLIENT_ID` / `ORCID_CLIENT_SECRET` | unset | Enable authenticated ORCID OAuth/OpenID binding. Use ORCID sandbox credentials with `ORCID_BASE_URL=https://sandbox.orcid.org` while testing. |
 | `ORCID_REDIRECT_URI` | `${APP_URL}/auth/orcid/callback` | OAuth callback URI registered with ORCID. Must exactly match the ORCID client settings. |
 | `ORCID_BASE_URL` | `https://orcid.org` | ORCID OAuth host; set to `https://sandbox.orcid.org` for sandbox testing. |
@@ -68,7 +73,151 @@ npm run seed
 | `PREXIV_APPEALS_CONTACT` | `mailto:appeals@prexiv.org` | Moderation appeal contact shown on `/policies`. |
 | `PREXIV_GOVERNING_LAW` | operator-domicile default | Public governing-law text shown on `/tos`. Configure explicitly for production. |
 | `PREXIV_DMCA_COUNTER_JURISDICTION` | statutory generic text | Counter-notice jurisdiction language shown on `/dmca`. |
-| SMTP env | `/etc/prexiv/smtp.env` in production | Optional outbound verification email settings sourced by `scripts/start-rust.sh`; inline verification fallback still works without SMTP. |
+| Mail env | `/etc/prexiv/mail.env` or `.env` in production | Optional outbound Gmail API settings sourced by `scripts/start-rust.sh`. Production email verification is mailbox-based; inline verification tokens are not shown unless explicitly enabled. |
+
+### Outbound email
+
+Production email uses Gmail API, not Brevo and not direct-to-MX SMTP. The recommended sender is `noreply@prexiv.net` on Google Workspace, or a verified Gmail send-as alias for the OAuth-authorized mailbox. Direct self-hosted SMTP is not recommended on the current host because outbound port 25 is commonly blocked and new server IPs have poor mail reputation.
+
+Values PreXiv needs:
+
+```env
+MAIL_FROM_ADDRESS=noreply@prexiv.net
+MAIL_FROM_NAME=PreXiv
+GMAIL_CLIENT_ID=...
+GMAIL_CLIENT_SECRET=...
+GMAIL_REFRESH_TOKEN=...
+GMAIL_USER_ID=me
+```
+
+How to get them, step by step:
+
+1. Create or enable the sending mailbox.
+
+   Open Google Workspace Admin:
+
+   <https://admin.google.com>
+
+   Create a user or group/alias for `noreply@prexiv.net`. The Gmail account you authorize later must be able to send as this address. If you use an alias rather than a real mailbox, verify the alias in Gmail's "Send mail as" settings before testing PreXiv.
+
+2. Create/select a Google Cloud project.
+
+   Open Google Cloud Console:
+
+   <https://console.cloud.google.com>
+
+3. Enable Gmail API for that project.
+
+   Open the Gmail API library page and click **Enable**:
+
+   <https://console.cloud.google.com/apis/library/gmail.googleapis.com>
+
+4. Configure the OAuth consent screen.
+
+   Open:
+
+   <https://console.cloud.google.com/apis/credentials/consent>
+
+   Choose the app type that matches your Google account setup. For a Workspace-owned app, internal is simplest. Add the Gmail send scope if the UI asks for scopes:
+
+   ```text
+   https://www.googleapis.com/auth/gmail.send
+   ```
+
+5. Create OAuth client credentials.
+
+   Open:
+
+   <https://console.cloud.google.com/apis/credentials>
+
+   Click **Create credentials** -> **OAuth client ID**. For the easiest refresh-token workflow, choose **Desktop app**. Copy:
+
+   ```env
+   GMAIL_CLIENT_ID=<the Client ID>
+   GMAIL_CLIENT_SECRET=<the Client secret>
+   ```
+
+6. Generate the refresh token.
+
+   Open Google OAuth Playground:
+
+   <https://developers.google.com/oauthplayground>
+
+   In the gear icon:
+
+   - Check **Use your own OAuth credentials**.
+   - Paste the client ID and client secret from step 5.
+   - Close the gear panel.
+
+   In the scope box, paste exactly:
+
+   ```text
+   https://www.googleapis.com/auth/gmail.send
+   ```
+
+   Click **Authorize APIs**. Sign in as the Gmail/Workspace account that can send as `noreply@prexiv.net`. Then click **Exchange authorization code for tokens**. Copy the `refresh_token` field:
+
+   ```env
+   GMAIL_REFRESH_TOKEN=<refresh_token from OAuth Playground>
+   ```
+
+   If OAuth Playground does not show a refresh token, revoke the test grant at <https://myaccount.google.com/permissions>, then repeat the flow with your own OAuth credentials enabled. Google usually returns the refresh token only on the first consent for a client/user/scope combination.
+
+7. Configure the production server env.
+
+   Store these in `/home/prexiv/.env` or `/etc/prexiv/mail.env` on the server, never in git:
+
+   ```env
+   MAIL_FROM_ADDRESS=noreply@prexiv.net
+   MAIL_FROM_NAME=PreXiv
+   GMAIL_CLIENT_ID=...
+   GMAIL_CLIENT_SECRET=...
+   GMAIL_REFRESH_TOKEN=...
+   GMAIL_USER_ID=me
+   ```
+
+8. Configure domain authentication for deliverability.
+
+   SPF:
+
+   <https://support.google.com/a/answer/33786>
+
+   Add this DNS TXT record at `prexiv.net`:
+
+   ```dns
+   prexiv.net TXT "v=spf1 include:_spf.google.com ~all"
+   ```
+
+   DKIM:
+
+   <https://support.google.com/a/answer/180504>
+
+   Generate the DKIM record in Google Workspace Admin, then add the exact TXT record Google gives you.
+
+   DMARC:
+
+   <https://support.google.com/a/answer/2466580>
+
+   Start with monitoring mode:
+
+   ```dns
+   _dmarc.prexiv.net TXT "v=DMARC1; p=none; rua=mailto:postmaster@prexiv.net"
+   ```
+
+   After SPF/DKIM pass consistently, move toward `p=quarantine` or `p=reject`.
+
+9. Test from PreXiv.
+
+   Restart `prexiv.service`, register a new test account, and confirm the message arrives from `PreXiv <noreply@prexiv.net>`. If Gmail rejects the sender, fix the Gmail/Workspace send-as alias first; if mail goes to spam, check SPF/DKIM/DMARC in the message headers.
+
+Reference docs:
+
+- Gmail API sending guide: <https://developers.google.com/gmail/api/guides/sending>
+- Gmail `users.messages.send`: <https://developers.google.com/gmail/api/reference/rest/v1/users.messages/send>
+- Google OAuth 2.0: <https://developers.google.com/identity/protocols/oauth2>
+- OAuth Playground: <https://developers.google.com/oauthplayground>
+
+Do not enable `PREXIV_ALLOW_INLINE_EMAIL_TOKENS` in production unless you deliberately want to bypass mailbox-ownership proof for emergency recovery. Normal verified-account privileges require the user to click a link delivered to their mailbox.
 
 ## Product surface
 
@@ -155,13 +304,13 @@ PREXIV_DATA_KEY=<stable 32-byte key>
 DATABASE_URL=postgres://prexiv:<password>@127.0.0.1:5432/prexiv
 DATA_DIR=/var/lib/prexiv/current
 UPLOAD_DIR=/var/lib/prexiv/current/uploads
-APP_URL=https://victoria.tail921ea4.ts.net
+APP_URL=https://prexiv.net
 NODE_ENV=production
 PORT=3000
 # Optional ORCID OAuth:
 # ORCID_CLIENT_ID=...
 # ORCID_CLIENT_SECRET=...
-# ORCID_REDIRECT_URI=https://victoria.tail921ea4.ts.net/auth/orcid/callback
+# ORCID_REDIRECT_URI=https://prexiv.net/auth/orcid/callback
 # Public legal/policy contacts:
 # PREXIV_OPERATOR_NAME="PreXiv operator"
 # PREXIV_LEGAL_CONTACT=mailto:legal@prexiv.org

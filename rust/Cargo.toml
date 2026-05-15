@@ -44,8 +44,7 @@ jsonwebtoken = "9"
 pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
 ammonia = "4"
 
-# HTTP client — used for HIBP k-anonymity check and for outbound email
-# via Brevo's transactional API (POST https://api.brevo.com/v3/smtp/email).
+# HTTP client — used for HIBP k-anonymity check and Gmail API email delivery.
 # `json` enables typed body serialization.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 
@@ -71,6 +70,7 @@ tempfile = "3"
 # decrypting every row. Key material loaded from PREXIV_DATA_KEY.
 aes-gcm = "0.10"
 hmac = "0.12"
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "rustls-tls"] }
 
 [profile.release]
 lto = "thin"

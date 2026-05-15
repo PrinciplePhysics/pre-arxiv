@@ -141,14 +141,14 @@ pub async fn submit(
     .await
     .ok();
 
-    // Stash plaintext token so /me/edit can render the inline
-    // "Confirm new email →" button while Brevo activation is still
-    // pending. Persistent until the user confirms (the confirm handler
-    // clears it).
-    if let Some(t) = &token {
-        let _ = session
-            .insert("pending_email_change_token", t.clone())
-            .await;
+    // Production confirms ownership through the new mailbox. The inline
+    // token fallback is dev-only unless explicitly enabled.
+    if crate::email::inline_token_fallback_enabled() {
+        if let Some(t) = &token {
+            let _ = session
+                .insert("pending_email_change_token", t.clone())
+                .await;
+        }
     }
 
     set_flash(

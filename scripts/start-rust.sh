@@ -19,8 +19,15 @@ if [ -r "$REPO/.env" ]; then
   set +a
 fi
 
-# SMTP credentials for outbound verification mail.
-# Live secret file (not in git), typically mode 0640 root:dbai.
+# Mail credentials for outbound verification mail.
+# Live secret files (not in git), typically mode 0600.
+if [ -r /etc/prexiv/mail.env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . /etc/prexiv/mail.env
+  set +a
+fi
+# Backward-compatible path from the older SMTP/Brevo setup.
 if [ -r /etc/prexiv/smtp.env ]; then
   set -a
   # shellcheck disable=SC1091
@@ -35,7 +42,7 @@ fi
 if [ -n "${UPLOAD_DIR:-}" ]; then
   export UPLOAD_DIR
 fi
-export APP_URL="${APP_URL:-https://victoria.tail921ea4.ts.net}"
+export APP_URL="${APP_URL:-https://prexiv.net}"
 export NODE_ENV="${NODE_ENV:-production}"
 export RUST_LOG="${RUST_LOG:-info,sqlx=warn,tower_http=info}"
 

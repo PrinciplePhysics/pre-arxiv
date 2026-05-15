@@ -64,7 +64,7 @@ pub fn render_sent(ctx: &PageCtx) -> Markup {
         section.form-section {
             h2 { "Didn't receive it?" }
             ul {
-                li { "Check your spam folder — the message comes from " strong { "PreXiv" } " via Brevo." }
+                li { "Check your spam folder — the message comes from " strong { "PreXiv" } " at " code { "noreply@prexiv.net" } "." }
                 li { "Make sure you used the email tied to your account (not an alias)." }
                 li {
                     "If you registered very recently and haven't verified your email yet, the address may still resolve — but the reset email will land at whatever address you typed in at register time."

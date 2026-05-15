@@ -71,7 +71,7 @@ pub async fn invalidate_for_user(pool: &DbPool, user_id: i64) -> Result<()> {
 /// background, and return the plaintext token so the caller can stash it
 /// in the session for an inline-verify-link fallback.
 ///
-/// We deliberately don't await the SMTP/HTTP send: it can take seconds
+/// We deliberately don't await the Gmail/HTTP send: it can take seconds
 /// (or minutes, if a provider's API is slow), and the registration
 /// response must complete promptly. The send is spawned with its own
 /// 12-second wall-clock cap so it can't pile up forever; failures are

@@ -255,14 +255,9 @@ pub async fn do_register(
     .fetch_one(&state.pool)
     .await?;
 
-    // Mint a verification token and fire the email send in the
-    // background. `mint_and_send` returns the plaintext token, which we
-    // stash in the session so /me/edit can render an inline
-    // "Verify my email →" button — this is the fallback path that
-    // keeps PreXiv usable while the upstream mail provider's
-    // anti-abuse activation is pending. Once outbound mail starts
-    // working, the same token also arrives by email; whichever the
-    // user clicks works.
+    // Mint a verification token and fire the email send in the background.
+    // In production, email verification must happen through the mailbox.
+    // The inline token fallback is dev-only unless explicitly enabled.
     let pending_token = verify::mint_and_send(
         &state.pool,
         user_id,
@@ -277,13 +272,15 @@ pub async fn do_register(
         .await
         .map_err(crate::error::AppError::Other)?;
 
-    if let Some(t) = pending_token {
-        let _ = session.insert("pending_verify_token", t).await;
+    if crate::email::inline_token_fallback_enabled() {
+        if let Some(t) = pending_token {
+            let _ = session.insert("pending_verify_token", t).await;
+        }
     }
 
     set_flash(
         &session,
-        "Welcome! Click the green button below to verify your email — submission is gated on verification. (We've also queued a verification email; delivery may take a moment.)"
+        "Welcome! Check your inbox for the verification link. Submission and API token minting are gated on verified email ownership."
     ).await;
     // Redirect to /me/edit so the verify banner is the first thing the
     // user sees post-register. They can browse and comment from here

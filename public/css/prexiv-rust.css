@@ -490,6 +490,7 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   padding: 28px 32px 22px;
   max-width: 560px;
   width: 100%;
+  min-width: 0;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
   font-family: var(--serif);
   font-size: 16px;
@@ -500,6 +501,11 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
   outline: none;
 }
 .welcome-box:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.welcome-title,
+.welcome-lede,
+.welcome-body {
+  overflow-wrap: break-word;
+}
 
 .welcome-title {
   font-family: var(--serif);
@@ -594,7 +600,9 @@ body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-blo
 @media (max-width: 520px) {
   .welcome-modal { padding: 16px 12px; }
   .welcome-box {
-    padding: 22px 20px 18px;
+    width: calc(100vw - 24px);
+    max-width: 360px;
+    padding: 20px 18px 18px;
     max-height: calc(100vh - 32px);
   }
   .welcome-title { font-size: 22px; }
@@ -3673,6 +3681,112 @@ a.profile-name-badge { cursor: pointer; }
 }
 .sort-caption a { color: var(--ink-soft); }
 .sort-caption a:hover { color: var(--brand); }
+
+/* Homepage + topbar phone layout. Keep this after the desktop homepage
+   rules so the narrow viewport overrides are not clobbered by the base grid. */
+@media (max-width: 860px) {
+  .archive-intro {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
+@media (max-width: 600px) {
+  .archive-intro {
+    margin: 2px 0 14px;
+  }
+  .archive-intro-main {
+    padding: 17px 18px;
+  }
+  .archive-intro h1 {
+    font-size: 30px;
+    line-height: 1.08;
+    max-width: 100%;
+  }
+  .archive-intro-main p:not(.archive-kicker) {
+    font-size: 15px;
+  }
+  .archive-principles {
+    padding: 2px 14px;
+  }
+
+  .topbar-inner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    height: auto;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .topbar .brand {
+    min-width: 0;
+    order: 1;
+  }
+  .topbar .searchbox {
+    grid-column: 1 / -1;
+    order: 2;
+    min-width: 0;
+    width: 100%;
+    margin-left: 0;
+  }
+  .topbar .searchbox input {
+    width: 100%;
+    min-width: 0;
+  }
+  .topbar .userbox {
+    order: 1;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+  .topbar .topnav {
+    grid-column: 1 / -1;
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .topbar .topnav::-webkit-scrollbar {
+    display: none;
+  }
+  .topbar .topnav a {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 460px) {
+  .archive-intro-main {
+    padding: 16px;
+  }
+  .archive-kicker {
+    font-size: 10.5px;
+    letter-spacing: 0.11em;
+  }
+  .archive-intro h1 {
+    font-size: 28px;
+  }
+  .archive-intro-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .archive-intro-actions .btn-primary,
+  .archive-intro-actions .btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+  .archive-principle {
+    padding: 12px 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .archive-intro h1 {
+    font-size: 26px;
+  }
+}
 
 /* ─── Inline link-styled buttons (comment delete + flag) ───────────
    Buttons that look like text-only links — used for the small
