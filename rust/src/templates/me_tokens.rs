@@ -128,7 +128,7 @@ pub fn render(
             @if !can_mint {
                 (crate::templates::me_edit::verify_banner(&ctx.csrf_token, email, ctx.pending_verify_token.as_deref()))
                 p.muted.small {
-                    "API tokens let agents write as your account. PreXiv requires GitHub or email account verification before minting new tokens."
+                    "API tokens let agents write as your account. PreXiv requires GitHub, ORCID, or email account verification before minting new tokens."
                 }
             } @else {
                 form.submit-form method="post" action="/me/tokens" {
@@ -300,13 +300,13 @@ Before any state-changing request, GET {base_url}/api/v1/me to confirm the token
 
   curl -H 'Authorization: Bearer {token}' {base_url}/api/v1/me
 
-You should receive JSON like {{\"id\": …, \"username\": \"…\", \"display_name\": …, \"karma\": …, \"is_admin\": …, \"account_verified\": …, \"email_verified\": …, \"github_oauth_verified\": …}}. If you get HTTP 401 with {{\"error\": \"invalid or expired bearer token\"}}, the token is bad — stop, tell the user, do NOT retry. If account_verified is false and is_admin is false, read-only API calls will work but state-changing calls will be rejected until the user connects GitHub or verifies email.
+You should receive JSON like {{\"id\": …, \"username\": \"…\", \"display_name\": …, \"karma\": …, \"is_admin\": …, \"account_verified\": …, \"email_verified\": …, \"github_oauth_verified\": …, \"orcid_oauth_verified\": …}}. If you get HTTP 401 with {{\"error\": \"invalid or expired bearer token\"}}, the token is bad — stop, tell the user, do NOT retry. If account_verified is false and is_admin is false, read-only API calls will work but state-changing calls will be rejected until the user connects GitHub, connects ORCID, or verifies email.
 
 ═══════════════════════════════════════════════════════════
 WHAT YOU CAN DO
 ═══════════════════════════════════════════════════════════
 
-All endpoints are at {base_url}/api/v1. Read endpoints are public. Public writes and token creation require the Authorization header for an account verified by GitHub OAuth or email; token revocation remains available for account safety.
+All endpoints are at {base_url}/api/v1. Read endpoints are public. Public writes and token creation require the Authorization header for an account verified by GitHub OAuth, ORCID OAuth, or email; token revocation remains available for account safety.
 
   GET    /me                              ← whoami (sanity-check the token)
   GET    /categories                      ← the 20 valid category ids

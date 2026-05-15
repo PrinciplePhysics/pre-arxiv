@@ -75,14 +75,14 @@ fn archive_intro(logged_in: bool) -> Markup {
                 }
                 div.archive-principle {
                     strong { "Trust signals are separated" }
-                    span { "Email, ORCID, institutional email, audit status, and hosted-source status are distinct reader signals." }
+                    span { "GitHub, email, ORCID, institutional affiliation, audit status, and hosted-source status are distinct reader signals." }
                 }
             }
         }
     }
 }
 
-/// Two-pill segmented control: **Standard** (verified-scholar only)
+/// Two-pill segmented control: **Standard** (verified-account only)
 /// vs **All submissions** (firehose, includes unverified authors and
 /// restricted categories). The standard link points at the bare path;
 /// the all-submissions link tacks on `?show_all=1`. The active mode
@@ -95,7 +95,7 @@ pub fn mode_toggle(self_path: &str, show_all: bool) -> Markup {
               href=(self_path)
               role="tab"
               aria-selected=(if !show_all { "true" } else { "false" })
-              title="Only show submissions from verified scholars: authenticated ORCID OAuth or verified institutional email." {
+              title="Only show submissions from verified accounts: GitHub OAuth, ORCID OAuth, or verified email." {
                 span.mode-pill-dot.is-standard aria-hidden="true" {}
                 "Standard"
             }
@@ -111,19 +111,19 @@ pub fn mode_toggle(self_path: &str, show_all: bool) -> Markup {
     }
 }
 
-/// Cold-start banner — appears when the verified-scholar filter
+/// Cold-start banner — appears when the verified-account filter
 /// was applied (Standard mode) but came up empty. Auto-widens to
-/// everything until the first verified scholar shows up.
+/// everything until the first verified account shows up.
 pub fn verified_widen_banner() -> Markup {
     html! {
         div.advisory-banner role="note" {
             span {
                 span.advisory-title { "Bootstrap mode." }
-                " No verified-scholar submissions yet, so the default ranked listing is temporarily showing "
+                " No verified-account submissions yet, so the default ranked listing is temporarily showing "
                 em { "everything" }
-                ". The verified-only filter switches back on as soon as one verified scholar submits — "
-                a href="/me/edit" { "connect ORCID or use a verified institutional email" }
-                " to be that scholar."
+                ". The verified-only filter switches back on as soon as one verified account submits — "
+                a href="/me/edit" { "connect GitHub, connect ORCID, or verify email" }
+                " to enable your account."
             }
         }
     }

@@ -82,7 +82,7 @@ pub async fn create(
     if !user.is_verified_or_admin() {
         set_flash(
             &session,
-            "Connect GitHub or verify email before minting API tokens.",
+            "Connect GitHub, connect ORCID, or verify email before minting API tokens.",
         )
         .await;
         return Ok(Redirect::to("/me/tokens").into_response());

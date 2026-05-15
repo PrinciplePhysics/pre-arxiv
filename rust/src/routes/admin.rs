@@ -315,7 +315,11 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
     ): (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
         crate::db::pg(r#"SELECT
               COUNT(*),
-              COALESCE(SUM(CASE WHEN email_verified != 0 OR github_oauth_verified != 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE
+                  WHEN email_verified != 0
+                    OR github_oauth_verified != 0
+                    OR orcid_oauth_verified != 0
+                  THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN email_verified != 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN github_oauth_verified != 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN is_admin != 0 THEN 1 ELSE 0 END), 0),
@@ -488,6 +492,7 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
            ) t ON t.user_id = u.id
            WHERE u.email_verified = 0
              AND u.github_oauth_verified = 0
+             AND u.orcid_oauth_verified = 0
              AND (COALESCE(m.manuscript_count, 0)
                 + COALESCE(c.comment_count, 0)
                 + COALESCE(v.vote_count, 0)
@@ -625,7 +630,9 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
             )| RecentUserRow {
                 username,
                 display_name,
-                account_verified: email_verified != 0 || github_oauth_verified != 0,
+                account_verified: email_verified != 0
+                    || github_oauth_verified != 0
+                    || orcid_oauth_verified != 0,
                 email_verified: email_verified != 0,
                 github_oauth_verified: github_oauth_verified != 0,
                 is_admin: is_admin != 0,

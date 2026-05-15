@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
         .context("backfilling users.institutional_email")?;
     if inst_set > 0 {
         tracing::info!(
-            "verified-scholar backfill: tagged {inst_set} users with institutional_email=1"
+            "identity-signal backfill: tagged {inst_set} users with institutional_email=1"
         );
     }
 

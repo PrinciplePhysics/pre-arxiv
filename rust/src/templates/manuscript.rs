@@ -42,15 +42,15 @@ pub fn render(
     let logged_in = ctx.user.is_some();
     let slug = m.arxiv_like_id.as_deref().unwrap_or("");
     let public_slug = slug.strip_prefix("prexiv:").unwrap_or(slug);
-    let submitter_verified_scholar = submitter
-        .map(|(_, _, ev, ie, oo, _)| *oo != 0 || (*ev != 0 && *ie != 0))
+    let submitter_account_verified = submitter
+        .map(|(_, _, ev, _, oo, gh)| *ev != 0 || *oo != 0 || *gh != 0)
         .unwrap_or(false);
     let cat_restricted = crate::categories::is_restricted(&m.category);
     let submitter_email_verified = submitter
         .map(|(_, _, ev, _, _, _)| *ev != 0)
         .unwrap_or(false);
     let submitter_institutional_email = submitter
-        .map(|(_, _, _, ie, _, _)| *ie != 0)
+        .map(|(_, _, ev, ie, _, _)| *ev != 0 && *ie != 0)
         .unwrap_or(false);
     let submitter_orcid_authenticated = submitter
         .map(|(_, _, _, _, oo, _)| *oo != 0)
@@ -205,11 +205,11 @@ pub fn render(
                                 }
                             }
                         }
-                        @if !submitter_verified_scholar && !m.is_withdrawn() {
+                        @if !submitter_account_verified && !m.is_withdrawn() {
                             div.advisory-banner role="note" {
                                 span {
                                     span.advisory-title { "Unverified author." }
-                                    " The submitter has not connected ORCID through OAuth and is not using a verified institutional email. Default listings only surface verified-scholar work. This submission is reachable via search, "
+                                    " The submitter has not connected GitHub or ORCID and has not verified email. Default listings only surface account-verified work. This submission is reachable via search, "
                                     code { "/browse" }
                                     ", and direct link."
                                 }
@@ -406,13 +406,13 @@ pub fn render(
                     h3 { "Trust and subject" }
                     div.bx-subject-compact {
                         a.ms-cat-pill href={ "/browse/" (m.category) } { (m.category) }
-                        @if let Some((un, dn, ev, ie, oo, _gh)) = submitter {
+                        @if let Some((un, dn, ev, _ie, oo, gh)) = submitter {
                             span.muted.small {
                                 "by "
                                 a href={ "/u/" (un) } { (dn.as_deref().unwrap_or(un.as_str())) }
-                                @if *oo != 0 || (*ev != 0 && *ie != 0) {
+                                @if *ev != 0 || *oo != 0 || *gh != 0 {
                                     " "
-                                    span.profile-vbadge title="Verified scholar" { "✓ verified" }
+                                    span.profile-vbadge title="Account verified" { "✓ verified" }
                                 }
                             }
                         }
@@ -422,7 +422,7 @@ pub fn render(
                             (trust_badge("Email verified", "The submitter confirmed control of their account email address."))
                         }
                         @if submitter_github_verified {
-                            (trust_badge("GitHub verified", "The submitter connected a GitHub account through OAuth. This is an account-control signal, not a scholarly-identity signal."))
+                            (trust_badge("GitHub verified", "The submitter connected a GitHub account through OAuth. This is an account-control signal and grants the same posting/listing rights as ORCID or email verification."))
                         }
                         @if submitter_orcid_authenticated {
                             (trust_badge("ORCID authenticated", "The submitter connected ORCID through OAuth."))

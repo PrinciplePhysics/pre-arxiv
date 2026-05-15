@@ -156,7 +156,7 @@ pub fn render_register(ctx: &PageCtx, error: Option<&str>, form: &RegisterForm) 
                     }
                     li {
                         strong { "Verify the account." }
-                        " GitHub OAuth or email verification gates submissions, revisions, comments, votes, follows, flags, and API tokens."
+                        " GitHub OAuth, ORCID OAuth, or email verification gates submissions, revisions, comments, votes, follows, flags, and API tokens."
                     }
                     li {
                         strong { "Submit a hosted paper." }

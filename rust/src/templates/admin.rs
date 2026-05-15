@@ -84,9 +84,10 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                 (percent(s.account_verified_users, s.total_users)) " of "
                 (fmt_int(s.total_users)) " accounts · "
                 (fmt_int(s.github_oauth_users)) " GitHub · "
+                (fmt_int(s.orcid_oauth_users)) " ORCID · "
                 (fmt_int(s.email_verified_users)) " email"
             }))
-            (stat_card("Verified scholars", s.verified_scholar_users, html! {
+            (stat_card("Identity signals", s.verified_scholar_users, html! {
                 (fmt_int(s.orcid_oauth_users)) " ORCID · "
                 (fmt_int(s.institutional_verified_users)) " institutional"
             }))
@@ -377,7 +378,7 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                 div.admin-panel-head {
                     div {
                         h2 { "Unverified high-activity users" }
-                        p.muted { "Accounts without GitHub or email verification but with submissions, comments, votes, or active API tokens." }
+                        p.muted { "Accounts without GitHub, ORCID, or email verification but with submissions, comments, votes, or active API tokens." }
                     }
                 }
                 @if dashboard.unverified_high_activity_users.is_empty() {

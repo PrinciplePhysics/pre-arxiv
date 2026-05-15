@@ -46,11 +46,10 @@ fn restricted_filter(filters: &ListingFilters) -> String {
     }
 }
 
-/// SQL fragment that limits the listing to manuscripts submitted by a
-/// verified scholar. Only ORCID OAuth or verified institutional email
+/// SQL fragment that limits the listing to manuscripts submitted by an
+/// account-verified user. GitHub OAuth, ORCID OAuth, or verified email
 /// count. Empty string when the toggle is off. Used by /, /new, /top —
-/// but NOT by /audited, since the named-auditor signal already does
-/// this job.
+/// but NOT by /audited, since the named-auditor signal already does this job.
 fn verified_author_filter(filters: &ListingFilters) -> &'static str {
     if filters.show_all() {
         ""
@@ -58,7 +57,8 @@ fn verified_author_filter(filters: &ListingFilters) -> &'static str {
         " AND submitter_id IN (
             SELECT id FROM users
              WHERE orcid_oauth_verified = 1
-                OR (email_verified = 1 AND institutional_email = 1)
+                OR github_oauth_verified = 1
+                OR email_verified = 1
         )"
     }
 }

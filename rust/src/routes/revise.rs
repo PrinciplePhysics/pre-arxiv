@@ -103,7 +103,7 @@ pub async fn show(
     if !user.is_verified_or_admin() {
         set_flash(
             &session,
-            "Connect GitHub or verify email before revising a manuscript.",
+            "Connect GitHub, connect ORCID, or verify email before revising a manuscript.",
         )
         .await;
         return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
@@ -143,7 +143,7 @@ pub async fn submit(
     if !user.is_verified_or_admin() {
         set_flash(
             &session,
-            "Connect GitHub or verify email before revising a manuscript.",
+            "Connect GitHub, connect ORCID, or verify email before revising a manuscript.",
         )
         .await;
         return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());

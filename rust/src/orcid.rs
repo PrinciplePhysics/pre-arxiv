@@ -3,7 +3,7 @@
 //! PreXiv treats ORCID as account-ownership proof only when the user
 //! completes ORCID's authorization-code flow. Pasted ORCID iDs and
 //! public-record name matches are intentionally not accepted as a
-//! verified-scholar signal.
+//! verification signal.
 
 use anyhow::{anyhow, bail, Context, Result};
 use jsonwebtoken::jwk::JwkSet;

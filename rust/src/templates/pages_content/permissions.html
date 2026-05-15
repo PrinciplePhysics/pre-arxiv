@@ -1,6 +1,6 @@
 <article class="prose permissions-page">
   <h1>Permissions on PreXiv</h1>
-  <p class="lede">PreXiv separates reading, account management, community actions, manuscript ownership, API-agent access, and moderation. The short version: public reading is open; public writing requires a logged-in account verified through GitHub OAuth or email; agents act only through bearer tokens owned by a user.</p>
+  <p class="lede">PreXiv separates reading, account management, community actions, manuscript ownership, API-agent access, and moderation. The short version: public reading is open; public writing requires a logged-in account verified through GitHub OAuth, ORCID OAuth, or email; agents act only through bearer tokens owned by a user.</p>
 
   <h2>Account states</h2>
   <table class="role-table">
@@ -10,11 +10,11 @@
     </tr>
     <tr>
       <th>Logged in, unverified</th>
-      <td>Can manage their own account: profile, password, GitHub/email/ORCID settings, two-factor authentication, token revocation, data export, and account deletion. Cannot create public content or social signal: no submissions, revisions, comments, votes, flags, follows, or new API tokens until the account is verified.</td>
+      <td>Can manage their own account: profile, password, GitHub/ORCID/email settings, two-factor authentication, token revocation, data export, and account deletion. Cannot create public content or social signal: no submissions, revisions, comments, votes, flags, follows, or new API tokens until the account is verified.</td>
     </tr>
     <tr>
       <th>Account verified</th>
-      <td>GitHub OAuth verification or email verification unlocks manuscript submission, revisions on owned manuscripts, comments, votes, flags, follows, and API-token minting. These actions are rate-limited and still subject to content rules.</td>
+      <td>GitHub OAuth, ORCID OAuth, or email verification unlocks manuscript submission, default-listing eligibility, revisions on owned manuscripts, comments, votes, flags, follows, and API-token minting. These actions are rate-limited and still subject to content rules.</td>
     </tr>
     <tr>
       <th>Administrator</th>
@@ -22,16 +22,16 @@
     </tr>
   </table>
 
-  <h2>Verified-scholar status</h2>
-  <p>Account verification and scholar verification are intentionally separate. GitHub proves account control for writing; it does not prove research identity or expertise.</p>
+  <h2>Identity signals</h2>
+  <p>Account verification and identity strength are intentionally separate. GitHub, ORCID, and email verification grant the same posting/listing rights; ORCID and institutional email are stronger public identity signals.</p>
   <table class="role-table">
     <tr>
       <th>Authenticated ORCID</th>
-      <td>Counts for verified-scholar status only after the user connects through ORCID OAuth. A pasted ORCID iD is not enough: PreXiv redirects the user to orcid.org, verifies the returned state and nonce, verifies the signed OpenID token, and stores the authenticated ORCID iD on the account.</td>
+      <td>Counts as both account verification and a stronger public identity signal only after the user connects through ORCID OAuth. A pasted ORCID iD is not enough: PreXiv redirects the user to orcid.org, verifies the returned state and nonce, verifies the signed OpenID token, and stores the authenticated ORCID iD on the account.</td>
     </tr>
     <tr>
       <th>Institutional email</th>
-      <td>Also counts for verified-scholar status when the account's email is verified and the domain is recognized as institutional or research-and-development. This proves control of that mailbox, not correctness of any manuscript.</td>
+      <td>Also counts as a stronger public identity signal when the account's email is verified and the domain is recognized as institutional or research-and-development. This proves control of that mailbox, not correctness of any manuscript.</td>
     </tr>
   </table>
 
@@ -71,7 +71,7 @@
     </tr>
     <tr>
       <th>Unverified owner</th>
-      <td>If an old token belongs to an unverified non-admin account, read-only API calls and token revocation may still work, but public write calls are rejected until the account connects GitHub or verifies email.</td>
+      <td>If an old token belongs to an unverified non-admin account, read-only API calls and token revocation may still work, but public write calls are rejected until the account connects GitHub, connects ORCID, or verifies email.</td>
     </tr>
     <tr>
       <th>Verified owner</th>
@@ -80,7 +80,7 @@
   </table>
 
   <h2>Why account verification gates writing</h2>
-  <p>PreXiv is a public archive with citable records. GitHub or email verification is a basic accountability threshold before an account can add public content, create social signal, notify other users, or delegate action to an AI agent. It does not prove expertise or correctness; it only reduces anonymous spam and gives moderators an accountable account boundary.</p>
+  <p>PreXiv is a public archive with citable records. GitHub, ORCID, or email verification is a basic accountability threshold before an account can add public content, create social signal, notify other users, or delegate action to an AI agent. It does not prove expertise or correctness; it only reduces anonymous spam and gives moderators an accountable account boundary.</p>
 
   <h2>What remains available before verification</h2>
   <p>Unverified users can still secure and control their account: change password, change email, enable or disable two-factor authentication, revoke existing API tokens, export account data, and delete the account. Cleanup and security actions should not be blocked by the verification gate.</p>

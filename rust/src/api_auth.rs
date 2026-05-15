@@ -160,7 +160,7 @@ where
 }
 
 /// Same as ApiUser but the user must have account-control verification
-/// through email or GitHub OAuth, unless they are an admin.
+/// through GitHub OAuth, ORCID OAuth, or email, unless they are an admin.
 pub struct ApiVerifiedUser(pub User);
 
 impl<S> FromRequestParts<S> for ApiVerifiedUser
@@ -177,7 +177,7 @@ where
             Err((
                 StatusCode::FORBIDDEN,
                 Json(json!({
-                    "error": "account not verified — connect GitHub or verify email first"
+                    "error": "account not verified — connect GitHub, connect ORCID, or verify email first"
                 })),
             )
                 .into_response())

@@ -103,7 +103,7 @@ pub async fn do_submit(
     if !user.is_verified_or_admin() {
         return Ok(err_page(
             &session, maybe_user,
-            "Your account is not verified yet. Connect GitHub on /me/edit, or use email verification as a fallback. Submission is gated on account verification to deter spam.",
+            "Your account is not verified yet. Connect GitHub, connect ORCID, or verify email from /me/edit. Submission is gated on account verification to deter spam.",
         ).await);
     }
     if fields.title.trim().is_empty() || fields.r#abstract.trim().len() < 100 {

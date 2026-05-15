@@ -38,7 +38,8 @@ pub async fn index(
         " AND submitter_id IN (
             SELECT id FROM users
              WHERE orcid_oauth_verified = 1
-                OR (email_verified = 1 AND institutional_email = 1)
+                OR github_oauth_verified = 1
+                OR email_verified = 1
         )"
     } else {
         ""
@@ -66,7 +67,7 @@ pub async fn index(
     //
     // PostgreSQL's `EXTRACT(EPOCH FROM interval)` returns seconds; we
     // divide by 3600 to get hours. Withdrawn submissions are excluded;
-    // the verified-scholar / restricted-category filters above still apply.
+    // the verified-account / restricted-category filters above still apply.
     let rank_order = r#"ORDER BY
         (CAST(COALESCE(score, 0) AS REAL) + 1.0)
         /
@@ -83,7 +84,7 @@ pub async fn index(
         .fetch_all(&state.pool)
         .await?;
 
-    // Cold-start fallback: if the verified-scholar filter produced no
+    // Cold-start fallback: if the verified-account filter produced no
     // rows, transparently widen to the unfiltered query and render a
     // banner explaining what happened. Only kicks in when the filter
     // was actually applied AND when it dropped everything — never

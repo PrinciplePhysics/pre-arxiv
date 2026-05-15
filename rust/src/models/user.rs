@@ -69,22 +69,15 @@ impl User {
     pub fn is_github_oauth_verified(&self) -> bool {
         self.github_oauth_verified != 0
     }
-    /// Account-control verification for public writes and API token
-    /// minting. This is intentionally broader than `is_verified_scholar`:
-    /// a GitHub OAuth binding proves account control well enough to deter
-    /// throwaway abuse, but it is not a research-identity trust badge.
+    /// Account-control verification for public writes, default-listing
+    /// eligibility, and API token minting. GitHub and ORCID OAuth prove
+    /// control of an external account; email verification proves control
+    /// of a mailbox. These are not correctness guarantees.
     pub fn is_account_verified(&self) -> bool {
-        self.is_verified() || self.is_github_oauth_verified()
+        self.is_verified() || self.is_github_oauth_verified() || self.is_orcid_oauth_verified()
     }
     pub fn is_verified_or_admin(&self) -> bool {
         self.is_account_verified() || self.is_admin()
-    }
-    /// `true` if the user has an authenticated ORCID OAuth binding, or
-    /// has verified ownership of an institutional-looking email domain.
-    /// Legacy ORCID name matches are intentionally excluded.
-    pub fn is_verified_scholar(&self) -> bool {
-        self.orcid_oauth_verified != 0
-            || (self.email_verified != 0 && self.institutional_email != 0)
     }
     pub fn is_orcid_oauth_verified(&self) -> bool {
         self.orcid_oauth_verified != 0

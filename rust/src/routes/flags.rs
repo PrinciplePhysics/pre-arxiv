@@ -78,7 +78,7 @@ pub async fn flag_manuscript(
     if !user.is_verified_or_admin() {
         set_flash(
             &session,
-            "Connect GitHub or verify email before flagging content.",
+            "Connect GitHub, connect ORCID, or verify email before flagging content.",
         )
         .await;
         return Ok(Redirect::to(&back).into_response());
@@ -145,7 +145,7 @@ pub async fn flag_comment(
     if !user.is_verified_or_admin() {
         set_flash(
             &session,
-            "Connect GitHub or verify email before flagging content.",
+            "Connect GitHub, connect ORCID, or verify email before flagging content.",
         )
         .await;
         return Ok(Redirect::to(&back).into_response());

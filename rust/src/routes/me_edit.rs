@@ -536,7 +536,7 @@ pub async fn orcid_callback(
     set_orcid_flash(
         &session,
         format!(
-            "ORCID iD {} authenticated{who}. This now counts as verified-scholar status.",
+            "ORCID iD {} authenticated{who}. Your account can now submit, appear in default listings, comment, vote, and mint API tokens.",
             authenticated.orcid
         ),
         false,

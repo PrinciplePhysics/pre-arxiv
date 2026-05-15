@@ -53,7 +53,7 @@ pub fn render(
             div.profile-card-id {
                 div.profile-name-row {
                     h1.profile-name { (real_name) }
-                    @if u.is_orcid_oauth_verified() || u.is_verified_scholar() || u.is_github_oauth_verified() {
+                    @if u.is_orcid_oauth_verified() || (u.is_verified() && u.is_institutional_email()) || u.is_github_oauth_verified() {
                         span.profile-name-badges aria-label="Profile trust signals" {
                             @if u.is_orcid_oauth_verified() {
                                 @let orcid = u.orcid.as_deref().unwrap_or("");
@@ -97,7 +97,7 @@ pub fn render(
                                     }
                                 }
                             }
-                            @if u.is_verified_scholar() {
+                            @if u.is_verified() && u.is_institutional_email() {
                                 span.profile-name-badge.is-inst
                                   title="Verified ownership of an institutional / R&D-org email domain"
                                   aria-label="Verified institutional email" {

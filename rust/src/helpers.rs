@@ -27,7 +27,7 @@ pub async fn set_flash(session: &Session, msg: impl Into<String>) {
 // global flash above renders at the top of the page where it's easy
 // to miss when the user is focused on the ORCID section near the
 // middle of the form. We stash ORCID feedback under a separate session
-// key and render it inline INSIDE the verified-scholar status panel.
+// key and render it inline inside the verification status panel.
 //
 // The value is prefixed `ok:` or `err:` so the renderer can paint the
 // success / error states distinctly without a second session lookup.

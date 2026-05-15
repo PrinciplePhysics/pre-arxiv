@@ -59,7 +59,7 @@ pub fn render(
         }
         @if show_mode_toggle && !show_all {
             p.muted.small {
-                "Default archive listings emphasize verified-scholar submitters and standard subject categories. "
+                "Default archive listings emphasize account-verified submitters and standard subject categories. "
                 a href="/audited" { "Audited-only view" }
                 " is available for reader triage."
             }

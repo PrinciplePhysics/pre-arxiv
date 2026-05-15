@@ -5,7 +5,7 @@ use crate::routes::me_edit::EditValues;
 
 // `orcid_flash` carries inline feedback from a recent ORCID OAuth
 // attempt — `(message, is_error)`, or None when nothing's fresh.
-// Rendered INSIDE the verified-scholar status panel so users don't
+// Rendered inside the verification status panel so users don't
 // have to scroll back up to discover what happened.
 pub fn render(
     ctx: &PageCtx,
@@ -129,16 +129,16 @@ pub fn render(
 
             section.form-section {
                 h2 {
-                    "Verified-scholar status"
+                    "Verification and listing status"
                 }
                 p.muted.small.no-katex {
                     "PreXiv's default ranked listings (" code { "/" } " " code { "/new" } " "
                     code { "/top" } " " code { "/audited" }
                     ") only surface manuscripts from "
-                    strong { "verified scholars" }
-                    ". Scholar verification means either an authenticated ORCID OAuth binding or a verified email on an institutional domain (.edu, .ac.<cc>, .edu.<cc>, or our R&D-org allowlist). GitHub account verification unlocks writing, but does not by itself grant verified-scholar ranking. Other work remains reachable via "
+                    strong { "verified accounts" }
+                    ". Verification means GitHub OAuth, ORCID OAuth, or email verification. ORCID and institutional email remain stronger identity signals, but GitHub now has the same posting and default-listing rights. Other work remains reachable via "
                     code { "/browse" }
-                    " and search; it just doesn't get the front-page slot."
+                    " and search."
                 }
                 (verified_scholar_status_panel(user, orcid_flash))
             }
@@ -146,7 +146,7 @@ pub fn render(
             section.form-section {
                 h2 { "GitHub account verification" }
                 p.muted.small {
-                    "Connect through GitHub OAuth to unlock submissions, comments, votes, and API-token minting. PreXiv stores your GitHub numeric id and login, then discards the temporary OAuth token."
+                    "Connect through GitHub OAuth to unlock submissions, default listings, comments, votes, and API-token minting. PreXiv stores your GitHub numeric id and login, then discards the temporary OAuth token."
                 }
                 div.verified-scholar-panel {
                     @if let Some((msg, is_err)) = github_flash {
@@ -216,7 +216,7 @@ pub fn render(
 }
 
 /// Status panel — read-only summary of the ownership-grade
-/// verified-scholar signals. The ORCID action lives down in the ORCID
+/// identity-verification signals. The ORCID action lives down in the ORCID
 /// section and always goes through OAuth.
 fn verified_scholar_status_panel(
     user: Option<&crate::models::User>,
@@ -263,7 +263,7 @@ fn verified_scholar_status_panel(
                     }
                     span.muted.small.no-katex {
                         @if orcid_oauth {
-                            "Connected through ORCID OAuth. This proves account control and grants verified-scholar status."
+                            "Connected through ORCID OAuth. This unlocks public writes, default listings, and a stronger identity signal."
                         } @else {
                             "Not connected. Use "
                             strong { "Connect with ORCID" }
@@ -298,7 +298,7 @@ fn github_status_row(user: Option<&crate::models::User>) -> Markup {
                 }
                 span.muted.small.no-katex {
                     @if github_verified {
-                        "Connected through GitHub OAuth. This unlocks public write actions and API-token minting."
+                        "Connected through GitHub OAuth. This unlocks public writes, default listings, and API-token minting."
                     } @else {
                         "Not connected. This is the recommended account-verification path when email delivery is unavailable."
                     }

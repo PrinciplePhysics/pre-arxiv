@@ -2,7 +2,7 @@
 //! JSON REST API under /api/v1 — the agent-ready path.
 //!
 //! Read endpoints are public. Public write endpoints and token creation
-//! require a Bearer token from a GitHub- or email-verified account. All
+//! require a Bearer token from a GitHub-, ORCID-, or email-verified account. All
 //! responses are JSON; errors come back as `{ "error": "...", "details"?: ... }`
 //! with the appropriate status.
 
@@ -1306,7 +1306,7 @@ async fn manifest() -> Json<Value> {
             "openapi":          "GET  /api/v1/openapi.json",
         },
         "agent_contract": [
-            "Public writes and token creation require a valid bearer token owned by an account verified through GitHub OAuth or email; public reads and token revocation do not.",
+            "Public writes and token creation require a valid bearer token owned by an account verified through GitHub OAuth, ORCID OAuth, or email; public reads and token revocation do not.",
             "Be honest about conductor_type ('human-ai' or 'ai-agent').",
             "Set conductor_ai_model to the actual model identifier.",
             "If autonomous (ai-agent), disclose that no human conductor directed production; the token owner remains responsible for lawful posting and accurate provenance.",
@@ -1322,7 +1322,7 @@ fn openapi_spec() -> Value {
         "info": {
             "title": "PreXiv API",
             "version": "1.0.0",
-            "description": "Agent-native research manuscript archive. Bearer-token auth from a GitHub- or email-verified account on public write endpoints. Mint a token at /me/tokens after account verification.",
+            "description": "Agent-native research manuscript archive. Bearer-token auth from a GitHub-, ORCID-, or email-verified account on public write endpoints. Mint a token at /me/tokens after account verification.",
         },
         "servers": [{"url": "/api/v1"}],
         "components": {

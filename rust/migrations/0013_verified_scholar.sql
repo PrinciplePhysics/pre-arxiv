@@ -1,5 +1,5 @@
--- "Verified scholar" signal — two independent gates that grant the
--- badge:
+-- Legacy identity-signal fields. This migration originally introduced
+-- the older scholar-verification concept:
 --
 --   orcid_verified       — user pasted an ORCID iD and the public
 --                          record on pub.orcid.org carries a name
@@ -12,14 +12,14 @@
 --                          hand-curated R&D-org allowlist. Set
 --                          automatically at register / email change.
 --
--- Either one alone makes the user a "verified scholar". Both are
--- displayed independently on the profile page (an institutional-email
--- user without an ORCID still gets the badge, and vice-versa).
+-- The current product uses ORCID OAuth for authenticated ORCID status;
+-- pasted ORCID name matching is retained only for compatibility. A
+-- verified institutional email remains a stronger public identity
+-- signal.
 --
--- We don't drop or gate anything on these flags yet — they are used
--- in default listing filters (skip "general"-bucket categories +
--- gently de-emphasize unverified authors) and to render banners on
--- the manuscript page. Submission itself remains open.
+-- Default-listing and public-write gates now use account verification
+-- from GitHub OAuth, ORCID OAuth, or email verification. Do not use the
+-- legacy orcid_verified field for new trust decisions.
 
 ALTER TABLE users ADD COLUMN orcid_verified      INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN institutional_email INTEGER NOT NULL DEFAULT 0;

@@ -232,8 +232,8 @@ pub async fn do_register(
     // domain looks like a research-org address (.edu / .ac.<cc> / etc.,
     // see `email::is_institutional`). The user's email_verified flag
     // is *still* 0 until they click the verification link, so this
-    // alone doesn't grant them the verified-scholar badge — the badge
-    // gating logic AND-s the two.
+    // alone doesn't grant the institutional identity signal — that
+    // signal still requires the user to verify the mailbox.
     let inst_email: i64 = if crate::email::is_institutional(&email) {
         1
     } else {
@@ -290,12 +290,12 @@ pub async fn do_register(
     if verification_sent {
         set_flash(
             &session,
-            "Welcome. Connect GitHub from your profile to unlock submissions and API tokens. Email verification remains available as a fallback."
+            "Welcome. Connect GitHub or ORCID from your profile to unlock submissions and API tokens. Email verification remains available as a fallback."
         ).await;
     } else {
         set_flash(
             &session,
-            "Account created. Email delivery is unavailable, so connect GitHub from your profile to unlock submissions and API tokens."
+            "Account created. Email delivery is unavailable, so connect GitHub or ORCID from your profile to unlock submissions and API tokens."
         ).await;
     }
     // Redirect to /me/edit so the verify banner is the first thing the
