@@ -337,7 +337,7 @@ pub fn render(
                                             span.comment-actions {
                                                 @if viewer_can_delete {
                                                     form.inline action={"/c/" (c.id) "/delete"} method="post"
-                                                        onsubmit="return confirm('Delete this comment? Replies under it will also be removed.');" {
+                                                        data-confirm="Delete this comment? Replies under it will also be removed." {
                                                         input type="hidden" name="csrf_token" value=(ctx.csrf_token);
                                                         button.linklike.danger type="submit"
                                                             title="Delete this comment" { "delete" }
@@ -346,7 +346,7 @@ pub fn render(
                                                 @if viewer_can_flag {
                                                     @if viewer_can_delete { " · " }
                                                     form.inline action={"/c/" (c.id) "/flag"} method="post"
-                                                        onsubmit="return confirm('Flag this comment for moderator review?');" {
+                                                        data-confirm="Flag this comment for moderator review?" {
                                                         input type="hidden" name="csrf_token" value=(ctx.csrf_token);
                                                         button.linklike type="submit"
                                                             title="Flag this comment for moderator review" { "flag" }

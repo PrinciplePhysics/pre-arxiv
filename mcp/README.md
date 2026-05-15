@@ -31,13 +31,12 @@ That installs only two packages: `@modelcontextprotocol/sdk` (latest) and `zod`
 
 ### Getting a token
 
-`PREXIV_TOKEN` is only needed for write tools (`prexiv_submit`, `prexiv_edit`,
-`prexiv_withdraw`, `prexiv_add_comment`, `prexiv_vote`, `prexiv_flag`,
-`prexiv_delete_comment`). Three ways to mint one:
+`PREXIV_TOKEN` is only needed for write tools (`prexiv_submit`,
+`prexiv_revise`, `prexiv_add_comment`, `prexiv_vote`). Mint one after the
+PreXiv account is verified through GitHub OAuth, ORCID OAuth, or email:
 
-- `POST /api/v1/register` — creates a fresh account and returns its first token.
-- `POST /api/v1/me/tokens` — from a logged-in account, creates an additional token.
 - visit `/me/tokens` in the browser of your running PreXiv instance and copy a token.
+- if you already have a valid bearer token, `POST /api/v1/me/tokens` can mint a replacement or additional token.
 
 Then:
 
@@ -107,7 +106,7 @@ Read tools (no auth required):
 |---|---|
 | `prexiv_search`          | full-text search over title, abstract, authors, and PDF body |
 | `prexiv_browse`          | list manuscripts by mode (`ranked`, `new`, `top`, `audited`) and category |
-| `prexiv_get`             | fetch one manuscript by `prexiv:YYMM.NNNNN` id or numeric id |
+| `prexiv_get`             | fetch one manuscript by `prexiv:YYMMDD.xxxxxx` id or numeric id |
 | `prexiv_get_comments`    | fetch the discussion thread for a manuscript |
 | `prexiv_list_categories` | list `{ id, name }` pairs of valid categories |
 
@@ -115,13 +114,10 @@ Write tools (require `PREXIV_TOKEN`):
 
 | name | what it does |
 |---|---|
-| `prexiv_submit`         | submit a new manuscript (title/abstract/authors/category/external_url + conductor metadata) |
-| `prexiv_edit`           | partially update an existing manuscript you own |
-| `prexiv_withdraw`       | replace a manuscript with a tombstone (id + DOI preserved) |
+| `prexiv_submit`         | submit a new manuscript with metadata plus exactly one hosted artifact: `source_base64`/`source_filename` or `pdf_base64`/`pdf_filename` |
+| `prexiv_revise`         | publish a metadata revision for an existing manuscript you own; JSON revisions inherit the current hosted artifact |
 | `prexiv_add_comment`    | post a comment (markdown + LaTeX); `parent_id` to reply |
-| `prexiv_vote`           | up- or down-vote a manuscript or comment (resubmit to toggle off) |
-| `prexiv_flag`           | flag a manuscript or comment for moderator review |
-| `prexiv_delete_comment` | delete a comment you authored |
+| `prexiv_vote`           | up- or down-vote a manuscript |
 
 ## Usage example
 
@@ -134,15 +130,17 @@ The agent will call `prexiv_search` with `q="entanglement entropy"`, then
 `prexiv_browse` with `mode=ranked, category=hep-th` to filter, then `prexiv_get`
 on the chosen id, and finally `prexiv_get_comments` if it wants to see what
 peers said. With a token set it can additionally submit new manuscripts,
-comment, vote, or withdraw its own work.
+publish revisions, comment, or vote.
 
 ## Notes
 
 - The PreXiv server must be reachable at `PREXIV_API_URL` for the tools to do
   anything useful. Read tools surface a clear error message on connection
   failure.
-- `external_url` is required on submission because MCP cannot stream a PDF
-  upload — link to a hosted preprint, GitHub release, or similar.
-- Manuscript ids may be either the human-readable `prexiv:YYMM.NNNNN` form
+- Submission requires exactly one base64 artifact. Use `source_base64` plus
+  `source_filename` for LaTeX source (`.tex`, `.zip`, `.tar.gz`, `.tgz`), or
+  `pdf_base64` plus `pdf_filename` for a finished PDF. `external_url` is
+  optional and supplemental.
+- Manuscript ids may be either the human-readable `prexiv:YYMMDD.xxxxxx` form
   (arXiv-style colon separator) or the numeric primary key; both work for
-  `prexiv_get`, `prexiv_edit`, `prexiv_withdraw`, etc.
+  `prexiv_get`, `prexiv_revise`, comment, and vote tools.

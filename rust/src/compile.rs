@@ -6,9 +6,11 @@
 //! with the user-facing log excerpt on failure.
 //!
 //! Safety:
-//!   * pdflatex runs with `--no-shell-escape --interaction=nonstopmode`
+//!   * pdflatex/latexmk run with `--no-shell-escape`, restricted TeX file IO,
+//!     and `--interaction=nonstopmode`
 //!   * total wall-clock cap of 60 seconds per attempt (90 s for the
 //!     three-pass run that covers cross-refs / bibtex)
+//!   * source archives are capped by entry count and expanded byte size
 //!   * compile happens in a fresh per-submission temp dir, so concurrent
 //!     submissions can't see each other's files
 
@@ -26,6 +28,8 @@ use tokio::time::timeout;
 const PDFLATEX_TIMEOUT: Duration = Duration::from_secs(60);
 const TOTAL_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_LOG_BYTES: usize = 32 * 1024;
+const MAX_ARCHIVE_ENTRIES: usize = 512;
+const MAX_EXTRACTED_BYTES: u64 = 100 * 1024 * 1024;
 const BLACKOUT_TEX: &str = r"\rule{6em}{1.1ex}";
 
 #[derive(Debug)]
@@ -152,8 +156,16 @@ pub enum SourceKind {
 fn redact_zip(data: &[u8], redaction: &RedactionOptions) -> Result<Vec<u8>> {
     let reader = Cursor::new(data);
     let mut archive = zip::ZipArchive::new(reader).context("opening zip")?;
+    if archive.len() > MAX_ARCHIVE_ENTRIES {
+        return Err(anyhow!(
+            "archive has too many files ({} > {})",
+            archive.len(),
+            MAX_ARCHIVE_ENTRIES
+        ));
+    }
     let cursor = Cursor::new(Vec::new());
     let mut writer = zip::ZipWriter::new(cursor);
+    let mut total_uncompressed = 0u64;
 
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).context("reading zip entry")?;
@@ -179,6 +191,13 @@ fn redact_zip(data: &[u8], redaction: &RedactionOptions) -> Result<Vec<u8>> {
             continue;
         }
 
+        total_uncompressed = total_uncompressed.saturating_add(entry.size());
+        if total_uncompressed > MAX_EXTRACTED_BYTES {
+            return Err(anyhow!(
+                "archive expands above {} MB",
+                MAX_EXTRACTED_BYTES / 1024 / 1024
+            ));
+        }
         let mut buf = Vec::with_capacity(entry.size() as usize);
         entry.read_to_end(&mut buf).context("read zip entry")?;
         if should_redact_text_file(&rel) {
@@ -199,14 +218,31 @@ fn redact_targz(data: &[u8], redaction: &RedactionOptions) -> Result<Vec<u8>> {
     let mut archive = tar::Archive::new(gz);
     let encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
     let mut builder = tar::Builder::new(encoder);
+    let mut entries = 0usize;
+    let mut total_uncompressed = 0u64;
 
     for entry in archive.entries().context("opening tar")? {
         let mut entry = entry.context("reading tar entry")?;
+        entries += 1;
+        if entries > MAX_ARCHIVE_ENTRIES {
+            return Err(anyhow!(
+                "archive has too many files (>{})",
+                MAX_ARCHIVE_ENTRIES
+            ));
+        }
         let rel = entry.path().context("entry path")?.into_owned();
         if !is_safe_relative_path(&rel) || !entry.header().entry_type().is_file() {
             continue;
         }
 
+        let size = entry.header().size().unwrap_or(0);
+        total_uncompressed = total_uncompressed.saturating_add(size);
+        if total_uncompressed > MAX_EXTRACTED_BYTES {
+            return Err(anyhow!(
+                "archive expands above {} MB",
+                MAX_EXTRACTED_BYTES / 1024 / 1024
+            ));
+        }
         let mut buf = Vec::new();
         entry.read_to_end(&mut buf).context("read tar entry")?;
         if should_redact_text_file(&rel) {
@@ -575,6 +611,12 @@ async fn run_pdflatex(workdir: &Path, mainfile: &str) -> Result<String, CompileE
             .arg("-no-shell-escape")
             .arg("-halt-on-error")
             .arg(mainfile)
+            // Ask Web2C engines to keep file IO inside the working tree.
+            // This is a defense-in-depth layer on top of compiling inside
+            // an isolated temp directory and disabling shell escape.
+            .env("openin_any", "p")
+            .env("openout_any", "p")
+            .env("TEXMFOUTPUT", ".")
             .current_dir(workdir)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -596,6 +638,9 @@ async fn run_latexmk(workdir: &Path, mainfile: &str) -> Result<String, CompileEr
             .arg("-halt-on-error")
             .arg("-no-shell-escape")
             .arg(mainfile)
+            .env("openin_any", "p")
+            .env("openout_any", "p")
+            .env("TEXMFOUTPUT", ".")
             .current_dir(workdir)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -632,6 +677,14 @@ fn which(prog: &str) -> Option<PathBuf> {
 fn extract_zip(data: &[u8], dest: &Path) -> Result<()> {
     let reader = std::io::Cursor::new(data);
     let mut archive = zip::ZipArchive::new(reader).context("opening zip")?;
+    if archive.len() > MAX_ARCHIVE_ENTRIES {
+        return Err(anyhow!(
+            "archive has too many files ({} > {})",
+            archive.len(),
+            MAX_ARCHIVE_ENTRIES
+        ));
+    }
+    let mut total_uncompressed = 0u64;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).context("reading zip entry")?;
         let rel = match entry.enclosed_name() {
@@ -640,6 +693,13 @@ fn extract_zip(data: &[u8], dest: &Path) -> Result<()> {
         };
         if rel.as_os_str().is_empty() {
             continue;
+        }
+        total_uncompressed = total_uncompressed.saturating_add(entry.size());
+        if total_uncompressed > MAX_EXTRACTED_BYTES {
+            return Err(anyhow!(
+                "archive expands above {} MB",
+                MAX_EXTRACTED_BYTES / 1024 / 1024
+            ));
         }
         let target = dest.join(&rel);
         if entry.is_dir() {
@@ -660,12 +720,29 @@ fn extract_zip(data: &[u8], dest: &Path) -> Result<()> {
 fn extract_targz(data: &[u8], dest: &Path) -> Result<()> {
     let gz = flate2::read::GzDecoder::new(std::io::Cursor::new(data));
     let mut archive = tar::Archive::new(gz);
+    let mut entries = 0usize;
+    let mut total_uncompressed = 0u64;
     for entry in archive.entries().context("opening tar")? {
         let mut entry = entry.context("reading tar entry")?;
+        entries += 1;
+        if entries > MAX_ARCHIVE_ENTRIES {
+            return Err(anyhow!(
+                "archive has too many files (>{})",
+                MAX_ARCHIVE_ENTRIES
+            ));
+        }
         let rel = entry.path().context("entry path")?.into_owned();
         // Reject path traversal and links/special files.
         if !is_safe_relative_path(&rel) || !entry.header().entry_type().is_file() {
             continue;
+        }
+        let size = entry.header().size().unwrap_or(0);
+        total_uncompressed = total_uncompressed.saturating_add(size);
+        if total_uncompressed > MAX_EXTRACTED_BYTES {
+            return Err(anyhow!(
+                "archive expands above {} MB",
+                MAX_EXTRACTED_BYTES / 1024 / 1024
+            ));
         }
         let target = dest.join(&rel);
         if let Some(parent) = target.parent() {
@@ -826,5 +903,46 @@ Conducted with Claude Opus 4.7 and GPT-5.
             .read_to_end(&mut bin)
             .expect("read bin");
         assert_eq!(bin, b"Alice Doe");
+    }
+
+    #[test]
+    fn zip_extraction_rejects_too_many_entries() {
+        let mut zip_buf = Cursor::new(Vec::new());
+        {
+            let mut writer = zip::ZipWriter::new(&mut zip_buf);
+            let opts_zip = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            for i in 0..=MAX_ARCHIVE_ENTRIES {
+                writer
+                    .start_file(format!("f{i}.tex"), opts_zip)
+                    .expect("start file");
+                writer.write_all(b"").expect("write file");
+            }
+            writer.finish().expect("finish zip");
+        }
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let err = extract_zip(&zip_buf.into_inner(), dir.path()).expect_err("limit");
+        assert!(err.to_string().contains("too many files"));
+    }
+
+    #[test]
+    fn zip_redaction_rejects_too_many_entries() {
+        let mut zip_buf = Cursor::new(Vec::new());
+        {
+            let mut writer = zip::ZipWriter::new(&mut zip_buf);
+            let opts_zip = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            for i in 0..=MAX_ARCHIVE_ENTRIES {
+                writer
+                    .start_file(format!("f{i}.tex"), opts_zip)
+                    .expect("start file");
+                writer.write_all(b"").expect("write file");
+            }
+            writer.finish().expect("finish zip");
+        }
+
+        let err = prepare_source("bundle.zip", &zip_buf.into_inner(), &opts()).expect_err("limit");
+        assert!(format!("{err}").contains("too many files"));
     }
 }

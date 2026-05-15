@@ -269,12 +269,19 @@ html { scroll-behavior: smooth; }
 .audit-section:has(input[name="audit_status"][value="none"]:checked)  .audit-none-block  { display: block; }
 .audit-section:has(input[name="audit_status"][value="self"]:checked)  .audit-self-block  { display: block; }
 .audit-section:has(input[name="audit_status"][value="other"]:checked) .audit-other-block { display: block; }
+.audit-section.audit-choice-none .audit-none-block { display: block; }
+.audit-section.audit-choice-self .audit-self-block { display: block; }
+.audit-section.audit-choice-other .audit-other-block { display: block; }
 
 /* Self-audit only makes sense for human-AI; an autonomous agent cannot
    independently audit itself. Hide the option (and its block, if
    stale-selected) when conductor_type=ai-agent is active. */
 body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-radio,
 body:has(input[name="conductor_type"][value="ai-agent"]:checked) .audit-self-block {
+  display: none !important;
+}
+.submit-form.conductor-ai-agent .audit-self-radio,
+.submit-form.conductor-ai-agent .audit-self-block {
   display: none !important;
 }
 
@@ -2398,7 +2405,13 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   background: var(--brand-bg);
   box-shadow: 0 0 0 1px var(--brand) inset, var(--shadow-sm);
 }
-.ctype-card:has(input:checked) strong { color: var(--brand); }
+.ctype-card.is-checked {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+  box-shadow: 0 0 0 1px var(--brand) inset, var(--shadow-sm);
+}
+.ctype-card:has(input:checked) strong,
+.ctype-card.is-checked strong { color: var(--brand); }
 .ctype-card input[type="radio"] {
   margin: 4px 0 0;
   accent-color: var(--brand);
@@ -2409,6 +2422,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+.submit-form:has(input[name="conductor_type"][value="human-ai"]:checked) .ctype-ai-agent,
+.submit-form:has(input[name="conductor_type"][value="ai-agent"]:checked) .ctype-human-ai,
+.submit-form.conductor-human-ai .ctype-ai-agent,
+.submit-form.conductor-ai-agent .ctype-human-ai {
+  display: none;
 }
 .ctype-card strong { font-weight: 600; }
 
@@ -2976,6 +2995,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .source-block { display: none; margin-top: 10px; }
 .source-choice-section:has(input[name="source_type"][value="tex"]:checked) .source-tex-block { display: block; }
 .source-choice-section:has(input[name="source_type"][value="pdf"]:checked) .source-pdf-block { display: block; }
+.source-choice-section.source-choice-tex .source-tex-block { display: block; }
+.source-choice-section.source-choice-pdf .source-pdf-block { display: block; }
 @supports not selector(:has(*)) {
   .source-choice-section.source-choice-tex .source-tex-block { display: block; }
   .source-choice-section.source-choice-pdf .source-pdf-block { display: block; }

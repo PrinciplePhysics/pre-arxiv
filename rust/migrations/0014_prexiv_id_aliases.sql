@@ -1,10 +1,11 @@
 -- Aliases for retired PreXiv ids.
 --
 -- We renumbered every existing manuscript when the id scheme switched
--- from `prexiv:YYMM.NNNNN` (random) to `prexiv:YYMMDD.SSSSSS` (Crockford
--- base-32 monotonic; lex-sort = chronological-sort). External links and
--- citations under the old scheme still need to resolve, so we record
--- the mapping here and 301-redirect old slugs at the request layer.
+-- from the retired random scheme to the current `prexiv:YYMMDD.xxxxxx`
+-- form (Crockford base-32 monotonic; lex-sort = chronological-sort).
+-- External links and citations under the old scheme still need to resolve,
+-- so we record the mapping here and 301-redirect old slugs at the request
+-- layer.
 --
 -- `old_slug` and `new_slug` are both stored as the full id including
 -- the `prexiv:` prefix, exactly the way they appear in URLs. `new_slug`

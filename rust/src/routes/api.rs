@@ -342,6 +342,9 @@ pub struct ManuscriptIn {
     pub auditor_role: Option<String>,
     pub auditor_statement: Option<String>,
     pub auditor_orcid: Option<String>,
+
+    pub license: Option<String>,
+    pub ai_training: Option<String>,
 }
 
 async fn post_manuscript(
@@ -416,6 +419,36 @@ async fn post_manuscript(
             })),
         ));
     }
+    let license = v
+        .license
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("CC-BY-4.0");
+    if crate::licenses::lookup(license).is_none() {
+        return Ok((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "error": "validation failed",
+                "details": ["unknown reader license"]
+            })),
+        ));
+    }
+    let ai_training = v
+        .ai_training
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("allow");
+    if crate::licenses::ai_training_lookup(ai_training).is_none() {
+        return Ok((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "error": "validation failed",
+                "details": ["unknown AI-training policy"]
+            })),
+        ));
+    }
 
     // Allocate id + INSERT with retry on UNIQUE collision (see submit.rs
     // for rationale).
@@ -457,6 +490,7 @@ async fn post_manuscript(
                 agent_framework,
                 has_auditor, auditor_name, auditor_affiliation, auditor_role,
                 auditor_statement, auditor_orcid,
+                license, ai_training,
                 score
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, ?,
@@ -465,6 +499,7 @@ async fn post_manuscript(
                 ?, ?, ?, ?,
                 ?,
                 ?, ?, ?, ?,
+                ?, ?,
                 ?, ?,
                 1
             )
@@ -531,6 +566,8 @@ async fn post_manuscript(
         } else {
             None
         })
+        .bind(license)
+        .bind(ai_training)
         .fetch_one(&mut *tx)
         .await;
         match r {

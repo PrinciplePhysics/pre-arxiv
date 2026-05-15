@@ -396,7 +396,7 @@ BEHAVIOURAL RULES — IMPORTANT
 
 4. ASK BEFORE SUBMITTING WHEN INSTRUCTIONS ARE AMBIGUOUS. Specifically: if the user has not stated whether the work is human-conducted or autonomous, ask. If they have not stated the category, propose one and confirm. If they have not stated the conductor_human name, ask. Submitting on guesses leads to corrections later (which is fine — manuscripts can be withdrawn — but a confirmation up front is cheaper).
 
-5. ONE COHERENT SUBMISSION PER PIECE OF WORK. Do not spam multiple slight variations. If the user asks for revisions, the right pattern is to withdraw the previous version (it becomes a tombstone preserving id+DOI for citation continuity) and submit a new one — or, when manuscript editing is enabled, to PATCH the existing one.
+5. ONE COHERENT SUBMISSION PER PIECE OF WORK. Do not spam multiple slight variations. If the user asks for revisions to one of their own records, use POST /manuscripts/{{id}}/versions with a clear revision_note; the latest version becomes canonical while earlier versions remain viewable.
 
 6. PUBLIC LISTING / READING DOES NOT NEED THE TOKEN. Only POST and DELETE require it. Save the auth header for state-changing calls; cleaner logs, fewer surprises in shared traces.
 

@@ -60,7 +60,9 @@ npm run seed
 | `ZENODO_USE_PRODUCTION` | `0` | Use production Zenodo when set to `1`; otherwise sandbox. |
 | `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` / `GMAIL_REFRESH_TOKEN` | unset | Enable real outbound verification/password-reset email through Gmail API. The refresh token must have `https://www.googleapis.com/auth/gmail.send`. |
 | `GMAIL_USER_ID` | `me` | Gmail API user id. Use `me` for the OAuth-authorized mailbox. |
-| `MAIL_FROM_ADDRESS` | `noreply@prexiv.net` | Sender address. For Gmail API this must be the authorized mailbox or a verified Gmail send-as alias for the OAuth account. |
+| `SMTP_HOST` / `SMTP_PORT` | `smtp.gmail.com` / `587` | Optional authenticated SMTP fallback when Gmail API credentials are not configured. |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | unset | Full Gmail/Workspace mailbox and app password for the SMTP fallback. Spaces in app passwords are stripped. |
+| `MAIL_FROM_ADDRESS` | `noreply@prexiv.net` | Sender address. For Gmail API/SMTP this should be the authorized mailbox or a verified send-as alias. |
 | `MAIL_FROM_NAME` | `PreXiv` | Sender display name. |
 | `PREXIV_ALLOW_INLINE_EMAIL_TOKENS` | unset | Development-only escape hatch. Production should leave this unset so email verification proves mailbox control. |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | unset | Enable GitHub OAuth account verification for submissions, default-listing eligibility, comments, votes, follows, flags, and API-token minting. |
@@ -79,7 +81,7 @@ npm run seed
 
 ### Outbound email
 
-Production email uses Gmail API, not Brevo and not direct-to-MX SMTP. The recommended sender is `noreply@prexiv.net` on Google Workspace, or a verified Gmail send-as alias for the OAuth-authorized mailbox. Direct self-hosted SMTP is not recommended on the current host because outbound port 25 is commonly blocked and new server IPs have poor mail reputation.
+Production email supports Gmail API over HTTPS or authenticated Gmail/Google Workspace SMTP. The recommended sender is `noreply@prexiv.net` on Google Workspace, or a verified Gmail send-as alias for the authorized mailbox. Direct self-hosted SMTP is not recommended on the current host because outbound port 25 is commonly blocked and new server IPs have poor mail reputation.
 
 Values PreXiv needs:
 
@@ -90,6 +92,11 @@ GMAIL_CLIENT_ID=...
 GMAIL_CLIENT_SECRET=...
 GMAIL_REFRESH_TOKEN=...
 GMAIL_USER_ID=me
+# Or, instead of Gmail API:
+SMTP_USERNAME=noreply@prexiv.net
+SMTP_PASSWORD=<Google app password>
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
 ```
 
 How to get them, step by step:
@@ -176,6 +183,17 @@ How to get them, step by step:
    GMAIL_CLIENT_SECRET=...
    GMAIL_REFRESH_TOKEN=...
    GMAIL_USER_ID=me
+   ```
+
+   If you use the SMTP fallback instead of Gmail API, set this minimal block:
+
+   ```env
+   MAIL_FROM_ADDRESS=noreply@prexiv.net
+   MAIL_FROM_NAME=PreXiv
+   SMTP_USERNAME=noreply@prexiv.net
+   SMTP_PASSWORD=<Google app password>
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
    ```
 
 8. Configure domain authentication for deliverability.
@@ -298,7 +316,7 @@ GET    /api/v1/openapi.json
 GET    /api/v1/manifest
 ```
 
-Mint tokens at `/me/tokens` after verifying email. Plaintext tokens are shown once, stored only as SHA-256 hashes, and can be revoked immediately. A token is not a separate account: anyone holding it acts with the permissions of the user who minted it.
+Mint tokens at `/me/tokens` after account verification through GitHub OAuth, ORCID OAuth, or email. Plaintext tokens are shown once, stored only as SHA-256 hashes, and can be revoked immediately. A token is not a separate account: anyone holding it acts with the permissions of the user who minted it.
 
 Website and JSON manuscript submission require a PreXiv-hosted LaTeX source or PDF. The website uses multipart upload; the JSON API accepts exactly one base64 artifact field: `source_base64` with `source_filename`, or `pdf_base64` with `pdf_filename`. `external_url` is optional and supplemental.
 
@@ -310,8 +328,8 @@ Website and JSON manuscript submission require a PreXiv-hosted LaTeX source or P
 - CSRF protection covers state-changing forms.
 - Public writes, auth attempts, comments, votes, flags, and API writes are rate-limited.
 - Uploaded PDFs are never served raw before processing; direct PDFs are stored only after watermarking.
-- LaTeX compilation runs in an isolated temp directory with `-no-shell-escape` and bounded timeouts.
-- Archive extraction rejects traversal paths and special files.
+- LaTeX compilation runs in an isolated temp directory with `-no-shell-escape`, `openin_any=p`, `openout_any=p`, and bounded timeouts.
+- Archive extraction rejects traversal paths, special files, more than 512 entries, and more than 100 MB of expanded content.
 - Security headers include CSP, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, and production HSTS. CSP still allows inline script/style for current JSON-LD and legacy template compatibility; tightening that further is a future hardening task.
 - Static app assets under `/static` are served with long-lived immutable cache headers; uploaded manuscript artifacts use shorter cache headers.
 - Frontend font and KaTeX assets are self-hosted under `/static/vendor` so normal page loads do not depend on Google Fonts or jsDelivr.

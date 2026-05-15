@@ -83,10 +83,10 @@ const ROLES = [
 /**
  * Thin wrapper around `fetch` that targets the PreXiv REST API.
  *
- * @param {string} method  HTTP verb (GET, POST, PATCH, DELETE).
+ * @param {string} method  HTTP verb (GET, POST, DELETE).
  * @param {string} path    Path under the configured base URL, e.g. `/manuscripts`.
  *                         Leading slash is required; query string allowed.
- * @param {object} [body]  JSON-serializable request body (POST/PATCH only).
+ * @param {object} [body]  JSON-serializable request body (POST only).
  * @param {object} [opts]  { requireAuth?: boolean }.  When true and no token is
  *                         set, throws a friendly error before contacting the API.
  * @returns {Promise<any>} Parsed JSON response (or `null` on 204 No Content).
@@ -99,10 +99,7 @@ async function apiCall(method, path, body, opts = {}) {
   if (opts.requireAuth && !TOKEN) {
     throw new Error(
       'PREXIV_TOKEN is not set. This tool writes to PreXiv and requires a bearer token.\n' +
-      'Get one by either:\n' +
-      '  - POST /api/v1/register (creates an account and returns a token), or\n' +
-      '  - POST /api/v1/me/tokens from a logged-in account, or\n' +
-      '  - visit /me/tokens in the browser of your running PreXiv instance.\n' +
+      'Get one from /me/tokens after verifying the account through GitHub OAuth, ORCID OAuth, or email.\n' +
       'Then export PREXIV_TOKEN=prexiv_xxx... before launching the MCP server.',
     );
   }
@@ -167,43 +164,74 @@ async function apiCall(method, path, body, opts = {}) {
 // Handlers take the validated arguments object and return a JSON-serializable
 // result that we wrap in MCP `content` blocks below.
 
-/** Build the JSON-Schema fragment shared by `prexiv_submit` and `prexiv_edit`.
- *  When `requiredFields` is empty, every field is optional (used for PATCH).
- */
+/** Build the JSON-Schema fragment for `prexiv_submit`. */
 function manuscriptFieldsSchema({ allRequired }) {
   const props = {
     title: { type: 'string', minLength: 5, maxLength: 300, description: 'Manuscript title (5–300 chars).' },
-    abstract: { type: 'string', minLength: 50, maxLength: 5000, description: 'Abstract (50–5000 chars). Markdown + LaTeX `$..$` / `$$..$$` allowed.' },
+    abstract: { type: 'string', minLength: 100, maxLength: 5000, description: 'Abstract (100–5000 chars). Markdown + LaTeX `$..$` / `$$..$$` allowed.' },
     authors: { type: 'string', description: 'Authors or responsible credit line as a single semicolon-separated string, e.g. `Jane Doe; Example Lab`. Disclose AI tools in conductor_ai_models, not as legal authors.' },
     category: { type: 'string', description: 'Category id from /categories, e.g. `cs.LG`, `hep-th`, `math.NT`.' },
-    external_url: { type: 'string', format: 'uri', description: 'External URL where the manuscript PDF/preprint lives. Required because MCP cannot upload files.' },
+    external_url: { type: 'string', format: 'uri', description: 'Optional supplemental external URL. The primary artifact must still be uploaded with source_base64 or pdf_base64.' },
+    source_base64: { type: 'string', description: 'Base64-encoded .tex, .zip, .tar.gz, or .tgz source. Mutually exclusive with pdf_base64. Required for redaction of private conductor/model fields.' },
+    source_filename: { type: 'string', description: 'Filename for source_base64, e.g. `main.tex` or `paper.zip`.' },
+    pdf_base64: { type: 'string', description: 'Base64-encoded finished PDF. Mutually exclusive with source_base64. Cannot be used when private conductor/model fields require redaction.' },
+    pdf_filename: { type: 'string', description: 'Filename for pdf_base64, e.g. `paper.pdf`.' },
     conductor_type: { type: 'string', enum: ['human-ai', 'ai-agent'], description: '`human-ai` = a named human directed an AI; `ai-agent` = autonomous AI agent.' },
     conductor_ai_model: { type: 'string', description: 'Legacy single-model shape. Comma-separated string acceptable: `Claude Opus 4.7, GPT-5.5 Pro`. Prefer `conductor_ai_models` (array) for new submissions.' },
     conductor_ai_models: { type: 'array', items: { type: 'string' }, description: 'Preferred shape for multi-model AI provenance. Each entry is one precise model+version string, e.g. `["Claude Opus 4.7", "GPT-5.5 Pro", "Gemini 3 Pro"]`. List every model that actually contributed.' },
-    conductor_ai_model_private: { type: 'boolean', description: 'If true, ALL AI model names are hidden from the public manuscript page (the flag is per-manuscript, not per-model).' },
+    conductor_ai_model_public: { type: 'boolean', description: 'Default true. False hides all AI model names from the public manuscript page and requires source_base64 so PreXiv can produce redacted public source/PDF.' },
     conductor_human: { type: 'string', description: 'Required when conductor_type=human-ai. Display name of the human conductor.' },
-    conductor_human_private: { type: 'boolean', description: 'If true, the human conductor name is hidden from the public manuscript page.' },
-    conductor_role: { type: 'string', enum: ROLES, description: 'Required when conductor_type=human-ai. The conductor\'s role.' },
+    conductor_human_public: { type: 'boolean', description: 'Default true. False hides the human conductor name and requires source_base64 so PreXiv can produce redacted public source/PDF.' },
+    conductor_role: { type: 'string', enum: ROLES, description: 'Optional role for human-ai submissions.' },
     conductor_notes: { type: 'string', description: 'Optional free-form notes about the conductor or the production process.' },
     agent_framework: { type: 'string', description: 'Optional. For conductor_type=ai-agent, the framework or harness used (e.g. `Anthropic Agent SDK`).' },
-    ai_agent_ack: { type: 'boolean', description: 'Required true when conductor_type=ai-agent — explicit acknowledgement that no human conductor directed production and the submitter remains responsible for lawful posting and accurate disclosure.' },
     has_auditor: { type: 'boolean', description: 'Whether a named human auditor has signed a scoped correctness statement.' },
     auditor_name: { type: 'string', description: 'Required when has_auditor=true. The auditor\'s display name.' },
+    auditor_affiliation: { type: 'string', description: 'Optional auditor affiliation.' },
     auditor_role: { type: 'string', enum: ROLES, description: 'Required when has_auditor=true. The auditor\'s role.' },
     auditor_statement: { type: 'string', minLength: 20, description: 'Required when has_auditor=true. Signed, scoped correctness statement (≥20 chars).' },
-    no_auditor_ack: { type: 'boolean', description: 'Required true when has_auditor=false and conductor_type=human-ai — acknowledgement that the work is unaudited.' },
+    auditor_orcid: { type: 'string', description: 'Optional auditor ORCID iD.' },
+    license: { type: 'string', description: 'Reader license id, e.g. `CC-BY-4.0`. Defaults to CC-BY-4.0.' },
+    ai_training: { type: 'string', description: 'AI-training policy: `allow`, `allow-with-attribution`, or `disallow`. Defaults to allow.' },
   };
   // `conductor_ai_model` and `conductor_ai_models` are alternatives.
   // The server-side validator accepts either, so we mark neither as
   // strictly required in JSON Schema; downstream `required` collapses
   // them via a custom check rather than a schema-level requirement.
   const required = allRequired
-    ? ['title', 'abstract', 'authors', 'category', 'external_url', 'conductor_type']
+    ? ['title', 'abstract', 'authors', 'category', 'conductor_type']
     : [];
   return {
     type: 'object',
     properties: props,
     required,
+    ...(allRequired
+      ? {
+          oneOf: [
+            { required: ['source_base64', 'source_filename'] },
+            { required: ['pdf_base64', 'pdf_filename'] },
+          ],
+        }
+      : {}),
+    additionalProperties: false,
+  };
+}
+
+function revisionFieldsSchema() {
+  return {
+    type: 'object',
+    properties: {
+      title: { type: 'string', minLength: 5, maxLength: 300, description: 'Replacement title.' },
+      abstract: { type: 'string', minLength: 100, maxLength: 5000, description: 'Replacement abstract.' },
+      authors: { type: 'string', description: 'Replacement author/responsible-credit line.' },
+      category: { type: 'string', description: 'Replacement category id.' },
+      external_url: { type: 'string', format: 'uri', description: 'Optional supplemental external URL.' },
+      conductor_notes: { type: 'string', description: 'Optional replacement provenance notes.' },
+      license: { type: 'string', description: 'Optional reader license id.' },
+      ai_training: { type: 'string', description: 'Optional AI-training policy.' },
+      revision_note: { type: 'string', minLength: 1, description: 'Short public note describing what changed.' },
+    },
+    required: ['title', 'abstract', 'authors', 'category', 'revision_note'],
     additionalProperties: false,
   };
 }
@@ -213,7 +241,7 @@ const TOOLS = [
   {
     name: 'prexiv_search',
     description:
-      'Full-text search across PreXiv manuscripts (title, abstract, authors, and extracted PDF body). Exact `prexiv:YYMM.NNNNN` ids and DOIs match first. Returns a list of manuscript summaries.',
+      'Full-text search across PreXiv manuscripts (title, abstract, authors, and extracted PDF body). Exact `prexiv:YYMMDD.xxxxxx` ids and DOIs match first. Returns a list of manuscript summaries.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -256,11 +284,11 @@ const TOOLS = [
   {
     name: 'prexiv_get',
     description:
-      'Fetch a single manuscript by id. The id may be either the human-readable form `prexiv:YYMM.NNNNN` or the numeric primary key. Returns the full record including conductor / auditor metadata, score, comment count, and external URL.',
+      'Fetch a single manuscript by id. The id may be either the human-readable form `prexiv:YYMMDD.xxxxxx` or the numeric primary key. Returns the full record including conductor / auditor metadata, score, comment count, and external URL.',
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript.' },
+        id: { type: 'string', description: '`prexiv:YYMMDD.xxxxxx` id or numeric id of the manuscript.' },
       },
       required: ['id'],
       additionalProperties: false,
@@ -274,7 +302,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript.' },
+        id: { type: 'string', description: '`prexiv:YYMMDD.xxxxxx` id or numeric id of the manuscript.' },
       },
       required: ['id'],
       additionalProperties: false,
@@ -284,7 +312,7 @@ const TOOLS = [
   {
     name: 'prexiv_list_categories',
     description:
-      'List all valid manuscript categories. Each entry is `{ id, name }` (e.g. `{ "id": "cs.LG", "name": "Machine Learning" }`). The `id` is what `prexiv_submit`/`prexiv_edit` and `prexiv_browse` expect.',
+      'List all valid manuscript categories. Each entry is `{ id, name }` (e.g. `{ "id": "cs.LG", "name": "Machine Learning" }`). The `id` is what `prexiv_submit`, `prexiv_revise`, and `prexiv_browse` expect.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     handler: async () => apiCall('GET', '/categories'),
   },
@@ -293,49 +321,27 @@ const TOOLS = [
   {
     name: 'prexiv_submit',
     description:
-      'Submit a new manuscript to PreXiv. Requires `PREXIV_TOKEN`. Title, abstract, authors, category, an external URL, and conductor metadata are all required. `external_url` is mandatory because MCP cannot stream a PDF upload — link to a hosted preprint instead. See the field descriptions for human-ai vs ai-agent and auditor vs no-auditor rules.',
+      'Submit a new manuscript to PreXiv. Requires `PREXIV_TOKEN` from a GitHub-, ORCID-, or email-verified account. Include title, abstract, authors, category, conductor metadata, and exactly one hosted artifact (`source_base64` with `source_filename`, or `pdf_base64` with `pdf_filename`). `external_url` is optional and supplemental.',
     requireAuth: true,
     inputSchema: manuscriptFieldsSchema({ allRequired: true }),
     handler: async (args) => apiCall('POST', '/manuscripts', args, { requireAuth: true }),
   },
   {
-    name: 'prexiv_edit',
+    name: 'prexiv_revise',
     description:
-      'Update an existing manuscript. Requires `PREXIV_TOKEN` and you must own the manuscript (or be an admin). All fields are optional — supply only what you want to change.',
+      'Publish a metadata revision for an existing manuscript. Requires `PREXIV_TOKEN` and you must own the manuscript (or be an admin). The current Rust API inherits the existing hosted PDF/source artifact for JSON revisions.',
     requireAuth: true,
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript to update.' },
-        ...manuscriptFieldsSchema({ allRequired: false }).properties,
+        id: { type: 'string', description: '`prexiv:YYMMDD.xxxxxx` id or numeric id of the manuscript to revise.' },
+        ...revisionFieldsSchema().properties,
       },
-      required: ['id'],
+      required: ['id', 'title', 'abstract', 'authors', 'category', 'revision_note'],
       additionalProperties: false,
     },
-    handler: async ({ id, ...patch }) =>
-      apiCall('PATCH', `/manuscripts/${encodeURIComponent(id)}`, patch, { requireAuth: true }),
-  },
-  {
-    name: 'prexiv_withdraw',
-    description:
-      'Withdraw one of your manuscripts. Requires `PREXIV_TOKEN`. The manuscript is replaced with a tombstone but its id and DOI are preserved for citation continuity.',
-    requireAuth: true,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript.' },
-        reason: { type: 'string', description: 'Optional public-facing reason shown on the tombstone.' },
-      },
-      required: ['id'],
-      additionalProperties: false,
-    },
-    handler: async ({ id, reason }) =>
-      apiCall(
-        'POST',
-        `/manuscripts/${encodeURIComponent(id)}/withdraw`,
-        reason !== undefined ? { reason } : {},
-        { requireAuth: true },
-      ),
+    handler: async ({ id, ...body }) =>
+      apiCall('POST', `/manuscripts/${encodeURIComponent(id)}/versions`, body, { requireAuth: true }),
   },
   {
     name: 'prexiv_add_comment',
@@ -345,7 +351,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        manuscript_id: { type: 'string', description: '`prexiv:YYMM.NNNNN` id or numeric id of the manuscript being commented on.' },
+        manuscript_id: { type: 'string', description: '`prexiv:YYMMDD.xxxxxx` id or numeric id of the manuscript being commented on.' },
         content: { type: 'string', minLength: 1, description: 'Comment body. Markdown + LaTeX allowed.' },
         parent_id: { type: 'integer', description: 'Optional id of an existing comment to reply to.' },
       },
@@ -366,70 +372,24 @@ const TOOLS = [
   {
     name: 'prexiv_vote',
     description:
-      'Cast an up- or down-vote on a manuscript or comment. Requires `PREXIV_TOKEN`. Re-submitting the same value toggles the vote off. Returns `{ score, my_vote }` after the change.',
+      'Cast an up- or down-vote on a manuscript. Requires `PREXIV_TOKEN`. Returns `{ ok, score }` after the change.',
     requireAuth: true,
     inputSchema: {
       type: 'object',
       properties: {
-        target_type: { type: 'string', enum: ['manuscript', 'comment'], description: 'What you are voting on.' },
-        target_id: {
-          oneOf: [{ type: 'integer' }, { type: 'string' }],
-          description: 'For comments: the numeric comment id. For manuscripts: numeric id or `prexiv:YYMM.NNNNN`.',
-        },
+        manuscript_id: { type: 'string', description: 'Numeric id or `prexiv:YYMMDD.xxxxxx` manuscript id.' },
         value: { type: 'integer', enum: [1, -1], description: '1 to upvote, -1 to downvote.' },
       },
-      required: ['target_type', 'target_id', 'value'],
+      required: ['manuscript_id', 'value'],
       additionalProperties: false,
     },
-    handler: async ({ target_type, target_id, value }) =>
+    handler: async ({ manuscript_id, value }) =>
       apiCall(
         'POST',
-        `/votes/${encodeURIComponent(target_type)}/${encodeURIComponent(String(target_id))}`,
+        `/manuscripts/${encodeURIComponent(String(manuscript_id))}/vote`,
         { value },
         { requireAuth: true },
       ),
-  },
-  {
-    name: 'prexiv_flag',
-    description:
-      'Flag a manuscript or comment for moderator review. Requires `PREXIV_TOKEN`. Use sparingly — flags are queued for the admin team.',
-    requireAuth: true,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        target_type: { type: 'string', enum: ['manuscript', 'comment'], description: 'What you are flagging.' },
-        target_id: {
-          oneOf: [{ type: 'integer' }, { type: 'string' }],
-          description: 'For comments: numeric id. For manuscripts: numeric id or `prexiv:YYMM.NNNNN`.',
-        },
-        reason: { type: 'string', minLength: 1, description: 'Why the content needs moderator attention.' },
-      },
-      required: ['target_type', 'target_id', 'reason'],
-      additionalProperties: false,
-    },
-    handler: async ({ target_type, target_id, reason }) =>
-      apiCall(
-        'POST',
-        `/flags/${encodeURIComponent(target_type)}/${encodeURIComponent(String(target_id))}`,
-        { reason },
-        { requireAuth: true },
-      ),
-  },
-  {
-    name: 'prexiv_delete_comment',
-    description:
-      'Delete a comment you authored. Requires `PREXIV_TOKEN`. Returns `null` on success.',
-    requireAuth: true,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        comment_id: { type: 'integer', description: 'Numeric id of the comment to delete.' },
-      },
-      required: ['comment_id'],
-      additionalProperties: false,
-    },
-    handler: async ({ comment_id }) =>
-      apiCall('DELETE', `/comments/${encodeURIComponent(String(comment_id))}`, undefined, { requireAuth: true }),
   },
 ];
 
@@ -448,8 +408,8 @@ function buildServer() {
       instructions:
         'PreXiv is a community archive for manuscripts with explicit AI-use disclosure. ' +
         'Read tools (search/browse/get/comments/categories) work without auth. ' +
-        'Write tools (submit/edit/withdraw/comment/vote/flag/delete-comment) require PREXIV_TOKEN. ' +
-        'Manuscript ids may be either numeric or the human-readable form `prexiv:YYMM.NNNNN`. ' +
+        'Write tools (submit/revise/comment/vote) require PREXIV_TOKEN from an account verified through GitHub OAuth, ORCID OAuth, or email. ' +
+        'Manuscript ids may be either numeric or the human-readable form `prexiv:YYMMDD.xxxxxx`. ' +
         'For categories see prexiv_list_categories.',
     },
   );
