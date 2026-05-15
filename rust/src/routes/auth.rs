@@ -258,19 +258,28 @@ pub async fn do_register(
     // Mint a verification token and fire the email send in the background.
     // In production, email verification must happen through the mailbox.
     // The inline token fallback is dev-only unless explicitly enabled.
-    let pending_token = verify::mint_and_send(
+    let pending_token_result = verify::mint_and_send(
         &state.pool,
         user_id,
         &email,
         username,
         state.app_url.as_deref(),
     )
-    .await
-    .ok();
+    .await;
 
     login_session(&session, user_id)
         .await
         .map_err(crate::error::AppError::Other)?;
+
+    let mut verification_sent = true;
+    let pending_token = match pending_token_result {
+        Ok(token) => Some(token),
+        Err(e) => {
+            verification_sent = false;
+            tracing::error!(target: "prexiv::verify", error = %e, user_id, "registration verification email failed");
+            None
+        }
+    };
 
     if crate::email::inline_token_fallback_enabled() {
         if let Some(t) = pending_token {
@@ -278,10 +287,17 @@ pub async fn do_register(
         }
     }
 
-    set_flash(
-        &session,
-        "Welcome! Check your inbox for the verification link. Submission and API token minting are gated on verified email ownership."
-    ).await;
+    if verification_sent {
+        set_flash(
+            &session,
+            "Welcome! Check your inbox for the verification link. Submission and API token minting are gated on verified email ownership."
+        ).await;
+    } else {
+        set_flash(
+            &session,
+            "Account created, but PreXiv could not send the verification email because the mail provider rejected the message. Please contact the operator or retry after mail settings are fixed."
+        ).await;
+    }
     // Redirect to /me/edit so the verify banner is the first thing the
     // user sees post-register. They can browse and comment from here
     // (the topnav still works), but submit and tokens are gated.

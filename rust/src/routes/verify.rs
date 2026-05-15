@@ -110,7 +110,7 @@ pub async fn resend(
     // Mint a fresh token and send it. Production keeps the plaintext token
     // out of the browser; the inline fallback is dev-only unless explicitly
     // enabled.
-    let pending_token = verify::mint_and_send(
+    let pending_token = match verify::mint_and_send(
         &state.pool,
         user.id,
         &user.email,
@@ -118,7 +118,18 @@ pub async fn resend(
         state.app_url.as_deref(),
     )
     .await
-    .ok();
+    {
+        Ok(token) => Some(token),
+        Err(e) => {
+            tracing::error!(target: "prexiv::verify", error = %e, user_id = user.id, "verification email resend failed");
+            set_flash(
+                &session,
+                "We could not send the verification email. The mail provider rejected the message; please contact the operator or try again after mail settings are fixed.",
+            )
+            .await;
+            return Ok(Redirect::to("/me/edit").into_response());
+        }
+    };
     if crate::email::inline_token_fallback_enabled() {
         if let Some(t) = pending_token {
             let _ = session.insert("pending_verify_token", t).await;

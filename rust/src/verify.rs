@@ -9,7 +9,7 @@
 use std::time::Duration as StdDuration;
 
 use crate::db::DbPool;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use base64::Engine;
 use chrono::{Duration, NaiveDateTime, Utc};
 use rand::RngCore;
@@ -67,15 +67,13 @@ pub async fn invalidate_for_user(pool: &DbPool, user_id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Mint a token, build the verify URL, fire the outbound email in the
-/// background, and return the plaintext token so the caller can stash it
-/// in the session for an inline-verify-link fallback.
+/// Mint a token, build the verify URL, send the outbound email, and
+/// return the plaintext token so the caller can stash it in the session
+/// for an inline-verify-link fallback in development.
 ///
-/// We deliberately don't await the Gmail/HTTP send: it can take seconds
-/// (or minutes, if a provider's API is slow), and the registration
-/// response must complete promptly. The send is spawned with its own
-/// 12-second wall-clock cap so it can't pile up forever; failures are
-/// logged but otherwise invisible.
+/// The send is awaited with a short cap. Verification gates public write
+/// access, so telling the user "sent" when the mail provider rejected the
+/// message is worse than a slower response.
 pub async fn mint_and_send(
     pool: &DbPool,
     user_id: i64,
@@ -87,23 +85,12 @@ pub async fn mint_and_send(
     let base = app_url.unwrap_or("http://localhost:3001");
     let link = format!("{}/verify/{}", base.trim_end_matches('/'), token);
 
-    // Send in the background. We move owned copies of every &str so
-    // the spawn outlives the calling request.
-    let to = email.to_string();
-    let username_owned = username.to_string();
-    let link_for_send = link.clone();
-    tokio::spawn(async move {
-        let send_fut = crate::email::send_verification_email(&to, &username_owned, &link_for_send);
-        match tokio::time::timeout(StdDuration::from_secs(12), send_fut).await {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => {
-                tracing::error!(target: "prexiv::verify", error = %e, username = %username_owned, "verification email send failed");
-            }
-            Err(_) => {
-                tracing::error!(target: "prexiv::verify", username = %username_owned, "verification email send timed out after 12s");
-            }
-        }
-    });
+    let send_fut = crate::email::send_verification_email(email, username, &link);
+    match tokio::time::timeout(StdDuration::from_secs(12), send_fut).await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => return Err(e).context("sending verification email"),
+        Err(_) => return Err(anyhow!("verification email send timed out after 12s")),
+    }
 
     Ok(token)
 }
