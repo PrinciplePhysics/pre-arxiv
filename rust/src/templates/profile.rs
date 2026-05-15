@@ -20,6 +20,11 @@ const ORCID_BADGE_SVG: &str = r##"<svg viewBox="0 0 256 256" xmlns="http://www.w
 /// font so nothing extra has to load.
 const INST_BADGE_SVG: &str = r##"<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="128" cy="128" r="128" fill="#3a6f9c"/><g fill="#fff"><path d="M128 60 L62 96 L194 96 Z"/><rect x="58" y="100" width="140" height="9"/><rect x="68" y="114" width="12" height="56"/><rect x="92" y="114" width="12" height="56"/><rect x="116" y="114" width="12" height="56"/><rect x="140" y="114" width="12" height="56"/><rect x="164" y="114" width="12" height="56"/><rect x="58" y="174" width="140" height="11"/><rect x="50" y="188" width="156" height="6"/></g></svg>"##;
 
+/// GitHub account-control badge. We avoid external brand assets and
+/// render a compact "GH" mark so the profile page has no remote
+/// dependencies and no icon-font dependency.
+const GITHUB_BADGE_SVG: &str = r##"<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="128" cy="128" r="128" fill="#24292f"/><text x="128" y="149" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="86" font-weight="700" fill="#fff" letter-spacing="-6">GH</text></svg>"##;
+
 pub fn render(
     ctx: &PageCtx,
     u: &User,
@@ -48,7 +53,7 @@ pub fn render(
             div.profile-card-id {
                 div.profile-name-row {
                     h1.profile-name { (real_name) }
-                    @if u.is_orcid_oauth_verified() || u.is_verified_scholar() {
+                    @if u.is_orcid_oauth_verified() || u.is_verified_scholar() || u.is_github_oauth_verified() {
                         span.profile-name-badges aria-label="Profile trust signals" {
                             @if u.is_orcid_oauth_verified() {
                                 @let orcid = u.orcid.as_deref().unwrap_or("");
@@ -61,6 +66,35 @@ pub fn render(
                                   title=(orcid_title)
                                   aria-label=(orcid_aria) {
                                     (PreEscaped(ORCID_BADGE_SVG))
+                                }
+                            }
+                            @if u.is_github_oauth_verified() {
+                                @let gh_login = u.github_login.as_deref().unwrap_or("");
+                                @let gh_title = if gh_login.is_empty() {
+                                    "GitHub account verified".to_string()
+                                } else {
+                                    format!("GitHub account verified · @{gh_login}")
+                                };
+                                @let gh_aria = if gh_login.is_empty() {
+                                    "GitHub account verified".to_string()
+                                } else {
+                                    format!("GitHub account verified: @{gh_login}")
+                                };
+                                @if gh_login.is_empty() {
+                                    span.profile-name-badge.is-github
+                                      title=(gh_title)
+                                      aria-label=(gh_aria) {
+                                        (PreEscaped(GITHUB_BADGE_SVG))
+                                    }
+                                } @else {
+                                    @let gh_url = format!("https://github.com/{gh_login}");
+                                    a.profile-name-badge.is-github
+                                      href=(gh_url)
+                                      target="_blank" rel="noopener me"
+                                      title=(gh_title)
+                                      aria-label=(gh_aria) {
+                                        (PreEscaped(GITHUB_BADGE_SVG))
+                                    }
                                 }
                             }
                             @if u.is_verified_scholar() {

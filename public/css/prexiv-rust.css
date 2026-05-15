@@ -3406,8 +3406,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 
 /* ─── Profile verified-scholar pictorial badges ───────────────────
    Small circular SVG icons sitting at the end of the display-name
-   line, Twitter-verified-style. ORCID green + institutional
-   slate-blue. Pure inline SVG — no icon fonts, no remote images.
+   line, Twitter-verified-style. ORCID green, GitHub charcoal, and
+   institutional slate-blue. Pure inline SVG — no icon fonts, no remote images.
    The flex row keeps the badges vertically centered against the
    `<h1>` and lets them wrap below on a narrow viewport. */
 .profile-name-row {
@@ -3449,6 +3449,7 @@ a.profile-name-badge { cursor: pointer; }
   border-radius: 50%;
 }
 .profile-name-badge.is-orcid:hover svg { filter: drop-shadow(0 0 0.5px #A6CE39); }
+.profile-name-badge.is-github:hover svg { filter: drop-shadow(0 0 0.5px #24292f); }
 .profile-name-badge.is-inst:hover  svg { filter: drop-shadow(0 0 0.5px #3a6f9c); }
 
 /* ─── Homepage archive positioning ─────────────────────────────── */
