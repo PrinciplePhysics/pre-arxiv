@@ -80,9 +80,11 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                 (fmt_int(s.new_users_24h)) " new in 24h · "
                 (fmt_int(s.new_users_7d)) " new in 7d"
             }))
-            (stat_card("Verified users", s.email_verified_users, html! {
-                (percent(s.email_verified_users, s.total_users)) " of "
-                (fmt_int(s.total_users)) " accounts"
+            (stat_card("Account verified", s.account_verified_users, html! {
+                (percent(s.account_verified_users, s.total_users)) " of "
+                (fmt_int(s.total_users)) " accounts · "
+                (fmt_int(s.github_oauth_users)) " GitHub · "
+                (fmt_int(s.email_verified_users)) " email"
             }))
             (stat_card("Verified scholars", s.verified_scholar_users, html! {
                 (fmt_int(s.orcid_oauth_users)) " ORCID · "
@@ -257,7 +259,7 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                 div.admin-panel-head {
                     div {
                         h2 { "User growth" }
-                        p.muted { "New accounts by creation day; verified column reflects accounts already email-verified." }
+                        p.muted { "New accounts by creation day; verified column reflects accounts with email verification." }
                     }
                     span.admin-mini-stat { (fmt_int(s.total_users)) " total" }
                 }
@@ -375,7 +377,7 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                 div.admin-panel-head {
                     div {
                         h2 { "Unverified high-activity users" }
-                        p.muted { "Unverified accounts with submissions, comments, votes, or active API tokens." }
+                        p.muted { "Accounts without GitHub or email verification but with submissions, comments, votes, or active API tokens." }
                     }
                 }
                 @if dashboard.unverified_high_activity_users.is_empty() {
@@ -430,10 +432,16 @@ pub fn render_queue(ctx: &PageCtx, dashboard: &AdminDashboard, flags: &[FlagRow]
                                         }
                                     }
                                     td.admin-pill-stack {
-                                        @if u.email_verified {
-                                            (status_pill("email", "admin-pill-ok"))
+                                        @if u.account_verified {
+                                            (status_pill("account", "admin-pill-ok"))
                                         } @else {
                                             (status_pill("unverified", "admin-pill-warn"))
+                                        }
+                                        @if u.email_verified {
+                                            (status_pill("email", "admin-pill-ok"))
+                                        }
+                                        @if u.github_oauth_verified {
+                                            (status_pill("GitHub", "admin-pill-ok"))
                                         }
                                         @if u.orcid_oauth_verified {
                                             (status_pill("ORCID", "admin-pill-ok"))

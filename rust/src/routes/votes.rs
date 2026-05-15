@@ -41,7 +41,7 @@ pub async fn vote(
         return Ok(Redirect::to(&back).into_response());
     }
     if !user.is_verified_or_admin() {
-        set_flash(&session, "Verify your email before voting.").await;
+        set_flash(&session, "Connect GitHub or verify email before voting.").await;
         return Ok(Redirect::to(&back).into_response());
     }
     if !matches!(form.target_type.as_str(), "manuscript" | "comment") {

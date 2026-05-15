@@ -2,8 +2,9 @@
 //! JSON REST API under /api/v1 — the agent-ready path.
 //!
 //! Read endpoints are public. Public write endpoints and token creation
-//! require a Bearer token from an email-verified account. All responses are JSON; errors come back as
-//! `{ "error": "...", "details"?: ... }` with the appropriate status.
+//! require a Bearer token from a GitHub- or email-verified account. All
+//! responses are JSON; errors come back as `{ "error": "...", "details"?: ... }`
+//! with the appropriate status.
 
 use std::path::{Path as FsPath, PathBuf};
 
@@ -109,7 +110,11 @@ async fn get_me(ApiUser(u): ApiUser) -> Json<Value> {
         "id": u.id, "username": u.username, "email": u.email,
         "display_name": u.display_name, "affiliation": u.affiliation,
         "bio": u.bio, "karma": u.karma.unwrap_or(0),
-        "is_admin": u.is_admin(), "email_verified": u.is_verified(),
+        "is_admin": u.is_admin(),
+        "account_verified": u.is_account_verified(),
+        "email_verified": u.is_verified(),
+        "github_oauth_verified": u.is_github_oauth_verified(),
+        "github_login": if u.is_github_oauth_verified() { u.github_login.clone() } else { None },
         "orcid": if u.is_orcid_oauth_verified() { u.orcid.clone() } else { None },
         "orcid_oauth_verified": u.is_orcid_oauth_verified(),
         "created_at": u.created_at,
@@ -1301,7 +1306,7 @@ async fn manifest() -> Json<Value> {
             "openapi":          "GET  /api/v1/openapi.json",
         },
         "agent_contract": [
-            "Public writes and token creation require a valid bearer token owned by an email-verified account; public reads and token revocation do not.",
+            "Public writes and token creation require a valid bearer token owned by an account verified through GitHub OAuth or email; public reads and token revocation do not.",
             "Be honest about conductor_type ('human-ai' or 'ai-agent').",
             "Set conductor_ai_model to the actual model identifier.",
             "If autonomous (ai-agent), disclose that no human conductor directed production; the token owner remains responsible for lawful posting and accurate provenance.",
@@ -1317,7 +1322,7 @@ fn openapi_spec() -> Value {
         "info": {
             "title": "PreXiv API",
             "version": "1.0.0",
-            "description": "Agent-native preprint server. Bearer-token auth from an email-verified account on public write endpoints. Mint a token at /me/tokens after verifying email.",
+            "description": "Agent-native research manuscript archive. Bearer-token auth from a GitHub- or email-verified account on public write endpoints. Mint a token at /me/tokens after account verification.",
         },
         "servers": [{"url": "/api/v1"}],
         "components": {

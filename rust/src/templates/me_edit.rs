@@ -12,13 +12,16 @@ pub fn render(
     v: &EditValues,
     errors: &[String],
     pending_new_email: Option<&str>,
+    github_flash: Option<(&str, bool)>,
+    github_oauth_unavailable: Option<&str>,
     orcid_flash: Option<(&str, bool)>,
     orcid_oauth_unavailable: Option<&str>,
 ) -> Markup {
     let user = ctx.user.as_ref();
     let username = user.map(|u| u.username.as_str()).unwrap_or("");
     let email = user.map(|u| u.email.as_str()).unwrap_or("");
-    let verified = user.map(|u| u.is_verified()).unwrap_or(false);
+    let email_verified = user.map(|u| u.is_verified()).unwrap_or(false);
+    let account_verified = user.map(|u| u.is_verified_or_admin()).unwrap_or(false);
     let display_name_current = user.and_then(|u| u.display_name.as_deref()).unwrap_or("");
     let affiliation_current = user.and_then(|u| u.affiliation.as_deref()).unwrap_or("");
     let created_at = user.and_then(|u| u.created_at);
@@ -41,10 +44,18 @@ pub fn render(
                 dt { "E-mail" }
                 dd {
                     span.account-info-email.no-katex { (email) }
-                    @if verified {
+                    @if email_verified {
                         span.account-badge.account-badge-ok { "✓ verified" }
                     } @else {
                         span.account-badge.account-badge-warn { "⚠ not verified" }
+                    }
+                }
+                dt { "Account status" }
+                dd {
+                    @if account_verified {
+                        span.account-badge.account-badge-ok { "✓ write-enabled" }
+                    } @else {
+                        span.account-badge.account-badge-warn { "⚠ verification needed" }
                     }
                 }
                 dt { "Username" }
@@ -77,7 +88,7 @@ pub fn render(
             }
         }
 
-        @if !verified {
+        @if !account_verified {
             (verify_banner(&ctx.csrf_token, email, ctx.pending_verify_token.as_deref()))
         }
 
@@ -125,11 +136,49 @@ pub fn render(
                     code { "/top" } " " code { "/audited" }
                     ") only surface manuscripts from "
                     strong { "verified scholars" }
-                    ". Verification means either an authenticated ORCID OAuth binding or a verified email on an institutional domain (.edu, .ac.<cc>, .edu.<cc>, or our R&D-org allowlist). Unverified work is still reachable via "
+                    ". Scholar verification means either an authenticated ORCID OAuth binding or a verified email on an institutional domain (.edu, .ac.<cc>, .edu.<cc>, or our R&D-org allowlist). GitHub account verification unlocks writing, but does not by itself grant verified-scholar ranking. Other work remains reachable via "
                     code { "/browse" }
                     " and search; it just doesn't get the front-page slot."
                 }
                 (verified_scholar_status_panel(user, orcid_flash))
+            }
+
+            section.form-section {
+                h2 { "GitHub account verification" }
+                p.muted.small {
+                    "Connect through GitHub OAuth to unlock submissions, comments, votes, and API-token minting. PreXiv stores your GitHub numeric id and login, then discards the temporary OAuth token."
+                }
+                div.verified-scholar-panel {
+                    @if let Some((msg, is_err)) = github_flash {
+                        @let cls = if is_err { "vsp-flash vsp-flash-err" } else { "vsp-flash vsp-flash-ok" };
+                        div.(cls) role="status" aria-live="polite" {
+                            @if is_err {
+                                span.vsp-flash-icon aria-hidden="true" { "⚠" }
+                            } @else {
+                                span.vsp-flash-icon aria-hidden="true" { "✓" }
+                            }
+                            span.vsp-flash-msg { (msg) }
+                        }
+                    }
+                    (github_status_row(user))
+                }
+                div.orcid-oauth-card {
+                    div {
+                        strong { "Account-control proof" }
+                        p.muted.small.no-katex {
+                            @if let Some(msg) = github_oauth_unavailable {
+                                (msg)
+                            } @else {
+                                "You will be sent to github.com, sign in there, and authorize PreXiv to read your public GitHub identity."
+                            }
+                        }
+                    }
+                    @if github_oauth_unavailable.is_some() {
+                        button.btn-secondary type="button" disabled { "GitHub not configured" }
+                    } @else {
+                        a.btn-primary href="/me/github/connect" { "Connect with GitHub" }
+                    }
+                }
             }
 
             section.form-section {
@@ -234,22 +283,56 @@ fn verified_scholar_status_panel(
     }
 }
 
+fn github_status_row(user: Option<&crate::models::User>) -> Markup {
+    let github_verified = user.map(|u| u.is_github_oauth_verified()).unwrap_or(false);
+    let login = user
+        .and_then(|u| u.github_login.as_deref())
+        .unwrap_or("")
+        .trim();
+    html! {
+        div.vsp-row {
+            div.vsp-row-label {
+                strong { "Authenticated GitHub" }
+                @if github_verified && !login.is_empty() {
+                    " " code.no-katex { "@" (login) }
+                }
+                span.muted.small.no-katex {
+                    @if github_verified {
+                        "Connected through GitHub OAuth. This unlocks public write actions and API-token minting."
+                    } @else {
+                        "Not connected. This is the recommended account-verification path when email delivery is unavailable."
+                    }
+                }
+            }
+            div.vsp-row-status {
+                @if github_verified {
+                    span.vsp-pill.vsp-pill-ok { "write-enabled" }
+                } @else {
+                    span.vsp-pill.vsp-pill-pending { "not connected" }
+                }
+            }
+        }
+    }
+}
+
 /// Banner shown at the top of /me/edit (and /submit) when the current
-/// user's email isn't verified.
+/// user's account is not write-enabled yet.
 pub fn verify_banner(csrf_token: &str, email: &str, pending_token: Option<&str>) -> Markup {
     html! {
         div.verify-banner role="status" {
             @if let Some(token) = pending_token {
                 div.verify-banner-text {
-                    strong { "Email not verified yet." }
+                    strong { "Account verification required." }
                     " "
-                    "Click the button to verify your email and unlock manuscript submission. "
-                    "A copy has also been sent to "
+                    "Connect GitHub on "
+                    a href="/me/edit" { "your profile" }
+                    " to unlock public writes, or use the email fallback below. A verification email was sent to "
                     strong { (email) }
                     "."
                 }
                 div.verify-banner-actions {
-                    a.btn-primary href={ "/verify/" (token) } { "Verify my email →" }
+                    a.btn-primary href="/me/edit" { "Connect GitHub" }
+                    a.btn-secondary href={ "/verify/" (token) } { "Verify email" }
                     form.verify-banner-resend method="post" action="/me/resend-verification" {
                         input type="hidden" name="csrf_token" value=(csrf_token);
                         button.btn-secondary type="submit" { "New link" }
@@ -257,11 +340,13 @@ pub fn verify_banner(csrf_token: &str, email: &str, pending_token: Option<&str>)
                 }
             } @else {
                 div.verify-banner-text {
-                    strong { "Email not verified yet." }
+                    strong { "Account verification required." }
                     " "
-                    "We sent a verification link to "
+                    "Connect GitHub on "
+                    a href="/me/edit" { "your profile" }
+                    " to unlock public writes. Email verification is still available as a fallback; we sent a link to "
                     strong { (email) }
-                    " when you registered. Click the link in that email to enable manuscript submission. If you didn't get it, resend it now:"
+                    " when you registered."
                 }
                 form.verify-banner-resend method="post" action="/me/resend-verification" {
                     input type="hidden" name="csrf_token" value=(csrf_token);

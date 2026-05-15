@@ -25,7 +25,9 @@ pub struct AdminStats {
     pub stored_pdfs: i64,
     pub stored_sources: i64,
     pub total_users: i64,
+    pub account_verified_users: i64,
     pub email_verified_users: i64,
+    pub github_oauth_users: i64,
     pub admin_users: i64,
     pub verified_scholar_users: i64,
     pub orcid_oauth_users: i64,
@@ -86,7 +88,9 @@ pub struct RecentSubmissionRow {
 pub struct RecentUserRow {
     pub username: String,
     pub display_name: Option<String>,
+    pub account_verified: bool,
     pub email_verified: bool,
+    pub github_oauth_verified: bool,
     pub is_admin: bool,
     pub orcid_oauth_verified: bool,
     pub institutional_email: bool,
@@ -299,17 +303,21 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
 
     let (
         total_users,
+        account_verified_users,
         email_verified_users,
+        github_oauth_users,
         admin_users,
         verified_scholar_users,
         orcid_oauth_users,
         institutional_verified_users,
         new_users_7d,
         new_users_24h,
-    ): (i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
+    ): (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
         crate::db::pg(r#"SELECT
               COUNT(*),
+              COALESCE(SUM(CASE WHEN email_verified != 0 OR github_oauth_verified != 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN email_verified != 0 THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN github_oauth_verified != 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE WHEN is_admin != 0 THEN 1 ELSE 0 END), 0),
               COALESCE(SUM(CASE
                   WHEN orcid_oauth_verified != 0
@@ -479,6 +487,7 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
               GROUP BY user_id
            ) t ON t.user_id = u.id
            WHERE u.email_verified = 0
+             AND u.github_oauth_verified = 0
              AND (COALESCE(m.manuscript_count, 0)
                 + COALESCE(c.comment_count, 0)
                 + COALESCE(v.vote_count, 0)
@@ -590,9 +599,10 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
         i64,
         i64,
         i64,
+        i64,
         Option<NaiveDateTime>,
     )> = sqlx::query_as(crate::db::pg(
-        r#"SELECT username, display_name, email_verified, is_admin,
+        r#"SELECT username, display_name, email_verified, github_oauth_verified, is_admin,
                   orcid_oauth_verified, institutional_email, created_at
            FROM users
            ORDER BY id DESC
@@ -607,6 +617,7 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
                 username,
                 display_name,
                 email_verified,
+                github_oauth_verified,
                 is_admin,
                 orcid_oauth_verified,
                 institutional_email,
@@ -614,7 +625,9 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
             )| RecentUserRow {
                 username,
                 display_name,
+                account_verified: email_verified != 0 || github_oauth_verified != 0,
                 email_verified: email_verified != 0,
+                github_oauth_verified: github_oauth_verified != 0,
                 is_admin: is_admin != 0,
                 orcid_oauth_verified: orcid_oauth_verified != 0,
                 institutional_email: institutional_email != 0,
@@ -638,7 +651,9 @@ async fn load_dashboard(state: &AppState) -> AppResult<AdminDashboard> {
             stored_pdfs,
             stored_sources,
             total_users,
+            account_verified_users,
             email_verified_users,
+            github_oauth_users,
             admin_users,
             verified_scholar_users,
             orcid_oauth_users,

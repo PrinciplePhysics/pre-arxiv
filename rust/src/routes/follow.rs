@@ -27,7 +27,11 @@ pub async fn follow(
         return Ok(Redirect::to(&format!("/u/{username}")).into_response());
     }
     if !me.is_verified_or_admin() {
-        set_flash(&session, "Verify your email before following users.").await;
+        set_flash(
+            &session,
+            "Connect GitHub or verify email before following users.",
+        )
+        .await;
         return Ok(Redirect::to(&format!("/u/{username}")).into_response());
     }
     let target: Option<(i64,)> =

@@ -99,7 +99,8 @@ pub async fn find_user_by_bearer(pool: &DbPool, plain: &str) -> Option<User> {
         r#"SELECT id, username, email, display_name, affiliation, bio,
                   karma, is_admin, email_verified, orcid, created_at,
                   email_enc, orcid_verified, institutional_email,
-                  orcid_oauth_verified, orcid_oauth_verified_at, orcid_oauth_sub
+                  orcid_oauth_verified, orcid_oauth_verified_at, orcid_oauth_sub,
+                  github_oauth_verified, github_oauth_verified_at, github_id, github_login
            FROM users WHERE id = ?"#,
     ))
     .bind(user_id)
@@ -158,8 +159,8 @@ where
     }
 }
 
-/// Same as ApiUser but the user must be email_verified. Mirrors the JS
-/// `requireApiVerified` gate on POST /manuscripts.
+/// Same as ApiUser but the user must have account-control verification
+/// through email or GitHub OAuth, unless they are an admin.
 pub struct ApiVerifiedUser(pub User);
 
 impl<S> FromRequestParts<S> for ApiVerifiedUser
@@ -170,12 +171,14 @@ where
     type Rejection = Response;
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let ApiUser(u) = ApiUser::from_request_parts(parts, state).await?;
-        if u.is_verified() || u.is_admin() {
+        if u.is_verified_or_admin() {
             Ok(ApiVerifiedUser(u))
         } else {
             Err((
                 StatusCode::FORBIDDEN,
-                Json(json!({"error": "email not verified — verify your account first"})),
+                Json(json!({
+                    "error": "account not verified — connect GitHub or verify email first"
+                })),
             )
                 .into_response())
         }

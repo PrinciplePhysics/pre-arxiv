@@ -125,8 +125,8 @@ async fn render_view(
     .fetch_all(&state.pool)
     .await?;
 
-    let submitter: Option<(String, Option<String>, i64, i64, i64)> = sqlx::query_as(crate::db::pg(
-        "SELECT username, display_name, email_verified, institutional_email, orcid_oauth_verified
+    let submitter: Option<(String, Option<String>, i64, i64, i64, i64)> = sqlx::query_as(crate::db::pg(
+        "SELECT username, display_name, email_verified, institutional_email, orcid_oauth_verified, github_oauth_verified
            FROM users WHERE id = ?",
     ))
     .bind(m.submitter_id)

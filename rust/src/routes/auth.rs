@@ -290,12 +290,12 @@ pub async fn do_register(
     if verification_sent {
         set_flash(
             &session,
-            "Welcome! Check your inbox for the verification link. Submission and API token minting are gated on verified email ownership."
+            "Welcome. Connect GitHub from your profile to unlock submissions and API tokens. Email verification remains available as a fallback."
         ).await;
     } else {
         set_flash(
             &session,
-            "Account created, but PreXiv could not send the verification email because the mail provider rejected the message. Please contact the operator or retry after mail settings are fixed."
+            "Account created. Email delivery is unavailable, so connect GitHub from your profile to unlock submissions and API tokens."
         ).await;
     }
     // Redirect to /me/edit so the verify banner is the first thing the

@@ -101,7 +101,11 @@ pub async fn show(
         return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
     if !user.is_verified_or_admin() {
-        set_flash(&session, "Verify your email before revising a manuscript.").await;
+        set_flash(
+            &session,
+            "Connect GitHub or verify email before revising a manuscript.",
+        )
+        .await;
         return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
     if m.is_withdrawn() {
@@ -137,7 +141,11 @@ pub async fn submit(
         return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
     if !user.is_verified_or_admin() {
-        set_flash(&session, "Verify your email before revising a manuscript.").await;
+        set_flash(
+            &session,
+            "Connect GitHub or verify email before revising a manuscript.",
+        )
+        .await;
         return Ok(Redirect::to(&format!("/abs/{}", slug_for(&m))).into_response());
     }
     if m.is_withdrawn() {

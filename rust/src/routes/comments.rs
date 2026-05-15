@@ -28,7 +28,11 @@ pub async fn post_comment(
         return Ok(Redirect::to(&format!("/abs/{id}")).into_response());
     }
     if !user.is_verified_or_admin() {
-        set_flash(&session, "Verify your email before commenting.").await;
+        set_flash(
+            &session,
+            "Connect GitHub or verify email before commenting.",
+        )
+        .await;
         return Ok(Redirect::to(&format!("/abs/{id}")).into_response());
     }
     let content = form.content.trim();

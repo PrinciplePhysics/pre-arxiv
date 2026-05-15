@@ -80,7 +80,11 @@ pub async fn create(
         return Ok(Redirect::to("/me/tokens").into_response());
     }
     if !user.is_verified_or_admin() {
-        set_flash(&session, "Verify your email before minting API tokens.").await;
+        set_flash(
+            &session,
+            "Connect GitHub or verify email before minting API tokens.",
+        )
+        .await;
         return Ok(Redirect::to("/me/tokens").into_response());
     }
     let name = form.name.trim();

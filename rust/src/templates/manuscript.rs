@@ -35,7 +35,7 @@ pub fn render(
     ctx: &PageCtx,
     m: &Manuscript,
     comments: &[CommentWithAuthor],
-    submitter: Option<&(String, Option<String>, i64, i64, i64)>,
+    submitter: Option<&(String, Option<String>, i64, i64, i64, i64)>,
     cats: &[(String, i64)],
     my_vote: i64,
 ) -> Markup {
@@ -43,12 +43,21 @@ pub fn render(
     let slug = m.arxiv_like_id.as_deref().unwrap_or("");
     let public_slug = slug.strip_prefix("prexiv:").unwrap_or(slug);
     let submitter_verified_scholar = submitter
-        .map(|(_, _, ev, ie, oo)| *oo != 0 || (*ev != 0 && *ie != 0))
+        .map(|(_, _, ev, ie, oo, _)| *oo != 0 || (*ev != 0 && *ie != 0))
         .unwrap_or(false);
     let cat_restricted = crate::categories::is_restricted(&m.category);
-    let submitter_email_verified = submitter.map(|(_, _, ev, _, _)| *ev != 0).unwrap_or(false);
-    let submitter_institutional_email = submitter.map(|(_, _, _, ie, _)| *ie != 0).unwrap_or(false);
-    let submitter_orcid_authenticated = submitter.map(|(_, _, _, _, oo)| *oo != 0).unwrap_or(false);
+    let submitter_email_verified = submitter
+        .map(|(_, _, ev, _, _, _)| *ev != 0)
+        .unwrap_or(false);
+    let submitter_institutional_email = submitter
+        .map(|(_, _, _, ie, _, _)| *ie != 0)
+        .unwrap_or(false);
+    let submitter_orcid_authenticated = submitter
+        .map(|(_, _, _, _, oo, _)| *oo != 0)
+        .unwrap_or(false);
+    let submitter_github_verified = submitter
+        .map(|(_, _, _, _, _, gh)| *gh != 0)
+        .unwrap_or(false);
     let self_audited = is_self_audited(m);
     let hosted_source = m
         .source_path
@@ -397,7 +406,7 @@ pub fn render(
                     h3 { "Trust and subject" }
                     div.bx-subject-compact {
                         a.ms-cat-pill href={ "/browse/" (m.category) } { (m.category) }
-                        @if let Some((un, dn, ev, ie, oo)) = submitter {
+                        @if let Some((un, dn, ev, ie, oo, _gh)) = submitter {
                             span.muted.small {
                                 "by "
                                 a href={ "/u/" (un) } { (dn.as_deref().unwrap_or(un.as_str())) }
@@ -411,6 +420,9 @@ pub fn render(
                     div.trust-badges aria-label="Trust and provenance badges" {
                         @if submitter_email_verified {
                             (trust_badge("Email verified", "The submitter confirmed control of their account email address."))
+                        }
+                        @if submitter_github_verified {
+                            (trust_badge("GitHub verified", "The submitter connected a GitHub account through OAuth. This is an account-control signal, not a scholarly-identity signal."))
                         }
                         @if submitter_orcid_authenticated {
                             (trust_badge("ORCID authenticated", "The submitter connected ORCID through OAuth."))
@@ -437,7 +449,7 @@ pub fn render(
                             (trust_badge("Redacted artifact", "The public source artifact has private conductor or model details blacked out before serving."))
                         }
                     }
-                    @if !submitter_email_verified && !submitter_orcid_authenticated && !submitter_institutional_email && m.has_auditor == 0 {
+                    @if !submitter_email_verified && !submitter_github_verified && !submitter_orcid_authenticated && !submitter_institutional_email && m.has_auditor == 0 {
                         p.muted.small style="margin:8px 0 0" {
                             "No submitter identity or audit badge is available for this record."
                         }

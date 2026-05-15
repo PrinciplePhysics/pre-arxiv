@@ -57,6 +57,33 @@ pub async fn set_orcid_flash(session: &Session, msg: impl Into<String>, is_error
         .await;
 }
 
+// ─── GitHub OAuth inline feedback ─────────────────────────────────────
+
+const SESSION_GITHUB_FLASH_KEY: &str = "github_verify_flash";
+
+pub async fn take_github_flash(session: &Session) -> Option<(String, bool)> {
+    let raw: Option<String> = session.get(SESSION_GITHUB_FLASH_KEY).await.ok().flatten();
+    if raw.is_some() {
+        let _ = session.remove::<String>(SESSION_GITHUB_FLASH_KEY).await;
+    }
+    raw.map(|s| {
+        if let Some(rest) = s.strip_prefix("ok:") {
+            (rest.to_string(), false)
+        } else if let Some(rest) = s.strip_prefix("err:") {
+            (rest.to_string(), true)
+        } else {
+            (s, true)
+        }
+    })
+}
+
+pub async fn set_github_flash(session: &Session, msg: impl Into<String>, is_error: bool) {
+    let prefix = if is_error { "err:" } else { "ok:" };
+    let _ = session
+        .insert(SESSION_GITHUB_FLASH_KEY, format!("{prefix}{}", msg.into()))
+        .await;
+}
+
 pub async fn build_ctx(
     session: &Session,
     MaybeUser(user): MaybeUser,

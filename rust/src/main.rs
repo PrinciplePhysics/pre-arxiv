@@ -27,6 +27,7 @@ mod db;
 mod email;
 mod email_change;
 mod error;
+mod github;
 mod helpers;
 mod licenses;
 mod markdown;

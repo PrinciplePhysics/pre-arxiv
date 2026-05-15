@@ -10,7 +10,7 @@
 //!   POST /c/{id}/flag    — flag a comment by its DB id
 //!
 //! Both require a logged-in account (RequireUser) and CSRF. Reason is
-//! free-form text capped at 500 chars. We require email verification
+//! free-form text capped at 500 chars. We require account verification
 //! because flags create moderator workload. Anonymous reports are not
 //! supported, by design: every flag carries a reporter we can trace if
 //! the system is abused.
@@ -76,7 +76,11 @@ pub async fn flag_manuscript(
         return Ok(Redirect::to(&back).into_response());
     }
     if !user.is_verified_or_admin() {
-        set_flash(&session, "Verify your email before flagging content.").await;
+        set_flash(
+            &session,
+            "Connect GitHub or verify email before flagging content.",
+        )
+        .await;
         return Ok(Redirect::to(&back).into_response());
     }
 
@@ -139,7 +143,11 @@ pub async fn flag_comment(
         return Ok(Redirect::to(&back).into_response());
     }
     if !user.is_verified_or_admin() {
-        set_flash(&session, "Verify your email before flagging content.").await;
+        set_flash(
+            &session,
+            "Connect GitHub or verify email before flagging content.",
+        )
+        .await;
         return Ok(Redirect::to(&back).into_response());
     }
 

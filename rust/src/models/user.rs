@@ -43,6 +43,20 @@ pub struct User {
     #[serde(default)]
     #[sqlx(default)]
     pub orcid_oauth_sub: Option<String>,
+    /// Authenticated GitHub account binding. Used as account-control
+    /// verification for write access, not as a scholarly trust signal.
+    #[serde(default)]
+    #[sqlx(default)]
+    pub github_oauth_verified: i64,
+    #[serde(default)]
+    #[sqlx(default)]
+    pub github_oauth_verified_at: Option<NaiveDateTime>,
+    #[serde(default)]
+    #[sqlx(default)]
+    pub github_id: Option<String>,
+    #[serde(default)]
+    #[sqlx(default)]
+    pub github_login: Option<String>,
 }
 
 impl User {
@@ -52,8 +66,18 @@ impl User {
     pub fn is_verified(&self) -> bool {
         self.email_verified != 0
     }
+    pub fn is_github_oauth_verified(&self) -> bool {
+        self.github_oauth_verified != 0
+    }
+    /// Account-control verification for public writes and API token
+    /// minting. This is intentionally broader than `is_verified_scholar`:
+    /// a GitHub OAuth binding proves account control well enough to deter
+    /// throwaway abuse, but it is not a research-identity trust badge.
+    pub fn is_account_verified(&self) -> bool {
+        self.is_verified() || self.is_github_oauth_verified()
+    }
     pub fn is_verified_or_admin(&self) -> bool {
-        self.is_verified() || self.is_admin()
+        self.is_account_verified() || self.is_admin()
     }
     /// `true` if the user has an authenticated ORCID OAuth binding, or
     /// has verified ownership of an institutional-looking email domain.
